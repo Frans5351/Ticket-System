@@ -1,0 +1,10 @@
+{
+  "name": "park-manor-statements",
+  "version": "1.0.0",
+  "description": "Park Manor Body Corporate Statement Viewer",
+  "dependencies": {
+    "@netlify/blobs": "^7.0.0",
+    "@simplewebauthn/server": "^11.0.0",
+    "busboy": "^1.6.0"
+  }
+}

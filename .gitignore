@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.netlify/
+public/park_manor_attachments/
+park_manor_attachments/
+.DS_Store
+Thumbs.db
+*.log
