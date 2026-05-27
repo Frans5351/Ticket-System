@@ -660,6 +660,74 @@ async function checkStorageSetup(){
     background:inherit !important;
   }
 
+  /* ── Clean theme ─────────────────────────────────────────────────────
+     A soft, warm-neutral light look: gentle grey page, crisp white cards,
+     restrained borders and a strong title hierarchy. Mirrors the structure
+     of the light theme but with a calmer, less-blue palette. */
+  body.theme-clean{
+    --bg:#f4f4f6;            /* soft warm-grey page */
+    --surface:#ffffff;        /* white cards / header / modals */
+    --surface2:#f7f7f9;       /* very light inner surface */
+    --border:#e4e4ea;         /* light neutral border */
+    --border2:#d3d3db;        /* slightly darker neutral border */
+    --text:#1c1c22;           /* near-black text for strong titles */
+    --muted:#8a8a96;          /* dimmed metadata grey */
+    --accent:#5b48d8;
+    --accent2:#7c6df2;
+    --green:#0f9d63;
+    --red:#d54a4a;
+  }
+  body.theme-clean #ticket-modal > div,
+  body.theme-clean #ticket-modal-card,
+  body.theme-clean #login-modal > div,
+  body.theme-clean #settings-modal > div,
+  body.theme-clean #user-modal > div,
+  body.theme-clean #inv-modal > div,
+  body.theme-clean #role-perms-modal > div,
+  body.theme-clean #user-perms-modal > div{
+    background:#ffffff !important;
+    border-color:#e4e4ea !important;
+    color:#1c1c22;
+    box-shadow:0 20px 60px rgba(40,40,55,.16) !important;
+  }
+  body.theme-clean input[type="text"],
+  body.theme-clean input[type="password"],
+  body.theme-clean input[type="email"],
+  body.theme-clean input[type="date"],
+  body.theme-clean input[type="number"],
+  body.theme-clean input[type="search"],
+  body.theme-clean textarea,
+  body.theme-clean select{
+    background:#f7f7f9 !important;
+    color:#1c1c22 !important;
+    border-color:#d3d3db !important;
+  }
+  body.theme-clean input::placeholder,
+  body.theme-clean textarea::placeholder{ color:#a0a0ac !important; }
+  body.theme-clean .header{ background:#ffffff; border-bottom-color:#e4e4ea; }
+  body.theme-clean .header-logo .name{ color:#1c1c22; }
+  body.theme-clean .tab{ color:#8a8a96; }
+  body.theme-clean .tab.active{ color:#5b48d8; }
+  body.theme-clean .tab:hover{ color:#1c1c22; }
+  body.theme-clean button[style*="background:#111827"],
+  body.theme-clean button[style*="background:#1a2235"]{ background:#f7f7f9 !important; color:#1c1c22 !important; }
+  body.theme-clean .tkt-log-entry{ background:#f7f7f9; color:#1c1c22; }
+  body.theme-clean .tkt-card{ background:#ffffff; border-color:#e4e4ea; }
+  body.theme-clean .tkt-card:hover{ border-color:#5b48d8; }
+  body.theme-clean .tkt-card div[style*="color:#c8d8f0"],
+  body.theme-clean .tkt-card span[style*="color:#c8d8f0"]{ color:#1c1c22; }
+  body.theme-clean .tkt-card.status-awaiting_trustee_approval{
+    box-shadow:0 0 0 1px rgba(123,104,238,.22), 0 2px 14px rgba(123,104,238,.10);
+  }
+  body.theme-clean .tkt-card.status-awaiting_trustee_approval:hover{
+    box-shadow:0 0 0 1px rgba(123,104,238,.4), 0 4px 18px rgba(123,104,238,.2);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    body.theme-clean .tkt-card.status-awaiting_trustee_approval{
+      animation: pm-pulse-awaiting-light 2.4s ease-in-out infinite;
+    }
+  }
+
   body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px;line-height:1.5}
   .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:200}
   .header-logo .name{font-size:16px;font-weight:600;letter-spacing:-.3px}
@@ -1892,7 +1960,12 @@ const fmtDate=s=>{if(!s)return '—';const[y,m,d]=s.split('-');return `${+d} ${[
 const monthKey=s=>s?s.slice(0,7):'0000-00';
 const fmtMonth=k=>{if(!k||k==='0000-00')return '';const[y,m]=k.split('-');return ['January','February','March','April','May','June','July','August','September','October','November','December'][+m-1]+' '+y;};
 
-const DATA=RAW.map(t=>({...t,cat:getCat(t)}));
+// The RAW dataset below is Park Manor's own bank history, hardcoded into the
+// app. It must only ever be shown for the default Park Manor scheme — any other
+// scheme would otherwise incorrectly display Park Manor's private financials.
+// For non-default schemes we start empty (the Transactions / Expenses / Income
+// screens all read from DATA via mfGetData, so they all go empty together).
+const DATA=(CURRENT_SCHEME===SCHEME_DEFAULT_ID)?RAW.map(t=>({...t,cat:getCat(t)})):[];
 
 // ── Transactions tab ──────────────────────────────────────────────────────
 const files=[...new Set(DATA.map(t=>t.file).filter(Boolean))].sort();
@@ -3562,11 +3635,14 @@ async function deleteInvoice(invId){
   renderInvoices();
 }
 
-// Find docs tagged "Supporting Evidence" that no ticket and no transaction
-// references. These accumulate when tickets are deleted (the photos attached
-// via the resident submit flow live in INVOICES but have no use without a
-// parent ticket). Returns the list of orphan ids — does NOT delete.
-function findOrphanedSupportingEvidence(){
+// Find orphaned documents of a given docType — i.e. docs that no ticket and no
+// transaction references. These accumulate when tickets are deleted (e.g. photos
+// attached via the resident submit flow live in INVOICES but have no use without
+// a parent ticket). Pass a specific docType (e.g. 'Supporting Evidence'), or
+// '*'/'' to scan ALL document types. Returns the list of orphan ids — does NOT
+// delete.
+function findOrphanedDocs(docType){
+  var all = (!docType || docType === '*');
   // Build set of all currently-referenced invoice ids
   var stillLinkedToTicket = {};
   Object.values(TICKETS).forEach(function(t){
@@ -3574,40 +3650,94 @@ function findOrphanedSupportingEvidence(){
   });
   var orphans = [];
   Object.values(INVOICES).forEach(function(inv){
-    if(inv.docType !== 'Supporting Evidence') return;
+    if(!all && inv.docType !== docType) return;
     if(stillLinkedToTicket[inv.id]) return;
-    if((inv.linkedTxKeys||[]).length > 0) return; // belt and braces
+    if((inv.linkedTxKeys||[]).length > 0) return; // belt and braces — still linked to a transaction
     orphans.push(inv.id);
   });
   return orphans;
 }
 
-// Delete every orphaned Supporting Evidence doc. Used by deleteTicket (silent)
-// and by the manual Settings → Maintenance button (with confirmation).
-// Returns the number deleted.
-async function purgeOrphanedSupportingEvidence(silent){
-  var orphans = findOrphanedSupportingEvidence();
+// Count orphans grouped by docType — used by the Maintenance UI to preview how
+// many of each type would be purged. Returns an object { docType: count, ... }
+// plus a `_total` key.
+function countOrphanedDocsByType(){
+  var ids = findOrphanedDocs('*');
+  var byType = { _total: ids.length };
+  ids.forEach(function(id){
+    var inv = INVOICES[id];
+    var t = (inv && inv.docType) ? inv.docType : '(untyped)';
+    byType[t] = (byType[t]||0) + 1;
+  });
+  return byType;
+}
+
+// Backward-compatible wrapper — existing callers (e.g. deleteTicket's silent
+// cleanup) still call this name and expect Supporting Evidence specifically.
+function findOrphanedSupportingEvidence(){
+  return findOrphanedDocs('Supporting Evidence');
+}
+
+// Delete every orphaned document of the given docType ('*'/'' = all types).
+// Used by deleteTicket (silent) and by the Settings → Maintenance UI (with
+// confirmation). Returns the number deleted.
+async function purgeOrphanedDocs(docType, silent){
+  var orphans = findOrphanedDocs(docType);
+  var typeLabel = (!docType || docType === '*') ? 'orphaned' : ('orphaned ' + docType);
   if(!orphans.length){
-    if(!silent) alert('No orphaned Supporting Evidence documents found.');
+    if(!silent) alert('No ' + typeLabel + ' documents found.');
     return 0;
   }
   if(!silent){
-    if(!confirm('Permanently delete '+orphans.length+' orphaned Supporting Evidence document'+(orphans.length!==1?'s':'')+' (photos no longer attached to any ticket)?\n\nThis cannot be undone.')) return 0;
+    if(!confirm('Permanently delete '+orphans.length+' '+typeLabel+' document'+(orphans.length!==1?'s':'')+' (no longer attached to any ticket)?\n\nThis cannot be undone.')) return 0;
   }
-  console.log('purgeOrphanedSupportingEvidence: deleting', orphans.length, 'orphan(s):', orphans);
+  console.log('purgeOrphanedDocs: deleting', orphans.length, 'orphan(s) of type', docType||'*', ':', orphans);
   for(var i=0;i<orphans.length;i++){
     var id = orphans[i];
     delete INVOICES[id];
     try { await deleteInvoiceData(id); }
-    catch(e){ console.warn('purgeOrphanedSupportingEvidence: deleteInvoiceData failed for', id, e); }
+    catch(e){ console.warn('purgeOrphanedDocs: deleteInvoiceData failed for', id, e); }
   }
   try { localStorage.setItem('pm_inv_index', JSON.stringify(Object.keys(INVOICES))); } catch(e){}
   rebuildInvTxMap();
   if(!silent){
     renderInvoices();
-    alert('Deleted '+orphans.length+' orphaned document'+(orphans.length!==1?'s':'')+'.');
+    if(typeof refreshMaintenanceOrphanCount === 'function') refreshMaintenanceOrphanCount();
+    alert('Deleted '+orphans.length+' '+typeLabel+' document'+(orphans.length!==1?'s':'')+'.');
   }
   return orphans.length;
+}
+
+// Backward-compatible wrapper for the original Supporting-Evidence-only purge.
+async function purgeOrphanedSupportingEvidence(silent){
+  return await purgeOrphanedDocs('Supporting Evidence', silent);
+}
+
+// Update the live orphan-count line under the Maintenance document-type picker.
+// Shows how many orphans match the selected type, plus the all-types total.
+function refreshMaintenanceOrphanCount(){
+  var el = document.getElementById('purge-orphan-count');
+  if(!el) return;
+  var sel = (document.getElementById('purge-doctype')||{}).value || 'Supporting Evidence';
+  var byType = countOrphanedDocsByType();
+  var total = byType._total || 0;
+  if(sel === '*'){
+    if(!total){ el.innerHTML = 'No orphaned documents found.'; return; }
+    var parts = Object.keys(byType).filter(function(k){ return k!=='_total'; })
+      .map(function(k){ return escHtml(k)+': '+byType[k]; });
+    el.innerHTML = '<b style="color:#f59e0b">'+total+'</b> orphaned document'+(total!==1?'s':'')+' across all types &nbsp;·&nbsp; '+parts.join(' · ');
+  } else {
+    var n = byType[sel] || 0;
+    el.innerHTML = n
+      ? '<b style="color:#f59e0b">'+n+'</b> orphaned <b style="color:#c8d8f0">'+escHtml(sel)+'</b> document'+(n!==1?'s':'')+' will be purged.'
+      : 'No orphaned <b style="color:#c8d8f0">'+escHtml(sel)+'</b> documents found.';
+  }
+}
+
+// Purge handler wired to the Maintenance UI's document-type dropdown.
+async function purgeSelectedOrphanType(){
+  var sel = (document.getElementById('purge-doctype')||{}).value || 'Supporting Evidence';
+  await purgeOrphanedDocs(sel, false);
 }
 
 // ── Transaction row invoice badge ─────────────────────────────────────────
@@ -5400,6 +5530,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
           </select>
           <button type="button" onclick="tktAssignSupplierFromDropdown()" style="padding:7px 14px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">+ Assign</button>
         </div>
+        <div id="tkt-quote-received-banner" style="display:none;margin-bottom:10px"></div>
         <div id="tkt-assigned-suppliers" style="display:flex;flex-direction:column;gap:8px"></div>
       </div>
     </div>
@@ -5859,7 +5990,7 @@ function clearLocalSession(){
 // The light theme is applied via `body.theme-light` so all CSS variables
 // flip automatically (plus the explicit overrides in the stylesheet).
 var THEME_KEY = 'pm_theme';
-var THEMES = ['dark', 'light', 'green'];
+var THEMES = ['dark', 'light', 'green', 'clean'];
 function getTheme(){
   try {
     var v = localStorage.getItem(THEME_KEY);
@@ -5868,14 +5999,15 @@ function getTheme(){
 }
 function applyTheme(theme){
   // Remove all theme classes, then add the active one
-  document.body.classList.remove('theme-light', 'theme-green');
+  document.body.classList.remove('theme-light', 'theme-green', 'theme-clean');
   if(theme === 'light') document.body.classList.add('theme-light');
   else if(theme === 'green') document.body.classList.add('theme-green');
+  else if(theme === 'clean') document.body.classList.add('theme-clean');
   // Update the toggle button icon to show CURRENT theme (so user sees what
   // they're in; clicking advances to the next).
   var btn = document.getElementById('theme-toggle-btn');
   if(btn){
-    btn.textContent = theme === 'light' ? '☀️' : theme === 'green' ? '🌿' : '🌙';
+    btn.textContent = theme === 'light' ? '☀️' : theme === 'green' ? '🌿' : theme === 'clean' ? '✨' : '🌙';
     btn.title = 'Theme: ' + theme.charAt(0).toUpperCase() + theme.slice(1) + ' — click to cycle';
   }
 }
@@ -6018,15 +6150,14 @@ function postLoginUiSetup(userObj, opts){
   }
   // Per-role default ticket filter. Trustees specifically land on the list
   // pre-filtered to the status that needs their action (Awaiting Trustee
-  // Approval). Other roles get the standard active-statuses-only view.
-  // The user can still toggle other chips on within the session.
+  // Approval). All other roles land on Open tickets only — the cleanest
+  // starting view. The user can still toggle other chips on within the session.
   if(typeof _ticketStatusFilter !== 'undefined'){
     Object.keys(_ticketStatusFilter).forEach(function(k){ _ticketStatusFilter[k] = false; });
     if(userObj.role === 'trustee' || userObj.role === 'management'){
       _ticketStatusFilter.awaiting_trustee_approval = true;
     } else {
-      ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress']
-        .forEach(function(k){ _ticketStatusFilter[k] = true; });
+      _ticketStatusFilter.open = true;
     }
     // The chip strip was rendered earlier on DOMContentLoaded with the
     // pre-login default; refresh it so the visible state matches what we
@@ -6843,10 +6974,10 @@ function deleteDuplicates(){
 </div>
 
 <!-- Settings Export/Import Modal -->
-<div id="settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;align-items:center;justify-content:center" onclick="if(event.target===this)closeSettingsModal()">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:min(480px,94vw);overflow:hidden">
+<div id="settings-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:600;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 0" onclick="if(event.target===this)closeSettingsModal()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:0;width:min(480px,94vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;margin:auto">
     <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
       <div>
         <div style="font-size:14px;font-weight:600;color:#c8d8f0">⚙ Settings Transfer</div>
         <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px">Move data between devices or local ↔ Netlify</div>
@@ -6854,7 +6985,7 @@ function deleteDuplicates(){
       <button onclick="closeSettingsModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px">✕</button>
     </div>
     <!-- Body -->
-    <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+    <div style="padding:20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1;min-height:0">
       <!-- What's included -->
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
         <div style="font-size:11px;color:#7a9cc0;font-family:var(--mono);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Included in export</div>
@@ -6946,9 +7077,25 @@ function deleteDuplicates(){
       <div style="border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:14px 16px;background:rgba(245,158,11,.03)">
         <div style="font-size:12px;font-weight:600;color:#f59e0b;margin-bottom:4px">🧹 Maintenance</div>
         <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:12px;line-height:1.6">
-          Delete <b style="color:#c8d8f0">Supporting Evidence</b> photos that aren't attached to any ticket (orphans left behind by deleted tickets).
+          Delete <b style="color:#c8d8f0">orphaned documents</b> that aren't attached to any ticket (left behind when tickets are deleted). Choose which document type to purge.
         </div>
-        <button onclick="purgeOrphanedSupportingEvidence(false)" style="width:100%;padding:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;color:#f59e0b;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.12)'">🗑 Purge orphaned Supporting Evidence</button>
+        <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px;flex-wrap:wrap">
+          <select id="purge-doctype" onchange="refreshMaintenanceOrphanCount()" style="flex:1;min-width:160px;padding:8px 10px;background:var(--bg);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none">
+            <option value="Supporting Evidence">Supporting Evidence</option>
+            <option value="Invoice">Invoice</option>
+            <option value="Quote">Quote</option>
+            <option value="Receipt">Receipt</option>
+            <option value="Contract">Contract</option>
+            <option value="Report">Report</option>
+            <option value="Trustee Meeting Minutes">Trustee Meeting Minutes</option>
+            <option value="AGM Meeting Minutes">AGM Meeting Minutes</option>
+            <option value="Other">Other</option>
+            <option value="*">— All document types —</option>
+          </select>
+          <button onclick="refreshMaintenanceOrphanCount()" title="Re-scan for orphaned documents" style="flex-shrink:0;padding:8px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:13px;cursor:pointer">↻</button>
+        </div>
+        <div id="purge-orphan-count" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">Scanning…</div>
+        <button onclick="purgeSelectedOrphanType()" style="width:100%;padding:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;color:#f59e0b;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.12)'">🗑 Purge orphaned documents</button>
       </div>
     </div>
   </div>
@@ -7717,7 +7864,11 @@ function renderTicketSuppliers(ticket){
   if(!section) return;
   // Only staff with ticket-management rights manage supplier assignment.
   var canManage = (_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management');
-  if(!ticket || !ticket.id || !canManage){ section.style.display = 'none'; return; }
+  // Supplier assignment / quoting only makes sense while the ticket is in the
+  // "Obtaining Quotes" stage. Hide the whole section for any other status so
+  // the modal isn't cluttered with quote tooling that doesn't apply yet.
+  var inQuoteStage = ticket && ticket.status === 'awaiting_quote';
+  if(!ticket || !ticket.id || !canManage || !inQuoteStage){ section.style.display = 'none'; return; }
   section.style.display = 'block';
 
   var assignedIds = Array.isArray(ticket.assignedSupplierIds) ? ticket.assignedSupplierIds : [];
@@ -7730,6 +7881,29 @@ function renderTicketSuppliers(ticket){
       .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
     sel.innerHTML = '<option value="">— Assign a supplier… —</option>'
       + available.map(function(s){ return '<option value="'+escHtml(s.id)+'">'+escHtml(s.name||'(unnamed)')+'</option>'; }).join('');
+  }
+
+  // Quote-received indicator: count assigned suppliers who have SUBMITTED a
+  // quote. When at least one has, show a prominent banner prompting the user
+  // to move the ticket on to Awaiting Trustee Approval (where quotes are
+  // accepted). The banner renders above the assigned-supplier list.
+  var quotedCount = assignedIds.filter(function(supId){
+    var q = getSupplierQuote(ticket, supId);
+    return q && q.status === 'submitted';
+  }).length;
+  var banner = document.getElementById('tkt-quote-received-banner');
+  if(banner){
+    if(quotedCount > 0){
+      banner.style.display = 'block';
+      banner.innerHTML =
+        '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(74,222,158,.1);border:1px solid rgba(74,222,158,.35);border-radius:9px;flex-wrap:wrap">'
+        +'<span style="font-size:12px;font-family:var(--mono);color:#4ade9e;font-weight:700;flex:1;min-width:0">✓ '+quotedCount+' quote'+(quotedCount!==1?'s':'')+' received — ready to review &amp; send for approval</span>'
+        +'<button type="button" onclick="tktMoveToApproval()" style="padding:6px 12px;background:rgba(168,85,247,.18);border:1px solid rgba(168,85,247,.4);border-radius:7px;color:#c084fc;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">Move to Trustee Approval →</button>'
+        +'</div>';
+    } else {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    }
   }
 
   // Render the list of assigned companies + their quote state.
@@ -7776,6 +7950,16 @@ async function tktAssignSupplierFromDropdown(){
   if(!supId){ return; }
   await setTicketSupplierAssigned(_currentTicketId, supId, true);
   renderTicketSuppliers(TICKETS[_currentTicketId]);
+}
+
+// Triggered by the "quote received" banner — advances the ticket from the
+// Obtaining Quotes stage to Awaiting Trustee Approval, where trustees review
+// and accept a quote. Uses the existing setTicketStatus (which enforces the
+// trustee/admin permission check and saves the ticket).
+async function tktMoveToApproval(){
+  if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
+  if(!confirm('Move this ticket to Awaiting Trustee Approval?\n\nTrustees will then be able to review the submitted quote(s) and approve one.')) return;
+  await setTicketStatus('awaiting_trustee_approval');
 }
 
 async function tktUnassignSupplier(supId){
@@ -9382,6 +9566,14 @@ async function setTicketStatus(newStatus){
     document.getElementById('tkt-date-close').value = new Date().toISOString().slice(0,10);
   }
   renderStatusFlow(newStatus);
+  // Reflect the new status on the in-memory ticket immediately (autoSaveTicket
+  // is debounced, so the object may not be updated yet) and re-render the
+  // supplier section so it shows/hides based on the new status without needing
+  // the modal to be reopened.
+  if(_currentTicketId && TICKETS[_currentTicketId]){
+    TICKETS[_currentTicketId].status = newStatus;
+    if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(TICKETS[_currentTicketId]);
+  }
   autoSaveTicket();
 }
 
@@ -10443,6 +10635,22 @@ function renderTickets(){
     return b.added-a.added; // newest
   });
 
+  // Group by status when more than one status filter is active, so tickets of
+  // the same status cascade together (in the canonical TKT_STATUS order)
+  // rather than being intermixed. The chosen sort above is preserved WITHIN
+  // each status group because Array.sort is stable. With one (or zero) active
+  // status this is a no-op.
+  var _activeStatusCount = Object.keys(_ticketStatusFilter)
+    .filter(function(k){ return _ticketStatusFilter[k]; }).length;
+  if(_activeStatusCount > 1){
+    var _statusOrder = Object.keys(TKT_STATUS);
+    var _rank = function(t){
+      var i = _statusOrder.indexOf(t.status);
+      return i === -1 ? 999 : i;
+    };
+    filtered.sort(function(a,b){ return _rank(a) - _rank(b); });
+  }
+
   if(!filtered.length){ list.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
 
@@ -11328,9 +11536,15 @@ function autoSaveTicketNow(){
     reporterEditToken: prev.reporterEditToken,
     reporterUserId: prev.reporterUserId,
     linkedDocIds: prev.linkedDocIds||[], log: prev.log||[],
+    assignedSupplierIds: prev.assignedSupplierIds||[],
+    quotes: prev.quotes||{},
     added: prev.added||Date.now(), updated: Date.now()
   };
   saveTickets([_currentTicketId]);
+  // Status may have just changed via the dropdown — re-render the supplier
+  // section so it shows/hides based on the current status (it only appears in
+  // the Obtaining Quotes stage) without needing the modal reopened.
+  if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(TICKETS[_currentTicketId]);
 }
 
 function autoSaveTicket(){
@@ -12941,6 +13155,8 @@ function showSettingsModal(){
   }
   document.getElementById('settings-modal').style.display='flex';
   document.body.style.overflow='hidden';
+  // Populate the Maintenance orphaned-document count for the current selection.
+  if(typeof refreshMaintenanceOrphanCount === 'function') refreshMaintenanceOrphanCount();
   // Permissions section is admin-only
   var permSec = document.getElementById('settings-permissions-section');
   if(permSec) permSec.style.display = (_currentRole === 'admin') ? '' : 'none';
