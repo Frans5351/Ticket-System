@@ -9602,7 +9602,14 @@ function hexToRgb(hex){
 
 async function setTicketStatus(newStatus){
   if(!canChangeTicketStatus()){ alert('Only Trustees and Admins can change ticket status.'); return; }
-  if(prev === newStatus) return;
+  // Bail if the status isn't actually changing. The old code referenced an
+  // undeclared `prev` (a leftover that resolved to undefined or to a stale
+  // global from another function), which made the function silently no-op
+  // when stale state got the wrong value — most visibly: the "Move to
+  // Trustee Approval" button doing nothing. Read the real current status
+  // from the ticket instead.
+  var currentStatus = (_currentTicketId && TICKETS[_currentTicketId] && TICKETS[_currentTicketId].status) || null;
+  if(currentStatus === newStatus) return;
   document.getElementById('tkt-status').value = newStatus;
   // Auto set close date when resolved/closed
   if((newStatus==='resolved'||newStatus==='closed') && !document.getElementById('tkt-date-close').value){
