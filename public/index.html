@@ -14425,78 +14425,323 @@ if(typeof _PUBLIC_MODE !== 'undefined' && _PUBLIC_MODE){
   setTimeout(function(){
     if(_PUBLIC_MODE.kind === 'submit') renderPublicReportForm();
     else if(_PUBLIC_MODE.kind === 'edit') renderPublicEditView(_PUBLIC_MODE.token);
-    else if(_PUBLIC_MODE.kind === 'supplierQuote') renderSupplierQuotePlaceholder(_PUBLIC_MODE);
+    else if(_PUBLIC_MODE.kind === 'supplierQuote') renderSupplierQuoteView(_PUBLIC_MODE);
   }, 0);
 }
 
-// Placeholder landing page for the per-supplier quote link. Validates the
-// token and identifies the supplier so we know the routing is solid; the
-// actual quote-view + submit UI is the next build pass. Until then, this
-// page shows the supplier their job summary so they at least see a real
-// page, not a blank screen, and we can confirm the token mechanism works
-// end-to-end from email click.
-function renderSupplierQuotePlaceholder(mode){
+// ─── Supplier quote landing page ──────────────────────────────────────────
+// The supplier clicks the link in their email and lands here. We validate
+// their per-supplier token, show the ticket details + Supporting Evidence
+// photos, and present a quote-submission form. The submitted quote writes
+// into ticket.quotes[supplierId] using the same shape the in-app supplier
+// flow uses, so it flows naturally into the trustee-approval banner.
+//
+// Trust model: the link's token is the credential, scoped to ONE supplier on
+// ONE ticket. The supplier writes through the browser anon key (same trust
+// level as the existing public-report-edit feature). Application code
+// restricts them to their own quote slot on this specific ticket.
+
+// Module-level state for the form so re-renders preserve in-flight edits.
+var _SQV = {
+  mode: null,        // the _PUBLIC_MODE object
+  ticket: null,
+  supplier: null,
+  submitting: false
+};
+
+function renderSupplierQuoteView(mode){
   var host = document.getElementById('public-view-content');
   if(!host) return;
-  // Show an immediate loading state so the visitor never sees a blank screen
-  // while we wait for TICKETS / SUPPLIERS to load + sync from Supabase.
+  _SQV.mode = mode;
+  // Immediate loading state so visitors never see a blank screen.
   host.innerHTML = '<div style="max-width:420px;margin:80px auto;padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">'
     + '<div style="font-size:28px;margin-bottom:10px">⏳</div>'
     + 'Loading your quote request…'
     + '</div>';
 
-  // The real race we had on first ship: localStorage populates TICKETS quickly,
-  // but the assignment that generated this link may only be in Supabase yet —
-  // not in the cached snapshot. So we poll for the actual validation outcome
-  // (token match) rather than just for "TICKETS has any entries". We give it
-  // up to 10s, which comfortably covers a Supabase round-trip on a slow phone.
+  // Poll until validation succeeds OR we genuinely give up after 10s.
+  // We poll on validation outcome, not just "any data present", because
+  // localStorage may populate stale TICKETS quickly while the freshly-assigned
+  // supplier's token is still syncing in from Supabase.
   var startedAt = Date.now();
-  function tryRender(){
+  function awaitValidation(){
     var t = TICKETS[mode.ticketId];
-    var sup = SUPPLIERS[mode.supplierId];
     var validToken = !!(t && t.quoteTokens && t.quoteTokens[mode.supplierId] === mode.token);
-    var elapsed = Date.now() - startedAt;
-    // Keep waiting while the token doesn't match yet AND we still have budget —
-    // the ticket data may still be syncing in from Supabase.
-    if(!validToken && elapsed < 10000){
-      setTimeout(tryRender, 250);
-      return;
+    if(!validToken && (Date.now() - startedAt) < 10000){
+      setTimeout(awaitValidation, 250); return;
     }
-    var html;
-    if(!validToken){
-      // After the full wait, still no match — link genuinely is invalid/stale.
-      html = '<div style="max-width:560px;margin:60px auto;padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:center">'
-        + '<div style="font-size:48px;margin-bottom:12px">🔗</div>'
-        + '<h2 style="margin:0 0 10px;font-size:18px;color:var(--text)">This quote link is no longer valid</h2>'
-        + '<p style="margin:0 0 4px;font-size:13px;color:var(--muted);line-height:1.6">The link may have been replaced by a newer one, or the body corporate has already moved on from collecting quotes for this job.</p>'
-        + '<p style="margin:12px 0 0;font-size:12px;color:var(--muted)">If you believe this is wrong, please reply to the email you received to ask for a fresh link.</p>'
-        + '</div>';
-    } else {
-      // Validation passed. The supplier record may still not have loaded (it
-      // syncs separately from tickets) — that's fine, we degrade gracefully
-      // to a generic greeting rather than failing the whole page on it.
-      var supName = (sup && sup.name) ? sup.name : 'your company';
-      var ticketNo = t.ticketNumber ? ('#' + t.ticketNumber) : '';
-      var unit = t.unit ? (' (Unit ' + escHtml(t.unit) + ')') : '';
-      html = '<div style="max-width:640px;margin:40px auto;padding:0 20px">'
-        + '<div style="padding:14px 18px;background:rgba(74,222,158,.08);border:1px solid rgba(74,222,158,.3);border-radius:10px;margin-bottom:18px">'
-        +   '<div style="font-size:12px;color:#4ade9e;font-weight:600;font-family:var(--mono);margin-bottom:4px">✓ Quote request for ' + escHtml(supName) + '</div>'
-        +   '<div style="font-size:11px;color:var(--muted)">Ticket ' + escHtml(ticketNo) + ' · ' + escHtml(t.title || 'Maintenance job') + escHtml(unit) + '</div>'
-        + '</div>'
-        + '<div style="padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:18px">'
-        +   '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Description</div>'
-        +   '<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap">' + escHtml(t.desc || t.description || '(no description provided)') + '</div>'
-        +   (t.category ? '<div style="margin-top:14px;font-size:11px;color:var(--muted)"><b>Category:</b> ' + escHtml(t.category) + '</div>' : '')
-        + '</div>'
-        + '<div style="padding:16px 18px;background:rgba(96,165,250,.06);border:1px dashed rgba(96,165,250,.3);border-radius:10px;color:var(--muted);font-size:12px;line-height:1.6">'
-        +   '<b style="color:#60a5fa">📋 Quote submission form — coming shortly</b><br>'
-        +   'You\'re looking at the new supplier quote view. You\'ll soon be able to view photos of the job and submit your quote directly here. For now, please reply to the email you received with your quote.'
-        + '</div>'
-        + '</div>';
-    }
-    host.innerHTML = html;
+    if(!validToken){ renderInvalidLinkPage(host); return; }
+    _SQV.ticket = t;
+    _SQV.supplier = SUPPLIERS[mode.supplierId] || null;
+    renderQuoteForm(host);
   }
-  tryRender();
+  awaitValidation();
+}
+
+function renderInvalidLinkPage(host){
+  host.innerHTML = '<div style="max-width:560px;margin:60px auto;padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:center">'
+    + '<div style="font-size:48px;margin-bottom:12px">🔗</div>'
+    + '<h2 style="margin:0 0 10px;font-size:18px;color:var(--text)">This quote link is no longer valid</h2>'
+    + '<p style="margin:0 0 4px;font-size:13px;color:var(--muted);line-height:1.6">The link may have been replaced by a newer one, or the body corporate has already moved on from collecting quotes for this job.</p>'
+    + '<p style="margin:12px 0 0;font-size:12px;color:var(--muted)">If you believe this is wrong, please reply to the email you received to ask for a fresh link.</p>'
+    + '</div>';
+}
+
+// Find Supporting Evidence images attached to the ticket. Returns array of
+// {id, src, name} ready to render as <img>. Skips non-image docs (PDFs etc).
+function _sqvSupportingImages(ticket){
+  var ids = ticket.linkedDocIds || [];
+  var out = [];
+  ids.forEach(function(id){
+    var inv = INVOICES[id];
+    if(!inv) return;
+    if(inv.docType !== 'Supporting Evidence') return;
+    var src = inv.url || inv.data || '';
+    if(!src) return;
+    // Crude image-vs-pdf check: data: URIs declare a MIME type; URLs we infer
+    // by extension. Either way, only true images go in the gallery.
+    var isImg = false;
+    if(src.indexOf('data:image/') === 0) isImg = true;
+    else if(/\.(png|jpe?g|gif|webp|heic|bmp)(\?|$)/i.test(src)) isImg = true;
+    if(!isImg) return;
+    out.push({ id: id, src: src, name: inv.name || inv.filename || 'photo' });
+  });
+  return out;
+}
+
+function renderQuoteForm(host){
+  var t = _SQV.ticket, sup = _SQV.supplier, mode = _SQV.mode;
+  var supName = (sup && sup.name) ? sup.name : 'your company';
+  var ticketNo = t.ticketNumber ? ('#' + t.ticketNumber) : '';
+  var unit = t.unit ? (' (Unit ' + escHtml(t.unit) + ')') : '';
+  var images = _sqvSupportingImages(t);
+
+  // The supplier may have already submitted earlier — pre-fill from their
+  // existing quote slot, and show a "currently submitted" hint at the top.
+  var existing = (t.quotes && t.quotes[mode.supplierId]) || null;
+  var alreadySubmitted = !!(existing && existing.status === 'submitted');
+
+  var html = '<div style="max-width:680px;margin:24px auto;padding:0 16px">';
+
+  // Header card
+  html += '<div style="padding:14px 18px;background:rgba(74,222,158,.08);border:1px solid rgba(74,222,158,.3);border-radius:10px;margin-bottom:16px">'
+    +    '<div style="font-size:12px;color:#4ade9e;font-weight:600;font-family:var(--mono);margin-bottom:4px">✓ Quote request for ' + escHtml(supName) + '</div>'
+    +    '<div style="font-size:11px;color:var(--muted)">Ticket ' + escHtml(ticketNo) + ' · ' + escHtml(t.title || 'Maintenance job') + escHtml(unit) + '</div>'
+    + '</div>';
+
+  // Description
+  html += '<div style="padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px">'
+    +    '<div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Description</div>'
+    +    '<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap">' + escHtml(t.desc || t.description || '(no description provided)') + '</div>'
+    +    (t.category ? '<div style="margin-top:10px;font-size:11px;color:var(--muted)"><b>Category:</b> ' + escHtml(t.category) + '</div>' : '')
+    + '</div>';
+
+  // Photo gallery — only if there are images. Tap to enlarge.
+  if(images.length){
+    html += '<div style="padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:16px">'
+      +    '<div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Photos (' + images.length + ')</div>'
+      +    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">';
+    images.forEach(function(img, i){
+      html += '<img src="' + escHtml(img.src) + '" alt="' + escHtml(img.name) + '" '
+        +    'onclick="_sqvOpenLightbox(' + i + ')" '
+        +    'style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;background:var(--bg)">';
+    });
+    html += '</div></div>';
+  }
+
+  // Already-submitted indicator
+  if(alreadySubmitted){
+    html += '<div style="padding:10px 14px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.3);border-radius:9px;margin-bottom:14px;font-size:12px;color:#60a5fa;font-family:var(--mono)">'
+      +    '✓ Your quote was submitted on ' + new Date(existing.submittedAt || existing.updatedAt || Date.now()).toLocaleString()
+      +    '. You can update it below if needed.'
+      + '</div>';
+  }
+
+  // Quote form
+  var preAmount = existing ? (existing.amount != null ? existing.amount : '') : '';
+  var preDesc   = existing ? (existing.description || '') : '';
+  html += '<div style="padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px">'
+    +    '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px">' + (alreadySubmitted ? 'Update your quote' : 'Submit your quote') + '</div>'
+
+    +    '<label style="display:block;font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Quote amount (ZAR) <span style="color:#ef4444">*</span></label>'
+    +    '<input id="sqv-amount" type="number" inputmode="decimal" step="0.01" min="0" value="' + escHtml(String(preAmount)) + '" placeholder="e.g. 4500.00" '
+    +      'style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:14px;outline:none;margin-bottom:14px">'
+
+    +    '<label style="display:block;font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Scope of work / notes (optional)</label>'
+    +    '<textarea id="sqv-desc" rows="4" placeholder="Briefly describe what your quote covers, materials, timeframe, exclusions, etc." '
+    +      'style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:var(--sans);margin-bottom:14px">' + escHtml(preDesc) + '</textarea>'
+
+    +    '<label style="display:block;font-size:11px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Attach quote document (optional PDF)</label>'
+    +    '<input id="sqv-file" type="file" accept="application/pdf,image/*" '
+    +      'style="display:block;width:100%;padding:8px;background:var(--bg);border:1px dashed var(--border2);border-radius:8px;color:var(--muted);font-size:12px;margin-bottom:6px;font-family:var(--sans)">'
+    +    (existing && existing.docId ? '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:14px">A document is already attached. Pick a new file only if you want to replace it.</div>' : '<div style="margin-bottom:14px"></div>')
+
+    +    '<div id="sqv-status" style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;min-height:18px"></div>'
+
+    +    '<button id="sqv-submit" onclick="_sqvSubmit()" '
+    +      'style="width:100%;padding:12px;background:#7c6df2;border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)">'
+    +      (alreadySubmitted ? 'Update quote' : 'Submit quote')
+    +    '</button>'
+
+    + '</div>';
+
+  html += '</div>';
+  // Lightbox container — empty until used
+  html += '<div id="sqv-lightbox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;padding:20px;cursor:zoom-out" onclick="_sqvCloseLightbox()"></div>';
+
+  host.innerHTML = html;
+}
+
+// Lightbox: tap a thumb to view full-size; tap the backdrop to close.
+function _sqvOpenLightbox(index){
+  if(!_SQV.ticket) return;
+  var images = _sqvSupportingImages(_SQV.ticket);
+  var img = images[index]; if(!img) return;
+  var box = document.getElementById('sqv-lightbox');
+  if(!box) return;
+  box.innerHTML = '<img src="' + escHtml(img.src) + '" alt="' + escHtml(img.name) + '" '
+    + 'style="max-width:96vw;max-height:92vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 30px rgba(0,0,0,.6)">';
+  box.style.display = 'flex';
+}
+function _sqvCloseLightbox(){
+  var box = document.getElementById('sqv-lightbox');
+  if(box){ box.style.display = 'none'; box.innerHTML = ''; }
+}
+
+// Submit handler. Validates, optionally uploads the attached file as a
+// Supporting Evidence doc linked to the ticket, then writes the quote via
+// saveSupplierQuote (the same helper the in-app flow uses).
+async function _sqvSubmit(){
+  if(_SQV.submitting) return;
+  var t = _SQV.ticket, mode = _SQV.mode;
+  if(!t || !mode) return;
+  // Re-validate the token at submit time — the link could have been
+  // invalidated by an admin un-assigning the supplier between page load
+  // and submit.
+  var stillValid = !!(t.quoteTokens && t.quoteTokens[mode.supplierId] === mode.token);
+  if(!stillValid){
+    var st0 = document.getElementById('sqv-status');
+    if(st0) st0.innerHTML = '<span style="color:#ef4444">This quote link is no longer valid — please ask for a fresh one.</span>';
+    return;
+  }
+  var amountInput = document.getElementById('sqv-amount');
+  var descInput = document.getElementById('sqv-desc');
+  var fileInput = document.getElementById('sqv-file');
+  var statusEl = document.getElementById('sqv-status');
+  var submitBtn = document.getElementById('sqv-submit');
+  var amount = parseFloat((amountInput && amountInput.value) || '');
+  if(isNaN(amount) || amount <= 0){
+    if(statusEl) statusEl.innerHTML = '<span style="color:#ef4444">Please enter a quote amount.</span>';
+    if(amountInput) amountInput.focus();
+    return;
+  }
+  var description = (descInput && descInput.value || '').trim();
+  var file = (fileInput && fileInput.files && fileInput.files[0]) || null;
+
+  _SQV.submitting = true;
+  if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; submitBtn.style.opacity = '0.7'; }
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--muted)">Saving your quote…</span>';
+
+  try {
+    var docId = null;
+    if(file){
+      // Save the attached file as a Supporting Evidence document linked to
+      // the ticket, so trustees can open it from the in-app view. We reuse
+      // the existing INVOICES + linkedDocIds pattern.
+      if(statusEl) statusEl.innerHTML = '<span style="color:var(--muted)">Uploading attachment…</span>';
+      try {
+        docId = await _sqvUploadAttachment(file, t.id, mode.supplierId);
+      } catch(uploadErr){
+        console.warn('_sqvSubmit: attachment upload failed', uploadErr);
+        if(statusEl) statusEl.innerHTML = '<span style="color:#f59e0b">Could not upload your attachment, but the rest of your quote will still be saved. (' + escHtml(String(uploadErr && uploadErr.message || uploadErr)) + ')</span>';
+      }
+    }
+
+    var existing = (t.quotes && t.quotes[mode.supplierId]) || null;
+    var patch = {
+      amount: amount,
+      description: description,
+      status: 'submitted'
+    };
+    if(docId) patch.docId = docId;
+    else if(existing && existing.docId) patch.docId = existing.docId; // preserve any previous attachment
+
+    var saved = await saveSupplierQuote(t.id, mode.supplierId, patch);
+
+    if(!saved){
+      throw new Error('Save returned no result');
+    }
+
+    // Render the success state.
+    _sqvRenderSubmittedState(saved);
+
+  } catch(e){
+    console.warn('_sqvSubmit failed', e);
+    if(statusEl) statusEl.innerHTML = '<span style="color:#ef4444">Could not save your quote: ' + escHtml(String(e && e.message || e)) + '. Please try again, or reply to the email.</span>';
+    if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Submit quote'; submitBtn.style.opacity = '1'; }
+  } finally {
+    _SQV.submitting = false;
+  }
+}
+
+// Upload a supplier-provided file as a Supporting Evidence document linked
+// to the ticket. Mirrors the app's existing invoice/document upload pattern:
+// create an INVOICES entry with base64 data + add the id to linkedDocIds.
+// Returns the new doc id.
+async function _sqvUploadAttachment(file, ticketId, supplierId){
+  // 8 MB cap to keep base64-in-DB reasonable; bigger files would need the
+  // Storage bucket path, which requires more setup.
+  if(file.size > 8 * 1024 * 1024){
+    throw new Error('File too large (max 8 MB)');
+  }
+  var dataUrl = await new Promise(function(resolve, reject){
+    var fr = new FileReader();
+    fr.onload = function(){ resolve(fr.result); };
+    fr.onerror = function(){ reject(new Error('Could not read the file')); };
+    fr.readAsDataURL(file);
+  });
+  var supName = (SUPPLIERS[supplierId] && SUPPLIERS[supplierId].name) || 'supplier';
+  var docId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  var invObj = {
+    id: docId,
+    name: 'Quote from ' + supName + ' — ' + (file.name || 'attachment'),
+    filename: file.name || 'attachment',
+    docType: 'Supporting Evidence',
+    data: dataUrl,
+    fileType: file.type || '',
+    size: file.size,
+    added: Date.now(),
+    linkedTxKeys: []
+  };
+  INVOICES[docId] = invObj;
+  try { await sbUpsert('invoices', docId, invObj); }
+  catch(e){ console.warn('_sqvUploadAttachment: sbUpsert failed (continuing)', e); }
+  // Link to the ticket.
+  var t = TICKETS[ticketId];
+  if(t){
+    if(!Array.isArray(t.linkedDocIds)) t.linkedDocIds = [];
+    if(t.linkedDocIds.indexOf(docId) === -1) t.linkedDocIds.push(docId);
+  }
+  return docId;
+}
+
+function _sqvRenderSubmittedState(quote){
+  var host = document.getElementById('public-view-content');
+  if(!host) return;
+  var sup = _SQV.supplier;
+  var supName = (sup && sup.name) ? sup.name : 'your company';
+  var ticketNo = _SQV.ticket.ticketNumber ? ('#' + _SQV.ticket.ticketNumber) : '';
+  var amt = (typeof fmtZAR === 'function') ? fmtZAR(quote.amount) : ('R ' + Number(quote.amount).toFixed(2));
+  host.innerHTML = '<div style="max-width:560px;margin:48px auto;padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:center">'
+    + '<div style="font-size:48px;margin-bottom:14px">✅</div>'
+    + '<h2 style="margin:0 0 8px;font-size:18px;color:var(--text)">Quote submitted</h2>'
+    + '<p style="margin:0 0 14px;font-size:13px;color:var(--muted);line-height:1.6">Thanks ' + escHtml(supName) + '. The body corporate has received your quote of <b style="color:var(--text)">' + escHtml(amt) + '</b> for ticket ' + escHtml(ticketNo) + ' and will be in touch.</p>'
+    + '<p style="margin:0 0 18px;font-size:12px;color:var(--muted)">You can revisit this link any time before the job moves on to update your quote.</p>'
+    + '<button onclick="renderQuoteForm(document.getElementById(\'public-view-content\'))" '
+    +   'style="padding:10px 18px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;font-family:var(--sans)">'
+    +   'Update my quote'
+    + '</button>'
+    + '</div>';
 }
 
 // Render the new-ticket submission form.
