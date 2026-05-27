@@ -14438,21 +14438,33 @@ if(typeof _PUBLIC_MODE !== 'undefined' && _PUBLIC_MODE){
 function renderSupplierQuotePlaceholder(mode){
   var host = document.getElementById('public-view-content');
   if(!host) return;
-  // We need TICKETS and SUPPLIERS to be loaded before we can look anything up.
-  // Both load asynchronously; poll briefly until either ready or timeout.
+  // Show an immediate loading state so the visitor never sees a blank screen
+  // while we wait for TICKETS / SUPPLIERS to load + sync from Supabase.
+  host.innerHTML = '<div style="max-width:420px;margin:80px auto;padding:32px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">'
+    + '<div style="font-size:28px;margin-bottom:10px">⏳</div>'
+    + 'Loading your quote request…'
+    + '</div>';
+
+  // The real race we had on first ship: localStorage populates TICKETS quickly,
+  // but the assignment that generated this link may only be in Supabase yet —
+  // not in the cached snapshot. So we poll for the actual validation outcome
+  // (token match) rather than just for "TICKETS has any entries". We give it
+  // up to 10s, which comfortably covers a Supabase round-trip on a slow phone.
   var startedAt = Date.now();
   function tryRender(){
-    var ticketsReady = (typeof TICKETS === 'object' && Object.keys(TICKETS||{}).length > 0);
-    var suppliersReady = (typeof SUPPLIERS === 'object' && Object.keys(SUPPLIERS||{}).length > 0);
-    if(!ticketsReady || !suppliersReady){
-      if(Date.now() - startedAt < 6000){ setTimeout(tryRender, 150); return; }
-      // Timed out — render anyway with whatever we have; lookup may show 'not found'
-    }
     var t = TICKETS[mode.ticketId];
     var sup = SUPPLIERS[mode.supplierId];
     var validToken = !!(t && t.quoteTokens && t.quoteTokens[mode.supplierId] === mode.token);
+    var elapsed = Date.now() - startedAt;
+    // Keep waiting while the token doesn't match yet AND we still have budget —
+    // the ticket data may still be syncing in from Supabase.
+    if(!validToken && elapsed < 10000){
+      setTimeout(tryRender, 250);
+      return;
+    }
     var html;
-    if(!t || !sup || !validToken){
+    if(!validToken){
+      // After the full wait, still no match — link genuinely is invalid/stale.
       html = '<div style="max-width:560px;margin:60px auto;padding:32px;background:var(--surface);border:1px solid var(--border);border-radius:14px;text-align:center">'
         + '<div style="font-size:48px;margin-bottom:12px">🔗</div>'
         + '<h2 style="margin:0 0 10px;font-size:18px;color:var(--text)">This quote link is no longer valid</h2>'
@@ -14460,11 +14472,15 @@ function renderSupplierQuotePlaceholder(mode){
         + '<p style="margin:12px 0 0;font-size:12px;color:var(--muted)">If you believe this is wrong, please reply to the email you received to ask for a fresh link.</p>'
         + '</div>';
     } else {
+      // Validation passed. The supplier record may still not have loaded (it
+      // syncs separately from tickets) — that's fine, we degrade gracefully
+      // to a generic greeting rather than failing the whole page on it.
+      var supName = (sup && sup.name) ? sup.name : 'your company';
       var ticketNo = t.ticketNumber ? ('#' + t.ticketNumber) : '';
       var unit = t.unit ? (' (Unit ' + escHtml(t.unit) + ')') : '';
       html = '<div style="max-width:640px;margin:40px auto;padding:0 20px">'
         + '<div style="padding:14px 18px;background:rgba(74,222,158,.08);border:1px solid rgba(74,222,158,.3);border-radius:10px;margin-bottom:18px">'
-        +   '<div style="font-size:12px;color:#4ade9e;font-weight:600;font-family:var(--mono);margin-bottom:4px">✓ Quote request for ' + escHtml(sup.name || 'your company') + '</div>'
+        +   '<div style="font-size:12px;color:#4ade9e;font-weight:600;font-family:var(--mono);margin-bottom:4px">✓ Quote request for ' + escHtml(supName) + '</div>'
         +   '<div style="font-size:11px;color:var(--muted)">Ticket ' + escHtml(ticketNo) + ' · ' + escHtml(t.title || 'Maintenance job') + escHtml(unit) + '</div>'
         + '</div>'
         + '<div style="padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px;margin-bottom:18px">'
