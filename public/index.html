@@ -9704,6 +9704,38 @@ function renderTicketApprovalPanel(t){
     return inv && inv.docType === 'Quote';
   });
 
+  // Also include supplier-submitted quotes (the ones submitted via the
+  // per-supplier quote link in the email, stored in t.quotes[supplierId]).
+  // These don't live in INVOICES — they're on the ticket — so we wrap each
+  // one in an invoice-shaped object so renderApprovalRow_Quote can render
+  // it and approvals can be voted against the synthesised id.
+  if(t.quotes && typeof t.quotes === 'object'){
+    Object.keys(t.quotes).forEach(function(supId){
+      var sq = t.quotes[supId];
+      if(!sq || sq.status !== 'submitted') return;
+      var supName = (SUPPLIERS[supId] && SUPPLIERS[supId].name) || sq.byName || 'Supplier';
+      // Stable synthetic id so a trustee's vote on this supplier quote
+      // persists correctly across re-renders. Prefix avoids any clash with
+      // real INVOICES ids.
+      var synthId = 'supquote_' + supId;
+      quotes.push({
+        id: synthId,
+        invCompany: supName,
+        name: supName + ' — supplier quote',
+        amount: sq.amount,
+        invNumber: '',
+        invDate: sq.submittedAt || sq.updatedAt || null,
+        // Link to the supplier's attached document if they uploaded one;
+        // renderApprovalRow_Quote's "View →" button uses this id with
+        // openQuoteFromApproval(). If no file was attached, the button
+        // will try to open the synthetic id and find nothing — harmless.
+        _supplierQuote: true,
+        _supplierId: supId,
+        _attachedDocId: sq.docId || null
+      });
+    });
+  }
+
   // Set of quoteIds this trustee has approved on this ticket. With multi-
   // approval, one trustee may have several entries — each item independently
   // shows Approve or Revoke.
@@ -10523,6 +10555,22 @@ async function adminRevokeApproval(trusteeId, quoteId){
 function openQuoteFromApproval(invId){
   if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
   var t = TICKETS[_currentTicketId];
+  // Supplier quotes are synthesised with id 'supquote_<supplierId>' — they
+  // aren't in INVOICES. If they attached a file, redirect to opening THAT
+  // (Supporting Evidence doc); otherwise tell the trustee there's nothing
+  // to view because the supplier didn't attach a document.
+  if(invId && invId.indexOf('supquote_') === 0){
+    var supId = invId.slice('supquote_'.length);
+    var sq = (t.quotes||{})[supId];
+    var docId = sq && sq.docId;
+    if(docId && INVOICES[docId]){
+      invId = docId; // fall through to the normal viewer below
+    } else {
+      var sName = (SUPPLIERS[supId] && SUPPLIERS[supId].name) || 'this supplier';
+      alert(sName + ' did not attach a quote document — only an amount and notes. The details are shown inline on the approval row.');
+      return;
+    }
+  }
   // openTktViewer expects an index into the filtered linkedDocIds (only those
   // resolving to INVOICES) — find that index for the requested doc.
   var ids = (t.linkedDocIds||[]).filter(function(id){ return INVOICES[id]; });
