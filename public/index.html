@@ -5556,7 +5556,10 @@ document.getElementById('tbody').addEventListener('click', function(e){
       <!-- Choose which supplier companies can see and quote this job in their
            portal. Hidden for roles without ticket-management rights. -->
       <div id="tkt-suppliers-section" style="display:none;padding:14px 16px;border-top:1px solid var(--border)">
-        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Suppliers — assign to quote</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Suppliers — assign to quote</div>
+          <button type="button" id="tkt-refresh-quotes-btn" onclick="tktRefreshQuotes()" title="Re-read this ticket from the server to pick up any quotes suppliers have just submitted via their email link" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;font-family:var(--mono);cursor:pointer">↻ Refresh quotes</button>
+        </div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
           <select id="tkt-supplier-add" style="flex:1;min-width:160px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none">
             <option value="">— Assign a supplier… —</option>
@@ -7290,7 +7293,6 @@ async function setTicketSupplierAssigned(ticketId, supId, assigned){
 async function saveSupplierQuote(ticketId, supId, patch){
   var t = TICKETS[ticketId];
   if(!t || !supId) return;
-  console.log('[SQ-DEBUG] 1. entry. patch=', JSON.stringify(patch), 'in-memory quotes=', JSON.stringify(t.quotes||{}));
   // Concurrency guard: this save may run in the supplier's browser while an
   // admin has the same ticket open elsewhere (or vice-versa). Because
   // saveTickets() overwrites the WHOLE ticket row, a stale in-memory copy
@@ -7299,7 +7301,6 @@ async function saveSupplierQuote(ticketId, supId, patch){
   // freshest server fields we don't own, while we apply the quote change.
   try {
     var fresh = await sbLoadOne('tickets', ticketId);
-    console.log('[SQ-DEBUG] 2. fresh from DB. fresh.quotes=', JSON.stringify(fresh && fresh.quotes), 'fresh.status=', fresh && fresh.status);
     if(fresh && typeof fresh === 'object'){
       // Start from the server's latest, then overlay anything our session
       // legitimately holds that the server might be missing. The fields most
@@ -7320,7 +7321,6 @@ async function saveSupplierQuote(ticketId, supId, patch){
       t = merged;
     }
   } catch(e){ console.warn('saveSupplierQuote: fresh re-read failed, proceeding with in-memory copy', e); }
-  console.log('[SQ-DEBUG] 3. after merge. t.quotes=', JSON.stringify(t.quotes||{}));
 
   if(!t.quotes) t.quotes = {};
   var prev = t.quotes[supId] || { supId: supId, status: 'draft', createdAt: Date.now() };
@@ -7356,13 +7356,7 @@ async function saveSupplierQuote(ticketId, supId, patch){
     if(preApproval){ t.status = 'awaiting_trustee_approval'; }
   }
   t.updated = Date.now();
-  console.log('[SQ-DEBUG] 4. before saveTickets. t.quotes=', JSON.stringify(t.quotes||{}), 't.status=', t.status);
   await saveTickets([ticketId]);
-  // Verify what actually landed in the DB.
-  try {
-    var check = await sbLoadOne('tickets', ticketId);
-    console.log('[SQ-DEBUG] 5. AFTER save, DB quotes=', JSON.stringify(check && check.quotes), 'DB status=', check && check.status);
-  } catch(e){}
   return next;
 }
 
@@ -8041,6 +8035,45 @@ async function tktMoveToApproval(){
   if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
   if(!confirm('Move this ticket to Awaiting Trustee Approval?\n\nTrustees will then be able to review the submitted quote(s) and approve one.')) return;
   await setTicketStatus('awaiting_trustee_approval');
+}
+
+// Re-read the current ticket fresh from Supabase to pick up any quotes that
+// suppliers have submitted via their email links since this session loaded.
+// Updates the in-memory ticket (preserving local-only fields) and re-renders
+// the supplier section so newly-arrived quotes show up immediately.
+async function tktRefreshQuotes(){
+  if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
+  var btn = document.getElementById('tkt-refresh-quotes-btn');
+  var originalText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Refreshing…'; btn.style.opacity = '0.6'; }
+  try {
+    var fresh = await sbLoadOne('tickets', _currentTicketId);
+    if(fresh && typeof fresh === 'object'){
+      var t = TICKETS[_currentTicketId];
+      // Merge fresh server data on top of our in-memory copy. We prefer the
+      // server for the quote-related fields (which is the whole point of the
+      // refresh) and for assignments. Local-only fields stay as-is via the
+      // in-memory base.
+      var merged = Object.assign({}, t, fresh);
+      merged.quotes = Object.assign({}, t.quotes || {}, fresh.quotes || {});
+      merged.quoteTokens = Object.assign({}, t.quoteTokens || {}, fresh.quoteTokens || {});
+      merged.assignedSupplierIds = (fresh.assignedSupplierIds || t.assignedSupplierIds || []).slice();
+      TICKETS[_currentTicketId] = merged;
+      // Re-render anything that depends on this data.
+      if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(merged);
+      if(typeof renderTicketLinkedDocs === 'function') renderTicketLinkedDocs(merged);
+      if(typeof renderTickets === 'function') renderTickets();
+    }
+    if(btn){
+      btn.textContent = '✓ Refreshed';
+      setTimeout(function(){
+        if(btn){ btn.textContent = originalText || '↻ Refresh quotes'; btn.disabled = false; btn.style.opacity = '1'; }
+      }, 1200);
+    }
+  } catch(e){
+    console.warn('tktRefreshQuotes failed', e);
+    if(btn){ btn.textContent = 'Failed — try again'; btn.disabled = false; btn.style.opacity = '1'; }
+  }
 }
 
 async function tktUnassignSupplier(supId){
@@ -11750,6 +11783,9 @@ function autoSaveTicket(){
     reporterUserId: prev.reporterUserId,
       linkedDocIds: prev.linkedDocIds||[],
       log: prev.log||[],
+      assignedSupplierIds: prev.assignedSupplierIds||[],
+      quotes: prev.quotes||{},
+      quoteTokens: prev.quoteTokens||{},
       added: prev.added||Date.now(),
       updated: Date.now()
     };
