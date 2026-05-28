@@ -7290,6 +7290,7 @@ async function setTicketSupplierAssigned(ticketId, supId, assigned){
 async function saveSupplierQuote(ticketId, supId, patch){
   var t = TICKETS[ticketId];
   if(!t || !supId) return;
+  console.log('[SQ-DEBUG] 1. entry. patch=', JSON.stringify(patch), 'in-memory quotes=', JSON.stringify(t.quotes||{}));
   // Concurrency guard: this save may run in the supplier's browser while an
   // admin has the same ticket open elsewhere (or vice-versa). Because
   // saveTickets() overwrites the WHOLE ticket row, a stale in-memory copy
@@ -7298,6 +7299,7 @@ async function saveSupplierQuote(ticketId, supId, patch){
   // freshest server fields we don't own, while we apply the quote change.
   try {
     var fresh = await sbLoadOne('tickets', ticketId);
+    console.log('[SQ-DEBUG] 2. fresh from DB. fresh.quotes=', JSON.stringify(fresh && fresh.quotes), 'fresh.status=', fresh && fresh.status);
     if(fresh && typeof fresh === 'object'){
       // Start from the server's latest, then overlay anything our session
       // legitimately holds that the server might be missing. The fields most
@@ -7307,9 +7309,8 @@ async function saveSupplierQuote(ticketId, supId, patch){
       // Preserve the union of assignments and the freshest quoteTokens.
       merged.assignedSupplierIds = (fresh.assignedSupplierIds || t.assignedSupplierIds || []).slice();
       merged.quoteTokens = Object.assign({}, t.quoteTokens || {}, fresh.quoteTokens || {});
-      // Quotes: take the server's set as the base (other suppliers may have
-      // submitted since our page loaded) then we apply THIS supplier's change
-      // on top, below.
+      // Quotes: merge BOTH directions so neither a stale in-memory copy nor
+      // the server base loses an entry. (in-memory first, server overlaid).
       merged.quotes = Object.assign({}, t.quotes || {}, fresh.quotes || {});
       // Keep the most advanced status: never regress a ticket that the server
       // has already moved forward (e.g. another quote already pushed it to
@@ -7319,6 +7320,7 @@ async function saveSupplierQuote(ticketId, supId, patch){
       t = merged;
     }
   } catch(e){ console.warn('saveSupplierQuote: fresh re-read failed, proceeding with in-memory copy', e); }
+  console.log('[SQ-DEBUG] 3. after merge. t.quotes=', JSON.stringify(t.quotes||{}));
 
   if(!t.quotes) t.quotes = {};
   var prev = t.quotes[supId] || { supId: supId, status: 'draft', createdAt: Date.now() };
@@ -7354,7 +7356,13 @@ async function saveSupplierQuote(ticketId, supId, patch){
     if(preApproval){ t.status = 'awaiting_trustee_approval'; }
   }
   t.updated = Date.now();
+  console.log('[SQ-DEBUG] 4. before saveTickets. t.quotes=', JSON.stringify(t.quotes||{}), 't.status=', t.status);
   await saveTickets([ticketId]);
+  // Verify what actually landed in the DB.
+  try {
+    var check = await sbLoadOne('tickets', ticketId);
+    console.log('[SQ-DEBUG] 5. AFTER save, DB quotes=', JSON.stringify(check && check.quotes), 'DB status=', check && check.status);
+  } catch(e){}
   return next;
 }
 
