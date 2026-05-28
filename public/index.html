@@ -7322,6 +7322,26 @@ async function saveSupplierQuote(ticketId, supId, patch){
     }
   } catch(e){ console.warn('saveSupplierQuote: fresh re-read failed, proceeding with in-memory copy', e); }
 
+  // Quote-lock backstop. Once the ticket has moved past Obtaining Quotes the
+  // trustees are reviewing the submitted amount — letting a supplier silently
+  // change it from here would undermine the approval. This refusal applies
+  // ONLY to writes coming from the public supplier landing page (where no
+  // user is logged in). Logged-in admins/trustees keep full control via the
+  // in-app flow because they may legitimately need to correct or annotate a
+  // quote during review.
+  var isPublicSupplierWrite = (typeof _currentUserObj === 'undefined' || !_currentUserObj);
+  if(isPublicSupplierWrite && t.status && t.status !== 'awaiting_quote'){
+    console.warn('saveSupplierQuote: refusing public supplier write — ticket has moved past Obtaining Quotes (status=' + t.status + ')');
+    var locked = (t.quotes || {})[supId] || null;
+    // Throw rather than return silently, so the caller (_sqvSubmit) can
+    // surface a clear "your quote is locked" UI instead of pretending the
+    // write succeeded.
+    var err = new Error('Quote is locked for trustee review and cannot be edited from this link.');
+    err.code = 'QUOTE_LOCKED';
+    err.locked = locked;
+    throw err;
+  }
+
   if(!t.quotes) t.quotes = {};
   var prev = t.quotes[supId] || { supId: supId, status: 'draft', createdAt: Date.now() };
   // A finalised quote is locked: only an admin can change it after submission.
@@ -14663,6 +14683,17 @@ function renderQuoteForm(host){
   var existing = (t.quotes && t.quotes[mode.supplierId]) || null;
   var alreadySubmitted = !!(existing && existing.status === 'submitted');
 
+  // Once the ticket leaves "Obtaining Quotes", the quote is locked — trustees
+  // are reviewing it (or the workflow has already moved past quoting). The
+  // supplier may still load the link to verify what they sent, but they
+  // cannot edit. This protects trustees from approving an amount that gets
+  // silently changed after the fact.
+  var quoteLocked = (t.status !== 'awaiting_quote');
+  if(quoteLocked){
+    renderQuoteLocked(host, existing);
+    return;
+  }
+
   var html = '<div style="max-width:680px;margin:24px auto;padding:0 16px">';
 
   // Header card
@@ -14734,7 +14765,67 @@ function renderQuoteForm(host){
   host.innerHTML = html;
 }
 
-// Lightbox: tap a thumb to view full-size; tap the backdrop to close.
+// Read-only view shown when the ticket has moved past Obtaining Quotes (the
+// trustees are reviewing, or the work has already been awarded/done). The
+// supplier can still see what they submitted, but cannot edit. This protects
+// the integrity of the trustees' approval — the amount they approved cannot
+// be silently changed by the supplier after the fact.
+function renderQuoteLocked(host, existing){
+  var t = _SQV.ticket, sup = _SQV.supplier;
+  var supName = (sup && sup.name) ? sup.name : 'your company';
+  var ticketNo = t.ticketNumber ? ('#' + t.ticketNumber) : '';
+  var unit = t.unit ? (' (Unit ' + escHtml(t.unit) + ')') : '';
+  // Pretty status label for the message — fall back to the raw key if we
+  // don't have TKT_STATUS in scope (defensive; the public view loads it).
+  var statusLabel = (typeof TKT_STATUS === 'object' && TKT_STATUS[t.status] && TKT_STATUS[t.status].label) || t.status || 'in progress';
+
+  var html = '<div style="max-width:680px;margin:24px auto;padding:0 16px">';
+
+  // Header
+  html += '<div style="padding:14px 18px;background:rgba(74,222,158,.08);border:1px solid rgba(74,222,158,.3);border-radius:10px;margin-bottom:16px">'
+    +    '<div style="font-size:12px;color:#4ade9e;font-weight:600;font-family:var(--mono);margin-bottom:4px">✓ Quote for ' + escHtml(supName) + '</div>'
+    +    '<div style="font-size:11px;color:var(--muted)">Ticket ' + escHtml(ticketNo) + ' · ' + escHtml(t.title || 'Maintenance job') + escHtml(unit) + '</div>'
+    + '</div>';
+
+  // Lock notice — clear, friendly explanation of why they can't edit.
+  html += '<div style="padding:14px 18px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.35);border-radius:10px;margin-bottom:16px">'
+    +    '<div style="font-size:12px;font-weight:600;color:#60a5fa;font-family:var(--mono);margin-bottom:6px">🔒 Quote locked for review</div>'
+    +    '<div style="font-size:12px;color:var(--text);line-height:1.6">'
+    +      'Your quote has been submitted to the trustees for approval (current status: <b>' + escHtml(statusLabel) + '</b>). '
+    +      'It cannot be edited from here while it is under review.'
+    +    '</div>'
+    +    '<div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">'
+    +      'If you need to change anything, please reply to the email you received and the body corporate will help.'
+    +    '</div>'
+    + '</div>';
+
+  // Read-only summary of what was submitted, so the supplier can verify it.
+  if(existing){
+    var amt = (typeof fmtZAR === 'function') ? fmtZAR(existing.amount) : ('R ' + Number(existing.amount||0).toFixed(2));
+    var submittedAt = existing.submittedAt ? new Date(existing.submittedAt).toLocaleString() : '';
+    html += '<div style="padding:16px 18px;background:var(--surface);border:1px solid var(--border);border-radius:12px">'
+      +    '<div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Your submitted quote</div>'
+      +    '<div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:' + (existing.description ? '12px' : '0') + '">'
+      +      '<div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:3px">Amount</div>'
+      +        '<div style="font-size:16px;font-weight:600;color:var(--text)">' + escHtml(amt) + '</div></div>'
+      +      (submittedAt ? '<div><div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:3px">Submitted</div>'
+      +        '<div style="font-size:13px;color:var(--text)">' + escHtml(submittedAt) + '</div></div>' : '')
+      +    '</div>'
+      +    (existing.description
+        ? '<div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Scope / notes</div>'
+        + '<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap">' + escHtml(existing.description) + '</div>'
+        : '')
+      + '</div>';
+  } else {
+    // Edge case: status moved on but this supplier never submitted.
+    html += '<div style="padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:12px;color:var(--muted);line-height:1.6">'
+      +    'No quote was submitted from this link before the body corporate moved on. Please contact them if you would still like to submit one.'
+      + '</div>';
+  }
+
+  html += '</div>';
+  host.innerHTML = html;
+}
 function _sqvOpenLightbox(index){
   if(!_SQV.ticket) return;
   var images = _sqvSupportingImages(_SQV.ticket);
@@ -14765,6 +14856,31 @@ async function _sqvSubmit(){
     var st0 = document.getElementById('sqv-status');
     if(st0) st0.innerHTML = '<span style="color:#ef4444">This quote link is no longer valid — please ask for a fresh one.</span>';
     return;
+  }
+  // Lock enforcement: check the ticket's CURRENT status fresh from the
+  // server, not just what was on the page when it loaded. The status may
+  // have advanced to Awaiting Trustee Approval while the supplier was
+  // typing, and any edit after that would change an amount the trustees
+  // are already reviewing. Refuse the submit and re-render in read-only
+  // mode so the supplier sees clearly why.
+  try {
+    var freshNow = await sbLoadOne('tickets', mode.ticketId);
+    if(freshNow && freshNow.status && freshNow.status !== 'awaiting_quote'){
+      // Sync our in-memory copy so the read-only view renders the latest data.
+      _SQV.ticket = Object.assign({}, t, freshNow);
+      TICKETS[mode.ticketId] = _SQV.ticket;
+      var host = document.getElementById('public-view-content');
+      if(host){
+        var existing = (_SQV.ticket.quotes && _SQV.ticket.quotes[mode.supplierId]) || null;
+        renderQuoteLocked(host, existing);
+      }
+      return;
+    }
+  } catch(e){
+    // If the status check fails, fall through and let the normal save run —
+    // saveSupplierQuote itself does a fresh re-read + merge, so the lock is
+    // still enforced server-side as a backstop.
+    console.warn('_sqvSubmit: status check failed, relying on save-time merge', e);
   }
   var amountInput = document.getElementById('sqv-amount');
   var descInput = document.getElementById('sqv-desc');
@@ -14819,6 +14935,15 @@ async function _sqvSubmit(){
 
   } catch(e){
     console.warn('_sqvSubmit failed', e);
+    // QUOTE_LOCKED is thrown by saveSupplierQuote's backstop when the ticket
+    // has advanced past Obtaining Quotes between when this page loaded and
+    // when the supplier hit Submit. Don't show a generic "could not save" —
+    // re-render the read-only view so they understand what happened.
+    if(e && e.code === 'QUOTE_LOCKED'){
+      var host = document.getElementById('public-view-content');
+      if(host) renderQuoteLocked(host, e.locked || null);
+      return;
+    }
     if(statusEl) statusEl.innerHTML = '<span style="color:#ef4444">Could not save your quote: ' + escHtml(String(e && e.message || e)) + '. Please try again, or reply to the email.</span>';
     if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = 'Submit quote'; submitBtn.style.opacity = '1'; }
   } finally {
