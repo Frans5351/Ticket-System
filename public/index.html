@@ -3346,7 +3346,9 @@ function openInvModal(invId){
   var isVid = (inv.type && inv.type.startsWith('video/')) || /\.(mp4|webm|ogg|mov|m4v|3gp|quicktime)(\s|$)/i.test(nm);
   var isAud = (inv.type && inv.type.startsWith('audio/')) || /\.(mp3|wav|m4a|aac|oga|opus|weba|flac|amr)(\s|$)/i.test(nm);
   if(isImg && src){
-    prev.innerHTML = '<img src="'+src+'" style="max-width:100%;max-height:500px;border-radius:6px;object-fit:contain">';
+    // onerror catches broken images at render time (most legacy images that
+    // 404 will trigger this) — falls back to the re-upload UI.
+    prev.innerHTML = '<img src="'+src+'" onerror="_invShowReuploadUI(\''+invId.replace(/\'/g,"\\'")+'\', \'This image could not be loaded.\')" style="max-width:100%;max-height:500px;border-radius:6px;object-fit:contain">';
   } else if(isVid && src){
     // Inline player so a supporting-evidence video can be watched right here,
     // with a download fallback if the browser can't decode the codec.
@@ -3382,6 +3384,32 @@ function openInvModal(invId){
   } else {
     prev.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:var(--mono)">📄 '+escHtml(inv.name)+'<br><br><span style="font-size:11px">Loading file…</span></div>';
   }
+
+  // Parallel 404 probe — catches the case the <img>/<iframe> error handlers
+  // can't: when a URL-based file's "broken" response is Netlify's 404 page
+  // (which the iframe loads successfully — it just contains a 404 page, not
+  // a PDF). Skip data URLs (inline content, always works) and skip cases
+  // where there's no src (already shown an empty state). Only act on a
+  // confirmed 404 to avoid false positives on slow networks / CORS.
+  if(src && !src.startsWith('data:')){
+    (function(probeInvId, probeUrl){
+      fetch(probeUrl, { method:'HEAD' }).then(function(r){
+        if(r.status === 404){
+          _invShowReuploadUI(probeInvId, 'The file for this document isn\'t available on this server. It was likely uploaded from the local dev environment and never made it to the live site.');
+        }
+      }).catch(function(){
+        // Ignore probe errors (network, CORS, HEAD-not-supported) — the
+        // visible viewer is the authority. We only swap the UI on a confirmed
+        // 404 to avoid showing a re-upload prompt for a file that actually
+        // works.
+      });
+    })(invId, src);
+  }
+  // Legacy-local detection: if this doc's URL points only at the local-dev
+  // file server (no Supabase Storage path), and we're running on localhost
+  // where the original file is still accessible, show a banner offering to
+  // "migrate" this file to the cloud so it works on Netlify too.
+  _invMaybeShowLegacyBanner(invId);
   // Notes
   var ni = document.getElementById('inv-notes-input');
   ni.value = inv.notes||''; ni.disabled=false; ni.placeholder='Supplier, reference, description...';
@@ -3465,6 +3493,264 @@ async function saveInvoiceMeta(invId){
   try { localStorage.setItem('pm_inv_'+invId, JSON.stringify(meta)); } catch(e){}
   try { localStorage.setItem('pm_inv_index', JSON.stringify(Object.keys(INVOICES))); } catch(e){}
   await sbUpsert('invoices', invId, meta);
+}
+
+// Swap the document viewer's preview area for a "file unavailable — re-upload"
+// UI. Triggered when an image fails to load (legacy 404'd URL) or when the
+// parallel 404 probe confirms the file isn't reachable from this server.
+// Documents most often hit this when they were uploaded from the local-dev
+// environment and their URL points to a path that doesn't exist on Netlify.
+function _invShowReuploadUI(invId, message){
+  var prev = document.getElementById('inv-modal-preview');
+  if(!prev) return;
+  var inv = INVOICES[invId];
+  if(!inv) return;
+  var safeId = invId.replace(/'/g,"\\'");
+  var safeName = escHtml(inv.name||inv.filename||'this file');
+  // Avoid stomping a re-upload that's already in progress.
+  if(prev.getAttribute('data-reupload') === 'busy') return;
+  prev.setAttribute('data-reupload','ready');
+  prev.innerHTML =
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:30px 20px;max-width:420px;margin:auto;text-align:center">'
+    +   '<div style="font-size:42px">📄</div>'
+    +   '<div style="font-size:13px;color:#c8d8f0;font-weight:600">File not available</div>'
+    +   '<div style="font-size:11px;color:var(--muted);line-height:1.6">'+escHtml(message || 'This file could not be loaded.')+'</div>'
+    +   '<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-top:-4px"><b style="color:#c8d8f0">'+safeName+'</b></div>'
+    +   '<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:280px;margin-top:6px">'
+    +     '<input type="file" id="inv-reupload-file" accept="image/*,application/pdf,audio/*,video/*" onchange="_invDoReupload(\''+safeId+'\')" style="display:none">'
+    +     '<button type="button" onclick="document.getElementById(\'inv-reupload-file\').click()" style="padding:10px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">↑ Re-upload the file</button>'
+    +     '<div id="inv-reupload-status" style="font-size:10px;color:var(--muted);font-family:var(--mono);min-height:14px"></div>'
+    +   '</div>'
+    + '</div>';
+}
+
+// Triggered by the re-upload UI's file picker. Reads the picked file as a
+// data URL, attaches it to the invoice as fresh bytes, and calls
+// saveInvoices — which handles uploading to Supabase Storage and updating
+// the URL on the record. After it lands, re-render the viewer so the user
+// sees the working file in place of the re-upload prompt.
+async function _invDoReupload(invId){
+  var inv = INVOICES[invId];
+  if(!inv) return;
+  var picker = document.getElementById('inv-reupload-file');
+  var statusEl = document.getElementById('inv-reupload-status');
+  var prev = document.getElementById('inv-modal-preview');
+  if(!picker || !picker.files || !picker.files[0]) return;
+  var file = picker.files[0];
+  // 25 MB ceiling — generous for PDFs and photos, refuses massive videos
+  // which would slow the upload + may exceed storage limits.
+  if(file.size > 25 * 1024 * 1024){
+    if(statusEl) statusEl.innerHTML = '<span style="color:#ef4444">File too large (max 25 MB)</span>';
+    return;
+  }
+  if(prev) prev.setAttribute('data-reupload','busy');
+  if(statusEl) statusEl.textContent = 'Reading file…';
+  try {
+    var dataUrl = await new Promise(function(resolve, reject){
+      var fr = new FileReader();
+      fr.onload = function(){ resolve(fr.result); };
+      fr.onerror = function(){ reject(new Error('Could not read the file')); };
+      fr.readAsDataURL(file);
+    });
+    // Attach the fresh file bytes — clear the old storagePath so saveInvoices
+    // re-uploads to Storage and writes a new URL onto the record.
+    inv.data = dataUrl;
+    inv.storagePath = null;
+    inv.url = null;
+    inv.filename = file.name || inv.filename;
+    inv.type = file.type || inv.type;
+    inv.size = file.size;
+    if(statusEl) statusEl.textContent = 'Uploading to server…';
+    await saveInvoices([invId]);
+    if(statusEl) statusEl.innerHTML = '<span style="color:#4ade9e">✓ Uploaded — refreshing…</span>';
+    // Re-render the viewer; the new url should now resolve.
+    if(prev) prev.removeAttribute('data-reupload');
+    setTimeout(function(){
+      if(typeof openInvModal === 'function') openInvModal(invId);
+    }, 400);
+  } catch(e){
+    console.warn('_invDoReupload failed', e);
+    if(statusEl) statusEl.innerHTML = '<span style="color:#ef4444">Upload failed: '+escHtml(String(e && e.message || e))+'</span>';
+    if(prev) prev.setAttribute('data-reupload','ready');
+  }
+}
+
+// ─── Legacy-local document migration ─────────────────────────────────────
+// Documents uploaded via the localhost dev server (`/api/save-file`) have
+// their file bytes saved to disk on the developer's machine, with a URL
+// like `/attachments/<filename>` that ONLY the local server can serve.
+// Netlify has no such file → the document shows a 404 on the live site.
+//
+// These helpers identify those records, show a banner on localhost offering
+// a one-click migration ("upload to cloud so it works on Netlify too"), and
+// provide a bulk migration in Settings → Maintenance to fix them all at once.
+// On Netlify itself the banner stays hidden because the file isn't reachable
+// anyway — the existing 404 re-upload UI handles that case.
+
+// Detect whether this invoice's file lives only on the local dev server.
+function _isLegacyLocalDoc(inv){
+  if(!inv) return false;
+  // Already migrated to Supabase Storage — nothing to do.
+  if(inv.storagePath) return false;
+  if(!inv.url) return false;
+  // data: URLs are inline — they work everywhere.
+  if(inv.url.indexOf('data:') === 0) return false;
+  // Relative-path URLs that look like the local file server's output.
+  // Examples: "/attachments/foo.pdf", "/attachments/inv_abc.png".
+  if(inv.url.indexOf('/attachments/') === 0) return true;
+  // Any other relative path (no protocol) is also suspect — Netlify almost
+  // certainly can't serve it. Absolute URLs (https://...) are skipped here
+  // (those are Supabase Storage or other proper hosts).
+  if(inv.url.indexOf('http://') !== 0 && inv.url.indexOf('https://') !== 0 && inv.url.indexOf('//') !== 0){
+    return true;
+  }
+  return false;
+}
+
+// Inject a banner above the file preview if the doc is legacy-local AND we
+// have the local server running so the migration would actually succeed.
+async function _invMaybeShowLegacyBanner(invId){
+  var inv = INVOICES[invId];
+  if(!inv) return;
+  if(!_isLegacyLocalDoc(inv)) return;
+  // Probe local server. The banner only makes sense when we can actually
+  // read the file off disk to upload it — i.e. running localhost dev server.
+  var canMigrate = false;
+  try { canMigrate = await checkLocal(); } catch(e){ canMigrate = false; }
+  if(!canMigrate) return;
+  var prev = document.getElementById('inv-modal-preview');
+  if(!prev) return;
+  // Don't double-inject.
+  if(prev.querySelector('[data-legacy-banner]')) return;
+  var safeId = invId.replace(/'/g,"\\'");
+  var banner = document.createElement('div');
+  banner.setAttribute('data-legacy-banner','1');
+  banner.style.cssText = 'position:absolute;top:8px;left:8px;right:8px;z-index:5;padding:10px 14px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:9px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--sans)';
+  banner.innerHTML =
+    '<div style="flex:1;min-width:200px">'
+    +   '<div style="font-size:11px;font-weight:600;color:#f59e0b;font-family:var(--mono)">⚠ File is only on this computer</div>'
+    +   '<div style="font-size:10px;color:var(--muted);margin-top:2px;line-height:1.5">This document\'s file lives on your local dev machine — it won\'t work on the live Netlify site until uploaded to the cloud.</div>'
+    + '</div>'
+    + '<button type="button" onclick="_invMigrateOne(\''+safeId+'\', this)" style="padding:7px 12px;background:#f59e0b;border:none;border-radius:6px;color:#1c1c22;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--mono);white-space:nowrap">↑ Upload to live site</button>';
+  // Make the preview the positioning context for the banner.
+  if(getComputedStyle(prev).position === 'static') prev.style.position = 'relative';
+  prev.insertBefore(banner, prev.firstChild);
+}
+
+// Read the local file off disk via the local-server URL and upload it to
+// Supabase Storage by setting inv.data and running saveInvoices (which
+// handles the storage upload, URL assignment, and metadata persist).
+async function _invMigrateOne(invId, btn){
+  var inv = INVOICES[invId];
+  if(!inv) return { ok:false, reason:'Document not loaded' };
+  if(!_isLegacyLocalDoc(inv)) return { ok:true, reason:'Already migrated' };
+  var origLabel = btn && btn.textContent;
+  if(btn){ btn.disabled = true; btn.textContent = 'Reading file…'; btn.style.opacity = '0.7'; }
+  try {
+    // Fetch the file from the local server using its existing relative URL.
+    var resp = await fetch(inv.url);
+    if(!resp.ok) throw new Error('Local file fetch failed: '+resp.status);
+    var blob = await resp.blob();
+    if(!blob || blob.size === 0) throw new Error('Local file is empty');
+    // Convert to data URL and stage on the invoice for saveInvoices to upload.
+    var dataUrl = await new Promise(function(resolve, reject){
+      var fr = new FileReader();
+      fr.onload = function(){ resolve(fr.result); };
+      fr.onerror = function(){ reject(new Error('Could not read the local file')); };
+      fr.readAsDataURL(blob);
+    });
+    if(btn){ btn.textContent = 'Uploading to cloud…'; }
+    inv.data = dataUrl;
+    inv.storagePath = null;       // force saveInvoices to upload + assign new URL
+    inv.url = null;
+    if(!inv.type) inv.type = blob.type || inv.type;
+    if(!inv.size) inv.size = blob.size;
+    await saveInvoices([invId]);
+    // saveInvoices may fall back to base64-in-DB if Storage fails; in that
+    // case storagePath is still null but the file is now in the DB and
+    // reachable from anywhere. Either outcome means migration succeeded.
+    if(btn){ btn.textContent = '✓ Uploaded'; btn.style.background = '#4ade9e'; }
+    // Reopen the modal so the viewer re-renders without the banner.
+    setTimeout(function(){
+      if(typeof openInvModal === 'function') openInvModal(invId);
+    }, 800);
+    return { ok:true };
+  } catch(e){
+    console.warn('_invMigrateOne failed for', invId, e);
+    if(btn){ btn.disabled = false; btn.textContent = origLabel || '↑ Upload to live site'; btn.style.opacity = '1'; }
+    return { ok:false, reason: String(e && e.message || e) };
+  }
+}
+
+// Bulk migration — runs through every legacy-local doc in INVOICES and
+// migrates them in sequence. Surfaced in Settings → Maintenance (only when
+// localhost is responding). Reports progress and a summary at the end.
+async function _invMigrateAllLegacy(){
+  var statusEl = document.getElementById('legacy-migrate-status');
+  var btn = document.getElementById('legacy-migrate-btn');
+  if(!statusEl || !btn) return;
+  // Re-check; user may have started the local server only just now.
+  var canMigrate = false;
+  try { canMigrate = await checkLocal(); } catch(e){}
+  if(!canMigrate){
+    statusEl.innerHTML = '<span style="color:#ef4444">The local file server isn\'t responding — start the dev server and try again.</span>';
+    return;
+  }
+  var legacyIds = Object.keys(INVOICES).filter(function(id){ return _isLegacyLocalDoc(INVOICES[id]); });
+  if(!legacyIds.length){
+    statusEl.innerHTML = '<span style="color:#4ade9e">Nothing to migrate — no legacy-local documents found.</span>';
+    return;
+  }
+  if(!confirm('Migrate '+legacyIds.length+' legacy local document'+(legacyIds.length!==1?'s':'')+' to the cloud?\n\nEach file will be read from your local dev folder and uploaded to Supabase Storage. The originals stay on disk untouched.')) return;
+  btn.disabled = true; btn.style.opacity = '0.6';
+  var ok = 0, fail = 0, failed = [];
+  for(var i = 0; i < legacyIds.length; i++){
+    var id = legacyIds[i];
+    var name = (INVOICES[id] && INVOICES[id].name) || id;
+    statusEl.innerHTML = 'Migrating '+(i+1)+' of '+legacyIds.length+': <b style="color:#c8d8f0">'+escHtml(name)+'</b>…';
+    var result = await _invMigrateOne(id, null);
+    if(result && result.ok) ok++;
+    else { fail++; failed.push({ name: name, reason: (result && result.reason) || 'unknown' }); }
+  }
+  var summary = '<b style="color:#4ade9e">✓ '+ok+' migrated</b>';
+  if(fail){
+    summary += ' &nbsp;·&nbsp; <b style="color:#ef4444">⚠ '+fail+' failed</b>';
+    summary += '<div style="margin-top:8px;font-size:10px;color:var(--muted);font-family:var(--mono);max-height:120px;overflow-y:auto">';
+    failed.forEach(function(f){ summary += '• '+escHtml(f.name)+': '+escHtml(f.reason)+'<br>'; });
+    summary += '</div>';
+  }
+  statusEl.innerHTML = summary;
+  btn.disabled = false; btn.style.opacity = '1';
+  if(typeof renderInvoices === 'function') renderInvoices();
+}
+
+// Count legacy-local docs for the Settings UI's live indicator.
+function _countLegacyLocalDocs(){
+  return Object.keys(INVOICES).filter(function(id){ return _isLegacyLocalDoc(INVOICES[id]); }).length;
+}
+
+// Update the Settings → Maintenance migration panel: show count, show/hide
+// based on whether we're on localhost. Called whenever Settings opens.
+async function refreshLegacyMigrationPanel(){
+  var panel = document.getElementById('legacy-migrate-panel');
+  if(!panel) return;
+  var canMigrate = false;
+  try { canMigrate = await checkLocal(); } catch(e){}
+  if(!canMigrate){ panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  var count = _countLegacyLocalDocs();
+  var countEl = document.getElementById('legacy-migrate-count');
+  if(countEl){
+    if(count){
+      countEl.innerHTML = '<b style="color:#f59e0b">'+count+'</b> document'+(count!==1?'s':'')+' still stored only on this computer.';
+    } else {
+      countEl.innerHTML = '<span style="color:#4ade9e">✓ No legacy-local documents — all files are in the cloud.</span>';
+    }
+  }
+  var statusEl = document.getElementById('legacy-migrate-status');
+  if(statusEl && !statusEl.innerHTML) statusEl.innerHTML = '';
+  var btn = document.getElementById('legacy-migrate-btn');
+  if(btn) btn.disabled = (count === 0);
 }
 
 // Re-render the open ticket timeline if it includes the given document.
@@ -7132,6 +7418,16 @@ function deleteDuplicates(){
         </div>
         <div id="purge-orphan-count" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">Scanning…</div>
         <button onclick="purgeSelectedOrphanType()" style="width:100%;padding:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;color:#f59e0b;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.12)'">🗑 Purge orphaned documents</button>
+      </div>
+      <!-- Legacy local file migration (only shown when localhost dev server detected) -->
+      <div id="legacy-migrate-panel" style="display:none;border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:14px 16px;background:rgba(245,158,11,.03)">
+        <div style="font-size:12px;font-weight:600;color:#f59e0b;margin-bottom:4px">📤 Migrate local files to cloud</div>
+        <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">
+          Documents uploaded via the localhost dev server live on this machine only and won't load on Netlify. This uploads each one to Supabase Storage so the live site can serve them. The originals on disk are untouched.
+        </div>
+        <div id="legacy-migrate-count" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">Scanning…</div>
+        <div id="legacy-migrate-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6;min-height:0"></div>
+        <button id="legacy-migrate-btn" onclick="_invMigrateAllLegacy()" style="width:100%;padding:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;color:#f59e0b;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.12)'">↑ Migrate all legacy local files</button>
       </div>
     </div>
   </div>
@@ -13363,6 +13659,9 @@ function showSettingsModal(){
   document.body.style.overflow='hidden';
   // Populate the Maintenance orphaned-document count for the current selection.
   if(typeof refreshMaintenanceOrphanCount === 'function') refreshMaintenanceOrphanCount();
+  // Show/hide + populate the legacy-file migration panel (only visible when
+  // the localhost dev server is responding, so the migration can actually run).
+  if(typeof refreshLegacyMigrationPanel === 'function') refreshLegacyMigrationPanel();
   // Permissions section is admin-only
   var permSec = document.getElementById('settings-permissions-section');
   if(permSec) permSec.style.display = (_currentRole === 'admin') ? '' : 'none';
