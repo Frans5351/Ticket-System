@@ -9037,18 +9037,27 @@ var _resolutionModalVotes = {};
     var ls = localStorage.getItem('pm_resolutions');
     if(ls) RESOLUTIONS = JSON.parse(ls);
   } catch(e){}
+  // Meetings and resolutions are loaded independently so a failure in one
+  // doesn't silently mask the other. Previously they sat in one try/catch
+  // with an empty catch handler — if meetings succeeded and resolutions then
+  // threw (for any reason), the catch swallowed the error and you ended up
+  // with one populated and the other mysteriously empty. We now log any
+  // failure so it surfaces in the console instead of disappearing.
   try {
     var rm = await sbLoadAll('meetings');
     if(Object.keys(rm).length){ Object.assign(MEETINGS, rm); localStorage.setItem('pm_meetings', JSON.stringify(MEETINGS)); }
+  } catch(e){ console.warn('loadMeetingsAndResolutions: meetings load failed', e); }
+  try {
     var rr = await sbLoadAll('resolutions');
     if(Object.keys(rr).length){ Object.assign(RESOLUTIONS, rr); localStorage.setItem('pm_resolutions', JSON.stringify(RESOLUTIONS)); }
-    // The Supabase load is async, so any render that ran before it completed
-    // (e.g. on first page load when localStorage is empty — typical on a fresh
-    // device like Netlify) would have seen an empty MEETINGS/RESOLUTIONS and
-    // rendered "no records." Re-trigger the panel render now that the data is
-    // populated so those panels update without needing a manual tab-switch.
-    if(typeof renderResolutionsPanel === 'function') renderResolutionsPanel();
-  } catch(e){}
+  } catch(e){ console.warn('loadMeetingsAndResolutions: resolutions load failed', e); }
+  // The Supabase load is async, so any render that ran before it completed
+  // (e.g. on first page load when localStorage is empty — typical on a fresh
+  // device like Netlify) would have seen an empty MEETINGS/RESOLUTIONS and
+  // rendered "no records." Re-trigger the panel render now that the data is
+  // populated so those panels update without needing a manual tab-switch.
+  try { if(typeof renderResolutionsPanel === 'function') renderResolutionsPanel(); }
+  catch(e){ console.warn('loadMeetingsAndResolutions: re-render failed', e); }
 })();
 
 async function saveMeetings(idsToSave){
