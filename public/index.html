@@ -5750,11 +5750,10 @@ document.getElementById('tbody').addEventListener('click', function(e){
             <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Status</div>
             <select id="tkt-status" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none" onchange="autoSaveTicket()">
               <option value="open">Open</option>
-              <option value="in_progress">In Progress</option>
+              <option value="in_progress">Investigating</option>
               <option value="awaiting_quote">Obtaining Quotes</option>
               <option value="awaiting_trustee_approval">Awaiting Trustee Approval</option>
               <option value="work_in_progress">Work In Progress</option>
-              <option value="resolved">Resolved</option>
               <option value="closed">Closed</option>
             </select>
           </div>
@@ -7429,6 +7428,19 @@ function deleteDuplicates(){
         <div id="legacy-migrate-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6;min-height:0"></div>
         <button id="legacy-migrate-btn" onclick="_invMigrateAllLegacy()" style="width:100%;padding:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;color:#f59e0b;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(245,158,11,.2)'" onmouseout="this.style.background='rgba(245,158,11,.12)'">↑ Migrate all legacy local files</button>
       </div>
+      <!-- Meetings & Resolutions sync. Pushes any meetings/resolutions in this
+           browser's local cache up to Supabase, so they appear on every
+           device. Useful when records were added before the Supabase tables
+           existed, or when local saves silently failed to upsert. -->
+      <div id="mtgres-sync-panel" style="border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:14px 16px;background:rgba(96,165,250,.03)">
+        <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:4px">☁ Sync meetings &amp; resolutions to cloud</div>
+        <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">
+          If meetings or resolutions display on one device but not another, your local browser cache has records that aren't in Supabase yet. Run this from the device that <b style="color:#c8d8f0">has</b> the data — it pushes everything up so all devices see the same set. Safe to run multiple times.
+        </div>
+        <div id="mtgres-sync-count" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">Scanning…</div>
+        <div id="mtgres-sync-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6;min-height:0"></div>
+        <button id="mtgres-sync-btn" onclick="_syncMeetingsAndResolutionsToCloud()" style="width:100%;padding:9px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);border-radius:8px;color:#60a5fa;font-size:12px;font-weight:500;font-family:var(--sans);cursor:pointer;transition:all .15s" onmouseover="this.style.background='rgba(96,165,250,.2)'" onmouseout="this.style.background='rgba(96,165,250,.12)'">☁ Sync now</button>
+      </div>
     </div>
   </div>
 </div>
@@ -9053,6 +9065,138 @@ async function saveResolutions(idsToSave){
   }
 }
 
+// ── Meetings + Resolutions cloud sync ─────────────────────────────────────
+// Some meeting/resolution records exist in this browser's localStorage but
+// never made it to Supabase — either they were created before the Supabase
+// tables existed, or a save quietly failed. This sync compares what's in
+// memory against what's in Supabase right now, upserts anything missing,
+// and reports the result. Idempotent: safe to run repeatedly.
+
+// Count of in-memory records that aren't in Supabase yet. Used to show the
+// status in the Maintenance panel before the user clicks Sync.
+async function _countMtgResNeedingSync(){
+  var result = { meetings: 0, resolutions: 0, inSupaMeetings: 0, inSupaResolutions: 0, error: null };
+  try {
+    var supaMeetings = await sbLoadAll('meetings');
+    var supaResolutions = await sbLoadAll('resolutions');
+    result.inSupaMeetings = Object.keys(supaMeetings || {}).length;
+    result.inSupaResolutions = Object.keys(supaResolutions || {}).length;
+    Object.keys(MEETINGS || {}).forEach(function(id){
+      if(!supaMeetings || !supaMeetings[id]) result.meetings++;
+    });
+    Object.keys(RESOLUTIONS || {}).forEach(function(id){
+      if(!supaResolutions || !supaResolutions[id]) result.resolutions++;
+    });
+  } catch(e){
+    result.error = String(e && e.message || e);
+  }
+  return result;
+}
+
+// Refresh the panel — call when Settings opens or the user clicks ↻.
+async function refreshMtgResSyncPanel(){
+  var countEl = document.getElementById('mtgres-sync-count');
+  var btn = document.getElementById('mtgres-sync-btn');
+  if(!countEl) return;
+  countEl.innerHTML = 'Scanning…';
+  var info = await _countMtgResNeedingSync();
+  if(info.error){
+    countEl.innerHTML = '<span style="color:#ef4444">Could not check: '+escHtml(info.error)+'</span>';
+    return;
+  }
+  var inMemMtg = Object.keys(MEETINGS || {}).length;
+  var inMemRes = Object.keys(RESOLUTIONS || {}).length;
+  var lines = [];
+  lines.push('Local cache: <b style="color:#c8d8f0">'+inMemMtg+'</b> meeting'+(inMemMtg!==1?'s':'')+', <b style="color:#c8d8f0">'+inMemRes+'</b> resolution'+(inMemRes!==1?'s':'')+'.');
+  lines.push('In Supabase: <b style="color:#c8d8f0">'+info.inSupaMeetings+'</b> meeting'+(info.inSupaMeetings!==1?'s':'')+', <b style="color:#c8d8f0">'+info.inSupaResolutions+'</b> resolution'+(info.inSupaResolutions!==1?'s':'')+'.');
+  if(info.meetings === 0 && info.resolutions === 0){
+    lines.push('<span style="color:#4ade9e">✓ Everything in the local cache is already in the cloud.</span>');
+    if(btn) btn.disabled = true;
+  } else {
+    var needs = [];
+    if(info.meetings) needs.push(info.meetings+' meeting'+(info.meetings!==1?'s':''));
+    if(info.resolutions) needs.push(info.resolutions+' resolution'+(info.resolutions!==1?'s':''));
+    lines.push('<b style="color:#f59e0b">'+needs.join(', ')+' missing from the cloud.</b>');
+    if(btn) btn.disabled = false;
+  }
+  countEl.innerHTML = lines.join('<br>');
+}
+
+// The actual sync: walks in-memory records and upserts the ones Supabase is
+// missing. Reports progress and a summary.
+async function _syncMeetingsAndResolutionsToCloud(){
+  var statusEl = document.getElementById('mtgres-sync-status');
+  var btn = document.getElementById('mtgres-sync-btn');
+  if(!statusEl || !btn) return;
+  btn.disabled = true; btn.style.opacity = '0.6';
+  statusEl.innerHTML = '<span style="color:var(--muted)">Comparing local cache against Supabase…</span>';
+
+  var supaMeetings, supaResolutions;
+  try {
+    supaMeetings = await sbLoadAll('meetings');
+    supaResolutions = await sbLoadAll('resolutions');
+  } catch(e){
+    statusEl.innerHTML = '<span style="color:#ef4444">Could not read from Supabase: '+escHtml(String(e && e.message || e))+'</span>';
+    btn.disabled = false; btn.style.opacity = '1';
+    return;
+  }
+
+  var meetingIds    = Object.keys(MEETINGS || {}).filter(function(id){ return !supaMeetings || !supaMeetings[id]; });
+  var resolutionIds = Object.keys(RESOLUTIONS || {}).filter(function(id){ return !supaResolutions || !supaResolutions[id]; });
+  var total = meetingIds.length + resolutionIds.length;
+  if(total === 0){
+    statusEl.innerHTML = '<span style="color:#4ade9e">Nothing to sync — everything is already in Supabase.</span>';
+    btn.disabled = false; btn.style.opacity = '1';
+    return;
+  }
+
+  if(!confirm('Sync '+total+' record'+(total!==1?'s':'')+' from this browser to Supabase?\n\n• '+meetingIds.length+' meeting'+(meetingIds.length!==1?'s':'')+'\n• '+resolutionIds.length+' resolution'+(resolutionIds.length!==1?'s':'')+'\n\nThis is safe to run multiple times — already-synced records are skipped.')){
+    btn.disabled = false; btn.style.opacity = '1';
+    return;
+  }
+
+  var ok = 0, fail = 0, failures = [];
+  var done = 0;
+  for(var i = 0; i < meetingIds.length; i++){
+    var id = meetingIds[i];
+    var rec = MEETINGS[id];
+    var title = (rec && (rec.title || (rec.type ? rec.type+' meeting' : id))) || id;
+    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">'+escHtml(title)+'</b>';
+    try {
+      await sbUpsert('meetings', id, rec);
+      ok++;
+    } catch(e){
+      fail++;
+      failures.push({ name: 'Meeting: '+title, reason: String(e && e.message || e) });
+    }
+  }
+  for(var j = 0; j < resolutionIds.length; j++){
+    var rid = resolutionIds[j];
+    var rrec = RESOLUTIONS[rid];
+    var rtitle = (rrec && (rrec.title || rid)) || rid;
+    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">'+escHtml(rtitle)+'</b>';
+    try {
+      await sbUpsert('resolutions', rid, rrec);
+      ok++;
+    } catch(e){
+      fail++;
+      failures.push({ name: 'Resolution: '+rtitle, reason: String(e && e.message || e) });
+    }
+  }
+
+  var summary = '<b style="color:#4ade9e">✓ '+ok+' synced</b>';
+  if(fail){
+    summary += ' &nbsp;·&nbsp; <b style="color:#ef4444">⚠ '+fail+' failed</b>';
+    summary += '<div style="margin-top:8px;font-size:10px;color:var(--muted);font-family:var(--mono);max-height:120px;overflow-y:auto">';
+    failures.forEach(function(f){ summary += '• '+escHtml(f.name)+': '+escHtml(f.reason)+'<br>'; });
+    summary += '</div>';
+  }
+  statusEl.innerHTML = summary;
+  btn.disabled = false; btn.style.opacity = '1';
+  // Refresh the count so the user can see the gap closed.
+  await refreshMtgResSyncPanel();
+}
+
 // ── Governance member helpers ─────────────────────────────────────────────
 // Roles and their governance standing:
 //   • trustee    — full voting member; counts toward quorum; may chair.
@@ -9939,23 +10083,43 @@ function updateTicketBadge(){
 }
 
 // ── Status / priority helpers ─────────────────────────────────────────────
+// "in_progress" was previously labelled "In Progress" — easily confused with
+// "Work In Progress" further down the flow. Now labelled "Investigating" to
+// make the distinction clear (Investigating = admin triaging the issue;
+// Work In Progress = supplier doing the approved paid work).
+//
+// "resolved" was merged into "closed" — they were functionally identical in
+// our workflow and users couldn't articulate the difference. Old tickets
+// stored as 'resolved' are normalised to 'closed' on read via normalizeStatus
+// below; they persist as 'closed' the next time they're saved for any reason.
 var TKT_STATUS = {
   open:           {label:'Open',           bg:'rgba(245,158,11,.15)', color:'#f59e0b', border:'rgba(245,158,11,.3)'},
-  in_progress:    {label:'In Progress',    bg:'rgba(59,130,246,.15)', color:'#60a5fa', border:'rgba(59,130,246,.3)'},
+  in_progress:    {label:'Investigating',  bg:'rgba(59,130,246,.15)', color:'#60a5fa', border:'rgba(59,130,246,.3)'},
   awaiting_quote: {label:'Obtaining Quotes', bg:'rgba(245,158,11,.1)',  color:'#f59e0b', border:'rgba(245,158,11,.25)'},
   awaiting_trustee_approval: {label:'Awaiting Trustee Approval', bg:'rgba(168,85,247,.12)', color:'#c084fc', border:'rgba(168,85,247,.3)'},
   work_in_progress:{label:'Work In Progress', bg:'rgba(167,139,250,.15)', color:'#a78bfa', border:'rgba(167,139,250,.3)'},
-  resolved:       {label:'Resolved',       bg:'rgba(74,222,158,.1)',  color:'#4ade9e', border:'rgba(74,222,158,.25)'},
-  closed:         {label:'Closed',         bg:'rgba(100,116,139,.15)',color:'#94a3b8', border:'rgba(100,116,139,.3)'}
+  closed:         {label:'Closed',         bg:'rgba(74,222,158,.1)',  color:'#4ade9e', border:'rgba(74,222,158,.25)'}
 };
+// Legacy alias: any data still carrying 'resolved' should render as Closed.
+// This entry lets existing code that does TKT_STATUS[ticket.status] still
+// find a definition without special-casing. Visual style matches 'closed'.
+TKT_STATUS.resolved = TKT_STATUS.closed;
+
+// Normalise a stored status value to its current canonical form. Use this
+// anywhere we read ticket.status for comparison or rendering logic, so the
+// merged 'resolved' → 'closed' migration is invisible to the rest of the app.
+function normalizeStatus(s){
+  if(s === 'resolved') return 'closed';
+  return s;
+}
+
 var TKT_FLOW = [
   {value:'open',          label:'Open',           color:'#f59e0b'},
-  {value:'in_progress',   label:'In Progress',    color:'#60a5fa'},
+  {value:'in_progress',   label:'Investigating',  color:'#60a5fa'},
   {value:'awaiting_quote',label:'Obtaining Quotes', color:'#f59e0b'},
   {value:'awaiting_trustee_approval', label:'Awaiting Approval', color:'#c084fc'},
   {value:'work_in_progress', label:'Work In Progress', color:'#a78bfa'},
-  {value:'resolved',      label:'Resolved',       color:'#4ade9e'},
-  {value:'closed',        label:'Closed',         color:'#64748b'}
+  {value:'closed',        label:'Closed',         color:'#4ade9e'}
 ];
 
 function renderStatusFlow(currentStatus){
@@ -11057,7 +11221,7 @@ function toggleTicketFilter(statusKey){
 function renderTicketFilterChips(){
   var host = document.getElementById('tkt-filter-chips');
   if(!host) return;
-  var order = ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress','resolved','closed'];
+  var order = ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
   host.innerHTML = order.filter(function(k){ return TKT_STATUS[k]; }).map(function(k){
     var s = TKT_STATUS[k];
     var active = !!_ticketStatusFilter[k];
@@ -11405,7 +11569,10 @@ function openTicketModal(ticketId){
     }
   }
   document.getElementById('tkt-desc').value = t.desc||'';
-  document.getElementById('tkt-status').value = t.status||'open';
+  // Normalise on populate: legacy 'resolved' tickets show as Closed in the
+  // dropdown. Without this, the dropdown would fall back to empty (no matching
+  // option) and the next autosave would demote the ticket to Open.
+  document.getElementById('tkt-status').value = normalizeStatus(t.status||'open');
   document.getElementById('tkt-priority').value = t.priority||'medium';
   document.getElementById('tkt-category').value = t.category||'';
   document.getElementById('tkt-unit').value = t.unit||'';
@@ -11799,8 +11966,8 @@ function buildTimelineEvents(t){
       kind: 'closed',
       icon: '✅',
       color: '#4ade9e',
-      title: (t.status==='resolved'?'Resolved':'Closed'),
-      body: 'Ticket marked '+(t.status||'closed')
+      title: 'Closed',
+      body: 'Ticket marked closed'
     });
   }
 
@@ -12004,24 +12171,30 @@ async function retryTimelineDoc(docId){
   } catch(e){ console.warn('retryTimelineDoc failed', e); }
 }
 
-function autoSaveTicketNow(){
-  var title = (document.getElementById('tkt-title')||{value:''}).value.trim();
-  if(!title || !_currentTicketId) return;
-  var prev = TICKETS[_currentTicketId] || {};
-  var anonChecked = document.getElementById('tkt-anonymous')&&document.getElementById('tkt-anonymous').checked;
-  TICKETS[_currentTicketId] = {
-    id: _currentTicketId, title: title,
+// Shared form → ticket builder used by both autoSaveTicketNow (immediate)
+// and the debounced autoSaveTicket. Having one builder prevents the silent
+// field-drift we hit before — e.g. one autosave reading tkt-reporter-phone
+// while the other quietly wiped it on every save. If you add a new field to
+// the ticket modal, add it here once and both save paths get it for free.
+function _buildTicketFromForm(id, prev){
+  prev = prev || {};
+  var anonChecked = document.getElementById('tkt-anonymous') && document.getElementById('tkt-anonymous').checked;
+  function v(elId){ var el = document.getElementById(elId); return el ? (el.value || '') : ''; }
+  function vt(elId){ return v(elId).trim(); }
+  return {
+    id: id,
+    title: vt('tkt-title'),
     ticketNumber: (prev.ticketNumber !== undefined && prev.ticketNumber !== null) ? prev.ticketNumber : nextTicketNumber(),
-    desc: (document.getElementById('tkt-desc')||{value:''}).value.trim(),
-    category: (document.getElementById('tkt-category')||{value:''}).value,
-    status: (document.getElementById('tkt-status')||{value:'open'}).value||'open',
-    priority: (document.getElementById('tkt-priority')||{value:'medium'}).value||'medium',
-    unit: (document.getElementById('tkt-unit')||{value:''}).value.trim(),
-    reporter: anonChecked?'Anonymous':(document.getElementById('tkt-reporter')||{value:''}).value.trim(),
-    reporterPhone: anonChecked ? '' : (document.getElementById('tkt-reporter-phone')||{value:''}).value.trim(),
-    reporterEmail: anonChecked ? '' : (document.getElementById('tkt-reporter-email')||{value:''}).value.trim(),
-    dateOpen: (document.getElementById('tkt-date-open')||{value:''}).value,
-    dateClose: (document.getElementById('tkt-date-close')||{value:''}).value,
+    desc: vt('tkt-desc'),
+    category: v('tkt-category'),
+    status: normalizeStatus(v('tkt-status') || 'open'),
+    priority: v('tkt-priority') || 'medium',
+    unit: vt('tkt-unit'),
+    reporter: anonChecked ? 'Anonymous' : vt('tkt-reporter'),
+    reporterPhone: anonChecked ? '' : vt('tkt-reporter-phone'),
+    reporterEmail: anonChecked ? '' : vt('tkt-reporter-email'),
+    dateOpen: v('tkt-date-open'),
+    dateClose: v('tkt-date-close'),
     createdBy: (prev.createdBy !== undefined) ? prev.createdBy : (_currentUserObj ? _currentUserObj.id : null),
     approvals: prev.approvals,
     approvedQuoteId: prev.approvedQuoteId,
@@ -12033,12 +12206,21 @@ function autoSaveTicketNow(){
     createdViaPublicForm: prev.createdViaPublicForm,
     reporterEditToken: prev.reporterEditToken,
     reporterUserId: prev.reporterUserId,
-    linkedDocIds: prev.linkedDocIds||[], log: prev.log||[],
-    assignedSupplierIds: prev.assignedSupplierIds||[],
-    quotes: prev.quotes||{},
-    quoteTokens: prev.quoteTokens||{},
-    added: prev.added||Date.now(), updated: Date.now()
+    linkedDocIds: prev.linkedDocIds || [],
+    log: prev.log || [],
+    assignedSupplierIds: prev.assignedSupplierIds || [],
+    quotes: prev.quotes || {},
+    quoteTokens: prev.quoteTokens || {},
+    added: prev.added || Date.now(),
+    updated: Date.now(),
   };
+}
+
+function autoSaveTicketNow(){
+  var title = (document.getElementById('tkt-title')||{value:''}).value.trim();
+  if(!title || !_currentTicketId) return;
+  var prev = TICKETS[_currentTicketId] || {};
+  TICKETS[_currentTicketId] = _buildTicketFromForm(_currentTicketId, prev);
   saveTickets([_currentTicketId]);
   // Status may have just changed via the dropdown — re-render the supplier
   // section so it shows/hides based on the current status (it only appears in
@@ -12075,36 +12257,7 @@ function autoSaveTicket(){
       refreshStatusDropdownGating(prev);
       return;
     }
-    TICKETS[id] = {
-      id: id, title: title,
-      ticketNumber: (prev.ticketNumber !== undefined && prev.ticketNumber !== null) ? prev.ticketNumber : nextTicketNumber(),
-      desc: document.getElementById('tkt-desc').value.trim(),
-      category: document.getElementById('tkt-category').value,
-      status: status,
-      priority: document.getElementById('tkt-priority').value,
-      unit: document.getElementById('tkt-unit').value.trim(),
-      reporter: (document.getElementById('tkt-anonymous')&&document.getElementById('tkt-anonymous').checked)?'Anonymous':document.getElementById('tkt-reporter').value.trim(),
-      dateOpen: document.getElementById('tkt-date-open').value,
-      dateClose: document.getElementById('tkt-date-close').value,
-      createdBy: (prev.createdBy !== undefined) ? prev.createdBy : (_currentUserObj ? _currentUserObj.id : null),
-      approvals: prev.approvals,
-      approvedQuoteId: prev.approvedQuoteId,
-      approvedBy: prev.approvedBy,
-      approvedByName: prev.approvedByName,
-      approvedAt: prev.approvedAt,
-      shareToken: prev.shareToken,
-    criteria: prev.criteria,
-    createdViaPublicForm: prev.createdViaPublicForm,
-    reporterEditToken: prev.reporterEditToken,
-    reporterUserId: prev.reporterUserId,
-      linkedDocIds: prev.linkedDocIds||[],
-      log: prev.log||[],
-      assignedSupplierIds: prev.assignedSupplierIds||[],
-      quotes: prev.quotes||{},
-      quoteTokens: prev.quoteTokens||{},
-      added: prev.added||Date.now(),
-      updated: Date.now()
-    };
+    TICKETS[id] = _buildTicketFromForm(id, prev);
     // If status moved BACK to pre-approval (open, in_progress, awaiting_quote,
     // awaiting_trustee_approval) and there WERE approvals, clear them so the
     // workflow restarts cleanly. Moving forward (work_in_progress, resolved,
@@ -13662,6 +13815,9 @@ function showSettingsModal(){
   // Show/hide + populate the legacy-file migration panel (only visible when
   // the localhost dev server is responding, so the migration can actually run).
   if(typeof refreshLegacyMigrationPanel === 'function') refreshLegacyMigrationPanel();
+  // Populate the meetings/resolutions sync panel — counts local cache vs
+  // Supabase so the admin can see at a glance if there's a gap.
+  if(typeof refreshMtgResSyncPanel === 'function') refreshMtgResSyncPanel();
   // Permissions section is admin-only
   var permSec = document.getElementById('settings-permissions-section');
   if(permSec) permSec.style.display = (_currentRole === 'admin') ? '' : 'none';
