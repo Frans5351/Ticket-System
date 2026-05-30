@@ -15009,13 +15009,34 @@ async function renderShareView(){
           var file = (results[1]&&results[1][0]) ? results[1][0].file_data : null;
           if(meta){
             var name = meta.invCompany || meta.name || invId;
-            var isImg = meta.type && meta.type.indexOf('image/')===0;
             var src = file || meta.data || '';
+            // Type detection: prefer the explicit type field, but fall back to
+            // the filename extension. Many older records (and some upload
+            // paths) leave meta.type empty, so without the fallback every
+            // such image would render as a generic 📄 placeholder. This is
+            // the same detection rule used by the in-app viewer.
+            var nm = ((meta.name||'') + ' ' + (meta.filename||'') + ' ' + name).toLowerCase();
+            var isImg = (meta.type && meta.type.indexOf('image/') === 0)
+                      || /\.(jpe?g|png|gif|webp|bmp|heic)(\s|$)/i.test(nm);
+            var isPdf = meta.type === 'application/pdf'
+                      || /\.pdf(\s|$)/i.test(nm);
+            var isVid = (meta.type && meta.type.indexOf('video/') === 0)
+                      || /\.(mp4|webm|ogg|mov|m4v|3gp|quicktime)(\s|$)/i.test(nm);
+            var isAud = (meta.type && meta.type.indexOf('audio/') === 0)
+                      || /\.(mp3|wav|m4a|aac|oga|opus|weba|flac|amr)(\s|$)/i.test(nm);
             var thumb;
             if(isImg && src){
-              thumb = '<img src="'+src+'" style="width:100%;height:140px;object-fit:cover;display:block">';
-            } else if(meta.type === 'application/pdf' && src){
+              thumb = '<img src="'+src+'" style="width:100%;height:140px;object-fit:cover;display:block" '
+                    + 'onerror="this.parentNode.innerHTML=\'<div style=&quot;display:flex;align-items:center;justify-content:center;height:140px;background:var(--surface2);color:var(--muted);font-family:var(--mono);font-size:11px&quot;>📄 (image unavailable)</div>\'">';
+            } else if(isPdf && src){
               thumb = '<a href="'+src+'" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;height:140px;background:rgba(123,104,238,.08);color:#9d8ff7;font-family:var(--mono);font-size:11px;text-decoration:none;border-bottom:1px solid var(--border)">📄 Open PDF</a>';
+            } else if(isVid && src){
+              thumb = '<video src="'+src+'" controls preload="metadata" style="width:100%;height:140px;object-fit:cover;display:block;background:#000"></video>';
+            } else if(isAud && src){
+              thumb = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:140px;background:var(--surface2);gap:6px;padding:10px">'
+                    +   '<div style="font-size:24px">🎵</div>'
+                    +   '<audio src="'+src+'" controls style="width:100%;max-width:200px"></audio>'
+                    + '</div>';
             } else {
               thumb = '<div style="display:flex;align-items:center;justify-content:center;height:140px;background:var(--surface2);color:var(--muted);font-family:var(--mono);font-size:11px">📄</div>';
             }
