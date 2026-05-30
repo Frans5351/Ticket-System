@@ -11257,19 +11257,26 @@ function renderTickets(){
 
   var all = Object.values(TICKETS);
 
-  // Stats bar
+  // Stats bar — normalise status so legacy 'resolved' rolls into 'closed'.
+  // Without this, the bar renders two "Closed" chips (one for each raw key)
+  // because TKT_STATUS.resolved is aliased to TKT_STATUS.closed.
   var counts = {};
-  all.forEach(function(t){ counts[t.status]=(counts[t.status]||0)+1; });
-  if(stats) stats.innerHTML = Object.keys(TKT_STATUS).filter(function(k){return counts[k];}).map(function(k){
+  all.forEach(function(t){
+    var s = normalizeStatus(t.status);
+    counts[s]=(counts[s]||0)+1;
+  });
+  // Build the chips from the canonical set of statuses, EXCLUDING the
+  // legacy 'resolved' alias key so we don't render two "Closed" chips.
+  if(stats) stats.innerHTML = Object.keys(TKT_STATUS).filter(function(k){return counts[k] && k !== 'resolved';}).map(function(k){
     var s=TKT_STATUS[k];
     return '<span style="color:'+s.color+'">'+(counts[k]||0)+' '+s.label+'</span>';
   }).join('<span style="color:var(--border2);margin:0 4px">·</span>');
 
-  // Filter by status (multi-select). A ticket is shown if its status is in
-  // the active set. If no chips are active, nothing is shown — the empty
-  // chip strip is itself the explanation for why the list is empty.
+  // Filter by status (multi-select). A ticket is shown if its (normalised)
+  // status is in the active set — so a legacy 'resolved' ticket is matched
+  // by clicking the 'Closed' filter chip.
   var filtered = all.filter(function(t){
-    return !!_ticketStatusFilter[t.status];
+    return !!_ticketStatusFilter[normalizeStatus(t.status)];
   });
 
   // Role-based scope: residents and viewers only see tickets they created
@@ -11322,7 +11329,7 @@ function renderTickets(){
   if(_activeStatusCount > 1){
     var _statusOrder = Object.keys(TKT_STATUS);
     var _rank = function(t){
-      var i = _statusOrder.indexOf(t.status);
+      var i = _statusOrder.indexOf(normalizeStatus(t.status));
       return i === -1 ? 999 : i;
     };
     filtered.sort(function(a,b){ return _rank(a) - _rank(b); });
