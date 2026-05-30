@@ -9042,6 +9042,12 @@ var _resolutionModalVotes = {};
     if(Object.keys(rm).length){ Object.assign(MEETINGS, rm); localStorage.setItem('pm_meetings', JSON.stringify(MEETINGS)); }
     var rr = await sbLoadAll('resolutions');
     if(Object.keys(rr).length){ Object.assign(RESOLUTIONS, rr); localStorage.setItem('pm_resolutions', JSON.stringify(RESOLUTIONS)); }
+    // The Supabase load is async, so any render that ran before it completed
+    // (e.g. on first page load when localStorage is empty — typical on a fresh
+    // device like Netlify) would have seen an empty MEETINGS/RESOLUTIONS and
+    // rendered "no records." Re-trigger the panel render now that the data is
+    // populated so those panels update without needing a manual tab-switch.
+    if(typeof renderResolutionsPanel === 'function') renderResolutionsPanel();
   } catch(e){}
 })();
 
