@@ -1296,7 +1296,7 @@ async function checkStorageSetup(){
   <button class="tab admin-only" data-tab="invoices">Documents</button>
   <button class="tab admin-only" data-tab="suppliers">Suppliers</button>
   <button class="tab admin-only" data-tab="resolutions">Resolutions</button>
-  <button class="tab active" data-tab="tickets" id="tickets-tab">Tickets <span id="tickets-badge" style="display:none;background:#f59e0b;color:#000;border-radius:10px;font-size:9px;padding:1px 5px;font-weight:700;margin-left:4px;vertical-align:middle"></span></button>
+  <button class="tab active" data-tab="tickets" id="tickets-tab">Tracker <span id="tickets-badge" style="display:none;background:#f59e0b;color:#000;border-radius:10px;font-size:9px;padding:1px 5px;font-weight:700;margin-left:4px;vertical-align:middle"></span></button>
   <button class="tab admin-only" data-tab="users">Users</button>
   <button class="tab admin-only" data-tab="recon">Data Loaded</button>
   <button class="tab" data-tab="supplier-portal" id="supplier-portal-tab" style="display:none">My Jobs <span id="supplier-portal-badge" style="display:none;background:#4ade9e;color:#000;border-radius:10px;font-size:9px;padding:1px 5px;font-weight:700;margin-left:4px;vertical-align:middle"></span></button>
@@ -4176,7 +4176,7 @@ var NAV_MENU_META = {
   invoices:     { label:'Documents',    icon:'\u{1F4C4}' },
   suppliers:    { label:'Suppliers',    icon:'\u{1F527}' },
   resolutions:  { label:'Resolutions',  icon:'\u2696\uFE0F' },
-  tickets:      { label:'Tickets',      icon:'\u{1F6E0}\uFE0F' },
+  tickets:      { label:'Tracker',      icon:'\u{1F6E0}\uFE0F' },
   users:        { label:'Users',        icon:'\u{1F465}' },
   recon:        { label:'Data Loaded',  icon:'\u{1F4E5}' },
   'supplier-portal': { label:'My Jobs', icon:'\u{1F6E0}\uFE0F' }
@@ -4371,20 +4371,31 @@ function renderDashboard(){
   renderDashCashflow();
 
   // ---- Tickets ----
+  // Split by type: the maintenance breakdown only counts maintenance tickets
+  // so the status bars stay meaningful (otherwise action items with status
+  // 'open' would inflate the Open bar). Action items get their own mini card.
   var tks = Object.values(TICKETS);
+  var maintTks = tks.filter(function(t){ return (t.type || 'maintenance') === 'maintenance'; });
+  var actionTks = tks.filter(function(t){ return t.type === 'action'; });
   var statusMeta = {};
   (TKT_FLOW||[]).forEach(function(s){ statusMeta[s.value] = s; });
   var counts = {};
-  tks.forEach(function(t){ var s = t.status||'open'; counts[s] = (counts[s]||0)+1; });
+  maintTks.forEach(function(t){ var s = t.status||'open'; counts[s] = (counts[s]||0)+1; });
   var activeStatuses = ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress'];
   var activeCount = activeStatuses.reduce(function(a,s){ return a+(counts[s]||0); }, 0);
   var resolvedCount = (counts['resolved']||0) + (counts['closed']||0);
   var awaitingApproval = counts['awaiting_trustee_approval']||0;
+  // Action item counts — open vs done.
+  var actionOpenCount = actionTks.filter(function(t){ return normalizeStatus(t.status) !== 'closed'; }).length;
+  var today = new Date().toISOString().slice(0,10);
+  var actionOverdue = actionTks.filter(function(t){
+    return normalizeStatus(t.status) !== 'closed' && t.dueDate && t.dueDate < today;
+  }).length;
   var tHost = document.getElementById('dash-tickets');
   if(tHost){
     var rows = (TKT_FLOW||[]).filter(function(s){ return (counts[s.value]||0) > 0; }).map(function(s){
       var n = counts[s.value]||0;
-      var pct = tks.length ? Math.round(n/tks.length*100) : 0;
+      var pct = maintTks.length ? Math.round(n/maintTks.length*100) : 0;
       return '<div style="margin-bottom:9px">'
         +'<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">'
           +'<span style="color:#c8d8f0">'+escHtml(s.label)+'</span>'
@@ -4393,11 +4404,17 @@ function renderDashboard(){
         +'<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+s.color+'"></div></div>'
       +'</div>';
     }).join('');
+    // Build the mini-card row: maintenance active/resolved/awaiting, plus
+    // action items open (label hints at overdue when there are overdue ones).
+    var actionMiniLabel = actionOverdue
+      ? 'Action items ('+actionOverdue+' overdue)'
+      : 'Action items';
     tHost.innerHTML =
-      '<div style="display:flex;gap:10px;margin-bottom:14px">'
+      '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">'
         +dashMini('Active', activeCount, '#f59e0b')
         +dashMini('Resolved', resolvedCount, '#4ade9e')
         +dashMini('Awaiting approval', awaitingApproval, '#c084fc')
+        +dashMini(actionMiniLabel, actionOpenCount, actionOverdue ? '#f59e0b' : '#60a5fa')
       +'</div>'
       + (tks.length ? rows : '<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">No tickets yet.</div>');
   }
@@ -5282,6 +5299,20 @@ document.getElementById('tbody').addEventListener('click', function(e){
         </div>
         <div id="mtg-docs-list" style="display:flex;flex-wrap:wrap;gap:5px;min-height:0"></div>
       </div>
+
+      <!-- Action items linked to this meeting -->
+      <!-- Mirror of the global Tracker, filtered to action items whose
+           parentMeetingId matches the current meeting. Lets users create
+           and tick off action items in the context of the meeting they
+           came from. Hidden when creating a new (unsaved) meeting since
+           action items need a saved meeting id to link to. -->
+      <div id="mtg-actions-section" style="display:none;border-top:1px solid var(--border);padding-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);flex:1">Action items <span style="color:#3a5070;font-weight:400">— tasks that came out of this meeting</span></div>
+          <button onclick="openNewActionItemFromMeeting()" style="padding:5px 10px;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);border-radius:6px;color:#60a5fa;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer">+ Add action item</button>
+        </div>
+        <div id="mtg-actions-list" style="display:flex;flex-direction:column;gap:5px;min-height:0"></div>
+      </div>
     </div>
     <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface2);flex-shrink:0">
       <button onclick="cancelMeetingModal()" style="padding:8px 16px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:12px;font-family:var(--mono);cursor:pointer">Cancel</button>
@@ -5501,9 +5532,9 @@ document.getElementById('tbody').addEventListener('click', function(e){
 <!-- TICKETS PANEL -->
 <div class="panel active" id="panel-tickets">
   <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:10">
-    <div style="font-size:13px;font-weight:600;color:#c8d8f0;white-space:nowrap">&#x1F3AB; Tickets</div>
+    <div style="font-size:13px;font-weight:600;color:#c8d8f0;white-space:nowrap">&#x1F4CB; Tracker</div>
     <div id="tkt-filter-chips" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-    <input id="ticket-search" type="text" placeholder="Search tickets..." style="flex:1;min-width:160px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none" oninput="renderTickets()">
+    <input id="ticket-search" type="text" placeholder="Search tracker..." style="flex:1;min-width:160px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none" oninput="renderTickets()">
     <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
       <select id="ticket-sort" onchange="renderTickets()" style="padding:5px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--mono);outline:none">
         <option value="newest">Newest first</option>
@@ -5511,7 +5542,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
         <option value="priority">Priority</option>
         <option value="updated">Recently updated</option>
       </select>
-      <button id="new-tkt-btn" onclick="openNewTktSheet()" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> New Ticket</button>
+      <button id="new-tkt-btn" onclick="openTrackerTypeChooser()" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> New</button>
     </div>
   </div>
   <div id="ticket-stats" style="padding:8px 20px;border-bottom:1px solid var(--border);display:flex;gap:16px;font-size:11px;font-family:var(--mono);flex-wrap:wrap"></div>
@@ -5696,6 +5727,144 @@ document.getElementById('tbody').addEventListener('click', function(e){
   </div>
 </div>
 
+<!-- TRACKER TYPE CHOOSER —
+     Opens when user taps "+ New" on the Tracker page. Asks whether they
+     want to create a maintenance ticket (the existing full workflow with
+     status flow, supplier quotes, trustee approval) or a lightweight
+     action item (a thing to do, owned by someone, with a due date). -->
+<div id="tracker-type-chooser" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:710;align-items:center;justify-content:center;padding:20px;overflow-y:auto" onclick="if(event.target===this)closeTrackerTypeChooser()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(440px,96vw);padding:24px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <div style="font-size:18px;font-weight:700;color:#c8d8f0;flex:1">What are you adding?</div>
+      <button onclick="closeTrackerTypeChooser()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;padding:0">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:18px;line-height:1.5">Both live in the Tracker. Pick the one that fits.</div>
+
+    <button onclick="closeTrackerTypeChooser();openNewTktSheet()" style="display:flex;align-items:flex-start;gap:14px;width:100%;text-align:left;padding:14px 16px;margin-bottom:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.background='rgba(123,104,238,.08)'" onmouseout="this.style.borderColor='var(--border2)';this.style.background='var(--surface2)'">
+      <div style="font-size:24px;line-height:1">🔧</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:#c8d8f0;margin-bottom:3px">Maintenance ticket</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5">Building/unit issue that may need quotes, trustee approval, and supplier work. Goes through the full workflow.</div>
+      </div>
+    </button>
+
+    <button onclick="closeTrackerTypeChooser();openNewActionItemSheet()" style="display:flex;align-items:flex-start;gap:14px;width:100%;text-align:left;padding:14px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-family:inherit;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.background='rgba(123,104,238,.08)'" onmouseout="this.style.borderColor='var(--border2)';this.style.background='var(--surface2)'">
+      <div style="font-size:24px;line-height:1">📋</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:#c8d8f0;margin-bottom:3px">Action item</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.5">A task assigned to someone, optionally linked to a meeting. Simple Open → Done status.</div>
+      </div>
+    </button>
+  </div>
+</div>
+
+<!-- ACTION ITEM SHEET —
+     Slim sibling of the new-ticket sheet. Reuses the same slide-up styles
+     (.new-tkt-sheet, .new-tkt-inner, .new-tkt-body, .tkt-input, etc.) so
+     it looks consistent. Field set: title, description, owner, due date,
+     parent meeting, status. Saves into TICKETS with type='action'. -->
+<div class="new-tkt-sheet" id="new-action-sheet" onclick="if(event.target===this)closeNewActionSheet()">
+  <div class="new-tkt-inner">
+    <div class="new-tkt-drag"></div>
+    <div style="display:flex;align-items:center;padding:14px 20px 0;gap:10px">
+      <div style="font-size:16px;font-weight:700;color:#c8d8f0;flex:1">📋 New Action Item</div>
+      <button onclick="closeNewActionSheet()" style="background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer;line-height:1;padding:0">×</button>
+    </div>
+    <div class="new-tkt-body">
+
+      <div class="new-tkt-section">
+        <label class="tkt-field-label">What needs to be done? *</label>
+        <input id="nact-title" class="tkt-input" type="text" placeholder="e.g. Obtain 3 quotes for block A repaint" oninput="nactValidate()">
+      </div>
+
+      <div class="new-tkt-section">
+        <label class="tkt-field-label">Details (optional)</label>
+        <textarea id="nact-desc" class="tkt-input" rows="3" placeholder="Context, scope, links to other docs..." style="resize:none;font-size:14px"></textarea>
+      </div>
+
+      <div class="new-tkt-section">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="tkt-field-label">Owner *</label>
+            <select id="nact-owner" class="tkt-input" onchange="nactValidate()" style="font-size:14px"></select>
+          </div>
+          <div>
+            <label class="tkt-field-label">Due date (optional)</label>
+            <input id="nact-due" class="tkt-input" type="date" style="font-size:14px">
+          </div>
+        </div>
+      </div>
+
+      <div class="new-tkt-section">
+        <label class="tkt-field-label">Parent meeting (optional)</label>
+        <select id="nact-meeting" class="tkt-input" style="font-size:14px">
+          <option value="">— Not tied to a meeting —</option>
+        </select>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:6px;line-height:1.5">If this action came out of a meeting, link it so it appears on that meeting's page too.</div>
+      </div>
+
+      <div class="new-tkt-section" style="padding-bottom:16px">
+        <button id="nact-submit" onclick="submitNewActionItem()" disabled style="width:100%;padding:14px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;opacity:.4;transition:opacity .15s">Create action item</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION ITEM DETAIL MODAL —
+     Opened when clicking an action-item row in the Tracker. Much simpler
+     than the maintenance ticket modal: just title, description, owner,
+     due date, parent meeting, Open/Done toggle, comments/log, linked docs.
+     No status flow, no supplier section, no trustee approval, no priority. -->
+<div id="action-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:700;align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto" onclick="if(event.target===this)closeActionItemModal()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(640px,96vw)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+          <span style="font-size:9px;color:#60a5fa;font-family:var(--mono);background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);padding:1px 7px;border-radius:9px;white-space:nowrap">📋 Action Item</span>
+          <span id="act-number" style="font-size:10px;color:#9d8ff7;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px"></span>
+        </div>
+        <input id="act-title" type="text" placeholder="Action title..." style="width:100%;background:none;border:none;color:#c8d8f0;font-size:16px;font-weight:600;outline:none;font-family:var(--sans);padding:0" oninput="autoSaveActionItem()">
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button id="act-done-btn" onclick="toggleActionItemDone()" style="padding:6px 14px;border-radius:6px;background:rgba(74,222,158,.12);border:1px solid rgba(74,222,158,.3);color:#4ade9e;font-size:11px;cursor:pointer;font-family:var(--mono);font-weight:600">✓ Mark done</button>
+        <button onclick="deleteActionItem()" style="padding:6px 10px;border-radius:6px;background:rgba(240,111,111,.08);border:1px solid rgba(240,111,111,.25);color:#f06f6f;font-size:11px;cursor:pointer;font-family:var(--mono)" title="Delete this action item">Delete</button>
+        <button onclick="closeActionItemModal()" style="padding:6px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-size:14px;cursor:pointer;line-height:1">×</button>
+      </div>
+    </div>
+    <div style="padding:18px 20px">
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Details</div>
+        <textarea id="act-desc" rows="3" placeholder="Context, scope, links..." oninput="autoSaveActionItem()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--sans);padding:10px;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Owner</div>
+          <select id="act-owner" onchange="autoSaveActionItem()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--mono);padding:8px;outline:none"></select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Due date</div>
+          <input id="act-due" type="date" onchange="autoSaveActionItem()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--mono);padding:8px;outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Status</div>
+          <div id="act-status-badge" style="padding:8px;border-radius:8px;text-align:center;font-size:12px;font-family:var(--mono);font-weight:600"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Parent meeting</div>
+        <select id="act-meeting" onchange="autoSaveActionItem()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--mono);padding:8px;outline:none"></select>
+      </div>
+      <div style="margin-bottom:6px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Activity</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input id="act-note-input" type="text" placeholder="Add a note or comment..." onkeydown="if(event.key==='Enter')addActionItemNote()" style="flex:1;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none">
+          <button onclick="addActionItemNote()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">Add</button>
+        </div>
+        <div id="act-log" style="display:flex;flex-direction:column;gap:5px;max-height:240px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="ticket-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:700;align-items:flex-start;justify-content:center;padding:20px 16px;overflow-y:auto" onclick="if(event.target===this)closeTicketModal()">
   <div id="ticket-modal-card" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(760px,96vw)">
@@ -7433,9 +7602,9 @@ function deleteDuplicates(){
            device. Useful when records were added before the Supabase tables
            existed, or when local saves silently failed to upsert. -->
       <div id="mtgres-sync-panel" style="border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:14px 16px;background:rgba(96,165,250,.03)">
-        <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:4px">☁ Sync meetings &amp; resolutions to cloud</div>
+        <div style="font-size:12px;font-weight:600;color:#60a5fa;margin-bottom:4px">☁ Sync everything to cloud</div>
         <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">
-          If meetings or resolutions display on one device but not another, your local browser cache has records that aren't in Supabase yet. Run this from the device that <b style="color:#c8d8f0">has</b> the data — it pushes everything up so all devices see the same set. Safe to run multiple times.
+          If records (meetings, resolutions, or documents) display on one device but not another, your local browser cache holds data that isn't in Supabase yet. This pushes everything up — including legacy local files — so all devices see the same set. Run it from the device that <b style="color:#c8d8f0">has</b> the data. Safe to run multiple times.
         </div>
         <div id="mtgres-sync-count" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6">Scanning…</div>
         <div id="mtgres-sync-status" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:10px;line-height:1.6;min-height:0"></div>
@@ -9080,27 +9249,46 @@ async function saveResolutions(idsToSave){
   }
 }
 
-// ── Meetings + Resolutions cloud sync ─────────────────────────────────────
-// Some meeting/resolution records exist in this browser's localStorage but
-// never made it to Supabase — either they were created before the Supabase
-// tables existed, or a save quietly failed. This sync compares what's in
-// memory against what's in Supabase right now, upserts anything missing,
-// and reports the result. Idempotent: safe to run repeatedly.
+// ── Unified cloud sync — meetings + resolutions + documents ───────────────
+// Some records exist in this browser's localStorage/memory but never made
+// it to Supabase — either created before the tables existed, or saves
+// quietly failed. This sync compares what's in memory against what's in
+// Supabase right now, upserts anything missing, and (for documents whose
+// file bytes only live on the local dev server) uploads the bytes too.
+// Idempotent: safe to run repeatedly.
 
-// Count of in-memory records that aren't in Supabase yet. Used to show the
-// status in the Maintenance panel before the user clicks Sync.
+// Count of in-memory records that aren't in Supabase yet, across all three
+// kinds. Used to show the status in the Maintenance panel before the user
+// clicks Sync.
 async function _countMtgResNeedingSync(){
-  var result = { meetings: 0, resolutions: 0, inSupaMeetings: 0, inSupaResolutions: 0, error: null };
+  var result = {
+    meetings: 0, resolutions: 0, documents: 0, localFiles: 0,
+    inSupaMeetings: 0, inSupaResolutions: 0, inSupaDocuments: 0,
+    error: null
+  };
   try {
-    var supaMeetings = await sbLoadAll('meetings');
+    var supaMeetings    = await sbLoadAll('meetings');
     var supaResolutions = await sbLoadAll('resolutions');
-    result.inSupaMeetings = Object.keys(supaMeetings || {}).length;
+    var supaInvoices    = await sbLoadAll('invoices');
+    result.inSupaMeetings    = Object.keys(supaMeetings    || {}).length;
     result.inSupaResolutions = Object.keys(supaResolutions || {}).length;
-    Object.keys(MEETINGS || {}).forEach(function(id){
-      if(!supaMeetings || !supaMeetings[id]) result.meetings++;
+    result.inSupaDocuments   = Object.keys(supaInvoices    || {}).length;
+    Object.keys(MEETINGS    || {}).forEach(function(id){
+      if(!supaMeetings    || !supaMeetings[id])    result.meetings++;
     });
     Object.keys(RESOLUTIONS || {}).forEach(function(id){
       if(!supaResolutions || !supaResolutions[id]) result.resolutions++;
+    });
+    // Documents: two sub-cases.
+    //   (a) Metadata-row not in Supabase yet → needs an upsert.
+    //   (b) Metadata in Supabase but file bytes only on the local dev
+    //       server (the URL points at /attachments/, no storagePath) →
+    //       needs a file upload to Storage so Netlify can serve it.
+    Object.keys(INVOICES || {}).forEach(function(id){
+      var inv = INVOICES[id];
+      if(!inv) return;
+      if(!supaInvoices || !supaInvoices[id]) result.documents++;
+      else if(_isLegacyLocalDoc(inv)) result.localFiles++;
     });
   } catch(e){
     result.error = String(e && e.message || e);
@@ -9108,7 +9296,7 @@ async function _countMtgResNeedingSync(){
   return result;
 }
 
-// Refresh the panel — call when Settings opens or the user clicks ↻.
+// Refresh the panel — call when Settings opens or after a sync completes.
 async function refreshMtgResSyncPanel(){
   var countEl = document.getElementById('mtgres-sync-count');
   var btn = document.getElementById('mtgres-sync-btn');
@@ -9119,26 +9307,33 @@ async function refreshMtgResSyncPanel(){
     countEl.innerHTML = '<span style="color:#ef4444">Could not check: '+escHtml(info.error)+'</span>';
     return;
   }
-  var inMemMtg = Object.keys(MEETINGS || {}).length;
+  var inMemMtg = Object.keys(MEETINGS    || {}).length;
   var inMemRes = Object.keys(RESOLUTIONS || {}).length;
+  var inMemDoc = Object.keys(INVOICES    || {}).length;
   var lines = [];
-  lines.push('Local cache: <b style="color:#c8d8f0">'+inMemMtg+'</b> meeting'+(inMemMtg!==1?'s':'')+', <b style="color:#c8d8f0">'+inMemRes+'</b> resolution'+(inMemRes!==1?'s':'')+'.');
-  lines.push('In Supabase: <b style="color:#c8d8f0">'+info.inSupaMeetings+'</b> meeting'+(info.inSupaMeetings!==1?'s':'')+', <b style="color:#c8d8f0">'+info.inSupaResolutions+'</b> resolution'+(info.inSupaResolutions!==1?'s':'')+'.');
-  if(info.meetings === 0 && info.resolutions === 0){
+  lines.push('Local cache: <b style="color:#c8d8f0">'+inMemMtg+'</b> meeting'+(inMemMtg!==1?'s':'')+', <b style="color:#c8d8f0">'+inMemRes+'</b> resolution'+(inMemRes!==1?'s':'')+', <b style="color:#c8d8f0">'+inMemDoc+'</b> document'+(inMemDoc!==1?'s':'')+'.');
+  lines.push('In Supabase: <b style="color:#c8d8f0">'+info.inSupaMeetings+'</b> meeting'+(info.inSupaMeetings!==1?'s':'')+', <b style="color:#c8d8f0">'+info.inSupaResolutions+'</b> resolution'+(info.inSupaResolutions!==1?'s':'')+', <b style="color:#c8d8f0">'+info.inSupaDocuments+'</b> document'+(info.inSupaDocuments!==1?'s':'')+'.');
+  var totalNeeded = info.meetings + info.resolutions + info.documents + info.localFiles;
+  if(totalNeeded === 0){
     lines.push('<span style="color:#4ade9e">✓ Everything in the local cache is already in the cloud.</span>');
     if(btn) btn.disabled = true;
   } else {
     var needs = [];
-    if(info.meetings) needs.push(info.meetings+' meeting'+(info.meetings!==1?'s':''));
+    if(info.meetings)    needs.push(info.meetings+' meeting'+(info.meetings!==1?'s':''));
     if(info.resolutions) needs.push(info.resolutions+' resolution'+(info.resolutions!==1?'s':''));
-    lines.push('<b style="color:#f59e0b">'+needs.join(', ')+' missing from the cloud.</b>');
+    if(info.documents)   needs.push(info.documents+' document'+(info.documents!==1?'s':'')+' (metadata)');
+    if(info.localFiles)  needs.push(info.localFiles+' local file'+(info.localFiles!==1?'s':'')+' (bytes upload)');
+    lines.push('<b style="color:#f59e0b">'+needs.join(', ')+' need uploading.</b>');
     if(btn) btn.disabled = false;
   }
   countEl.innerHTML = lines.join('<br>');
 }
 
-// The actual sync: walks in-memory records and upserts the ones Supabase is
-// missing. Reports progress and a summary.
+// The unified sync: walks in-memory records across all three kinds and
+// uploads everything Supabase is missing. Phase 1 upserts meeting metadata,
+// phase 2 resolution metadata, phase 3 invoice/receipt/etc. metadata, phase
+// 4 the local-only file bytes (via the existing _invMigrateOne helper).
+// Reports progress and a summary at the end.
 async function _syncMeetingsAndResolutionsToCloud(){
   var statusEl = document.getElementById('mtgres-sync-status');
   var btn = document.getElementById('mtgres-sync-btn');
@@ -9146,57 +9341,103 @@ async function _syncMeetingsAndResolutionsToCloud(){
   btn.disabled = true; btn.style.opacity = '0.6';
   statusEl.innerHTML = '<span style="color:var(--muted)">Comparing local cache against Supabase…</span>';
 
-  var supaMeetings, supaResolutions;
+  var supaMeetings, supaResolutions, supaInvoices;
   try {
-    supaMeetings = await sbLoadAll('meetings');
+    supaMeetings    = await sbLoadAll('meetings');
     supaResolutions = await sbLoadAll('resolutions');
+    supaInvoices    = await sbLoadAll('invoices');
   } catch(e){
     statusEl.innerHTML = '<span style="color:#ef4444">Could not read from Supabase: '+escHtml(String(e && e.message || e))+'</span>';
     btn.disabled = false; btn.style.opacity = '1';
     return;
   }
 
-  var meetingIds    = Object.keys(MEETINGS || {}).filter(function(id){ return !supaMeetings || !supaMeetings[id]; });
+  var meetingIds    = Object.keys(MEETINGS    || {}).filter(function(id){ return !supaMeetings    || !supaMeetings[id]; });
   var resolutionIds = Object.keys(RESOLUTIONS || {}).filter(function(id){ return !supaResolutions || !supaResolutions[id]; });
-  var total = meetingIds.length + resolutionIds.length;
+  var documentIds   = Object.keys(INVOICES    || {}).filter(function(id){ return !supaInvoices    || !supaInvoices[id]; });
+  // For legacy local files we only target docs that ARE already in Supabase
+  // (metadata-side) but whose file bytes are still local. The metadata-missing
+  // docs above will be uploaded via sbUpsert which doesn't carry the file
+  // bytes; if those docs are also legacy-local they'll get caught on the
+  // NEXT run, since after the metadata upsert they then qualify for the
+  // legacy-local pass. Keeping the phases independent avoids race conditions
+  // with sbUpsert running concurrently with the file upload pipeline.
+  var localFileIds = Object.keys(INVOICES || {}).filter(function(id){
+    var inv = INVOICES[id];
+    return inv && supaInvoices && supaInvoices[id] && _isLegacyLocalDoc(inv);
+  });
+
+  var total = meetingIds.length + resolutionIds.length + documentIds.length + localFileIds.length;
   if(total === 0){
     statusEl.innerHTML = '<span style="color:#4ade9e">Nothing to sync — everything is already in Supabase.</span>';
     btn.disabled = false; btn.style.opacity = '1';
     return;
   }
 
-  if(!confirm('Sync '+total+' record'+(total!==1?'s':'')+' from this browser to Supabase?\n\n• '+meetingIds.length+' meeting'+(meetingIds.length!==1?'s':'')+'\n• '+resolutionIds.length+' resolution'+(resolutionIds.length!==1?'s':'')+'\n\nThis is safe to run multiple times — already-synced records are skipped.')){
+  var confirmLines = [];
+  if(meetingIds.length)    confirmLines.push('• '+meetingIds.length+' meeting'+(meetingIds.length!==1?'s':''));
+  if(resolutionIds.length) confirmLines.push('• '+resolutionIds.length+' resolution'+(resolutionIds.length!==1?'s':''));
+  if(documentIds.length)   confirmLines.push('• '+documentIds.length+' document'+(documentIds.length!==1?'s':'')+' (metadata)');
+  if(localFileIds.length)  confirmLines.push('• '+localFileIds.length+' local file'+(localFileIds.length!==1?'s':'')+' (bytes upload — requires local dev server running)');
+  if(!confirm('Sync '+total+' record'+(total!==1?'s':'')+' from this browser to Supabase?\n\n'+confirmLines.join('\n')+'\n\nThis is safe to run multiple times — already-synced records are skipped.')){
     btn.disabled = false; btn.style.opacity = '1';
     return;
   }
 
   var ok = 0, fail = 0, failures = [];
   var done = 0;
+
+  // Phase 1: meetings
   for(var i = 0; i < meetingIds.length; i++){
-    var id = meetingIds[i];
-    var rec = MEETINGS[id];
-    var title = (rec && (rec.title || (rec.type ? rec.type+' meeting' : id))) || id;
-    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">'+escHtml(title)+'</b>';
-    try {
-      await sbUpsert('meetings', id, rec);
-      ok++;
-    } catch(e){
-      fail++;
-      failures.push({ name: 'Meeting: '+title, reason: String(e && e.message || e) });
-    }
+    var mId = meetingIds[i];
+    var mRec = MEETINGS[mId];
+    var mTitle = (mRec && (mRec.title || (mRec.type ? mRec.type+' meeting' : mId))) || mId;
+    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">Meeting · '+escHtml(mTitle)+'</b>';
+    try { await sbUpsert('meetings', mId, mRec); ok++; }
+    catch(e){ fail++; failures.push({ name: 'Meeting: '+mTitle, reason: String(e && e.message || e) }); }
   }
+  // Phase 2: resolutions
   for(var j = 0; j < resolutionIds.length; j++){
-    var rid = resolutionIds[j];
-    var rrec = RESOLUTIONS[rid];
-    var rtitle = (rrec && (rrec.title || rid)) || rid;
-    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">'+escHtml(rtitle)+'</b>';
+    var rId = resolutionIds[j];
+    var rRec = RESOLUTIONS[rId];
+    var rTitle = (rRec && (rRec.title || rId)) || rId;
+    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">Resolution · '+escHtml(rTitle)+'</b>';
+    try { await sbUpsert('resolutions', rId, rRec); ok++; }
+    catch(e){ fail++; failures.push({ name: 'Resolution: '+rTitle, reason: String(e && e.message || e) }); }
+  }
+  // Phase 3: document metadata (records whose row isn't in Supabase yet).
+  // Note: this upserts the WHOLE INVOICES[id] object including any inline
+  // base64 in inv.data. For records whose file bytes are local-only (URL
+  // points at /attachments/), the bytes won't ride along — those are handled
+  // separately in phase 4.
+  for(var k = 0; k < documentIds.length; k++){
+    var dId = documentIds[k];
+    var dRec = INVOICES[dId];
+    var dTitle = (dRec && (dRec.name || dRec.filename || dId)) || dId;
+    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">Document · '+escHtml(dTitle)+'</b>';
     try {
-      await sbUpsert('resolutions', rid, rrec);
+      // Strip inline base64 from the metadata row before saving — same rule
+      // as saveInvoiceMeta. Big base64 in the data row would balloon storage.
+      var meta = Object.assign({}, dRec);
+      meta.data = null;
+      await sbUpsert('invoices', dId, meta);
       ok++;
-    } catch(e){
-      fail++;
-      failures.push({ name: 'Resolution: '+rtitle, reason: String(e && e.message || e) });
     }
+    catch(e){ fail++; failures.push({ name: 'Document: '+dTitle, reason: String(e && e.message || e) }); }
+  }
+  // Phase 4: legacy local file bytes — push to Supabase Storage so the live
+  // site can serve them. Requires the localhost dev server to be running so
+  // we can fetch the original file off disk. If it isn't running, each one
+  // fails with a clear "Local file fetch failed" message and the rest of
+  // the sync (which is already complete) stands.
+  for(var l = 0; l < localFileIds.length; l++){
+    var fId = localFileIds[l];
+    var fRec = INVOICES[fId];
+    var fTitle = (fRec && (fRec.name || fRec.filename || fId)) || fId;
+    statusEl.innerHTML = 'Uploading '+(++done)+' of '+total+': <b style="color:#c8d8f0">File · '+escHtml(fTitle)+'</b>';
+    var migrateResult = await _invMigrateOne(fId, null);
+    if(migrateResult && migrateResult.ok) ok++;
+    else { fail++; failures.push({ name: 'File: '+fTitle, reason: (migrateResult && migrateResult.reason) || 'unknown' }); }
   }
 
   var summary = '<b style="color:#4ade9e">✓ '+ok+' synced</b>';
@@ -9425,6 +9666,15 @@ function openMeetingModal(meetingId){
   renderMeetingAttendeeList();
   renderMeetingChairSelect(m.chairedBy);
   renderMeetingDocList();
+  // Action items linked to this meeting — only meaningful for saved meetings
+  // (a new meeting has no id to link to yet, so it's hidden until the first
+  // save). renderMeetingActionItems reads TICKETS for type==='action' with
+  // parentMeetingId === _currentMeetingId.
+  var actSection = document.getElementById('mtg-actions-section');
+  if(actSection){
+    actSection.style.display = isNew ? 'none' : '';
+    if(!isNew) renderMeetingActionItems();
+  }
   document.getElementById('meeting-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   document.getElementById('mtg-title').focus();
@@ -9615,6 +9865,72 @@ function addMeetingDocsFromPicker(){
 function removeMeetingDoc(idx){
   _meetingModalDocIds.splice(idx, 1);
   renderMeetingDocList();  // refreshes picker so the doc becomes selectable again
+}
+
+// ── Meeting → Action Items ────────────────────────────────────────────────
+// Renders the action items linked to the currently-open meeting (via
+// parentMeetingId). Click a row to open the full action-item modal; the
+// "+ Add action item" button opens the new-action sheet pre-filled with
+// this meeting selected.
+function renderMeetingActionItems(){
+  var host = document.getElementById('mtg-actions-list');
+  if(!host || !_currentMeetingId) return;
+  var items = Object.values(TICKETS || {}).filter(function(t){
+    return t && t.type === 'action' && t.parentMeetingId === _currentMeetingId;
+  });
+  // Open items first, then by due date; closed items sink to the bottom and
+  // are sorted by most-recently closed.
+  items.sort(function(a,b){
+    var ao = normalizeStatus(a.status) === 'closed' ? 1 : 0;
+    var bo = normalizeStatus(b.status) === 'closed' ? 1 : 0;
+    if(ao !== bo) return ao - bo;
+    if(ao === 0){
+      // Both open — sort by due date asc, nulls last
+      var ad = a.dueDate || '9999-12-31';
+      var bd = b.dueDate || '9999-12-31';
+      return ad.localeCompare(bd);
+    }
+    return (b.updated||0) - (a.updated||0);
+  });
+  if(!items.length){
+    host.innerHTML = '<span style="font-size:10px;color:#3a5070;font-family:var(--mono);font-style:italic">No action items yet — tap "+ Add" above to create one.</span>';
+    return;
+  }
+  var today = new Date().toISOString().slice(0,10);
+  host.innerHTML = items.map(function(t){
+    var done = normalizeStatus(t.status) === 'closed';
+    var overdue = !done && t.dueDate && t.dueDate < today;
+    var statusIcon = done ? '✓' : (overdue ? '⚠' : '○');
+    var statusColor = done ? '#4ade9e' : (overdue ? '#f06f6f' : '#f59e0b');
+    var dueStr = t.dueDate
+      ? new Date(t.dueDate).toLocaleDateString('en-ZA',{day:'numeric',month:'short'})
+      : '';
+    return '<div onclick="openTicketModal(\''+t.id+'\')" style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'rgba(96,165,250,.06)\'" onmouseout="this.style.background=\'var(--surface2)\'">'
+      +'<span style="font-size:14px;color:'+statusColor+';width:14px;text-align:center;flex-shrink:0">'+statusIcon+'</span>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12px;font-weight:600;color:'+(done?'var(--muted)':'#c8d8f0')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis'+(done?';text-decoration:line-through':'')+'">'+escHtml(t.title||'(untitled)')+'</div>'
+        +'<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px">'
+          +(t.reporter?escHtml(t.reporter):'No owner')
+          +(dueStr?' · <span style="color:'+(overdue?'#f06f6f':'var(--muted)')+'">'+(overdue?'⚠ Overdue · ':'Due ')+dueStr+'</span>':'')
+        +'</div>'
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
+// Open the new-action sheet pre-filled with the current meeting selected.
+// Called from the "+ Add action item" button inside the meeting modal.
+function openNewActionItemFromMeeting(){
+  var meetingId = _currentMeetingId;
+  if(!meetingId){ alert('Save the meeting first before adding action items.'); return; }
+  // Open the standard new-action sheet, then force the meeting select to
+  // this meeting (since openNewActionItemSheet rebuilds the dropdown from
+  // scratch, we set the value after it runs).
+  openNewActionItemSheet();
+  setTimeout(function(){
+    var mtgSel = document.getElementById('nact-meeting');
+    if(mtgSel) mtgSel.value = meetingId;
+  }, 50);
 }
 
 // (Re)build the doc-picker options. Excludes documents already linked to
@@ -11367,12 +11683,38 @@ function renderTickets(){
       var label = met ? ('✓ '+leading+' / '+TRUSTEE_APPROVAL_THRESHOLD) : (leading+' / '+TRUSTEE_APPROVAL_THRESHOLD+' approvals');
       awaitApprovalPill = '<span title="'+escHtml(tip)+'" style="font-size:9px;font-family:var(--mono);font-weight:600;color:'+color+';background:'+bg+';border:1px solid '+border+';padding:1px 7px;border-radius:9px;white-space:nowrap">'+label+'</span>';
     }
-    return '<div class="tkt-card priority-'+(t.priority||'medium')+' status-'+(t.status||'open')+'" onclick="openTicketModal(\''+t.id+'\''+')">'
+    // Type badge — distinguishes maintenance tickets from action items in the
+    // mixed Tracker list. Defaults to maintenance for legacy data with no
+    // explicit type field. Action items get a coloured left border too via
+    // the type-action class on the card.
+    var ttype = t.type || 'maintenance';
+    var typeBadge = ttype === 'action'
+      ? '<span style="font-size:9px;color:#60a5fa;font-family:var(--mono);background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);padding:1px 7px;border-radius:9px;white-space:nowrap">📋 Action</span>'
+      : '<span style="font-size:9px;color:#a78bfa;font-family:var(--mono);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);padding:1px 7px;border-radius:9px;white-space:nowrap">🔧 Maintenance</span>';
+    // Due-date pill for action items (only if due date set). Goes red if overdue.
+    var duePill = '';
+    if(ttype === 'action' && t.dueDate){
+      var today = new Date().toISOString().slice(0,10);
+      var overdue = t.dueDate < today && normalizeStatus(t.status) !== 'closed';
+      var dueColor = overdue ? '#f06f6f' : '#8aa0bd';
+      var dueBg = overdue ? 'rgba(240,111,111,.1)' : 'rgba(138,160,189,.08)';
+      var dueBorder = overdue ? 'rgba(240,111,111,.3)' : 'rgba(138,160,189,.2)';
+      var dueLabel = (overdue?'⚠ Overdue · ':'Due ')+new Date(t.dueDate).toLocaleDateString('en-ZA',{day:'numeric',month:'short'});
+      duePill = '<span style="font-size:9px;color:'+dueColor+';font-family:var(--mono);background:'+dueBg+';border:1px solid '+dueBorder+';padding:1px 7px;border-radius:9px;white-space:nowrap">'+dueLabel+'</span>';
+    }
+    // For action items the priority pill on the right has no meaning; show
+    // owner instead so the row is more informative at a glance.
+    var rightPill = ttype === 'action'
+      ? '<div style="font-size:11px;color:#60a5fa">'+(t.reporter ? escHtml(t.reporter) : '')+'</div>'
+      : '<div style="font-size:11px;font-weight:600;color:'+p.color+'">'+p.label+'</div>';
+    return '<div class="tkt-card priority-'+(t.priority||'medium')+' status-'+(t.status||'open')+' type-'+ttype+'" onclick="openTicketModal(\''+t.id+'\''+')">'
       +'<div style="flex:1;min-width:0">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px">'
-          +(t.ticketNumber?'<span style="font-size:10px;color:#9d8ff7;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600">Ticket # '+t.ticketNumber+'</span>':'')
+          +typeBadge
+          +(t.ticketNumber?'<span style="font-size:10px;color:#9d8ff7;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600">#'+t.ticketNumber+'</span>':'')
           +tktStatusBadge(t.status)
           +awaitApprovalPill
+          +duePill
           +(t.createdViaPublicForm?'<span title="Submitted via the public report form" style="font-size:9px;color:#60a5fa;font-family:var(--mono);background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);padding:1px 7px;border-radius:9px;white-space:nowrap">🌐 Public</span>':'')
           +(t.category?'<span style="font-size:9px;color:var(--muted);font-family:var(--mono)">'+escHtml(t.category)+'</span>':'')
           +(t.unit?'<span style="font-size:9px;color:#5a7fa8;font-family:var(--mono)">Unit '+escHtml(t.unit)+'</span>':'')
@@ -11381,13 +11723,13 @@ function renderTickets(){
         +(t.desc?'<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(t.desc.slice(0,80))+'</div>':'')
         +'<div style="display:flex;gap:10px;margin-top:6px;font-size:10px;font-family:var(--mono);color:var(--muted)">'
           +'<span>'+d+'</span>'
-          +(t.reporter?'<span>'+escHtml(t.reporter)+'</span>':'')
+          +(ttype !== 'action' && t.reporter?'<span>'+escHtml(t.reporter)+'</span>':'')
           +(docCount?'<span style="color:#9d8ff7">'+docCount+' doc'+(docCount!==1?'s':'')+'</span>':'')
           +(logCount?'<span>'+logCount+' note'+(logCount!==1?'s':'')+'</span>':'')
         +'</div>'
       +'</div>'
       +'<div style="text-align:right;flex-shrink:0">'
-        +'<div style="font-size:11px;font-weight:600;color:'+p.color+'">'+p.label+'</div>'
+        +rightPill
       +'</div>'
     +'</div>';
   }).join('');
@@ -11553,6 +11895,14 @@ async function unlinkTicketUser(){
 }
 
 function openTicketModal(ticketId){
+  // Dispatch to the action-item modal for type='action' rows. Action items
+  // are a much simpler shape than maintenance tickets — they don't need the
+  // supplier section, status flow pills, trustee approval panel, etc., so
+  // they get their own modal rather than living inside the maintenance one
+  // with conditional hiding everywhere.
+  if(ticketId && TICKETS[ticketId] && TICKETS[ticketId].type === 'action'){
+    if(typeof openActionItemModal === 'function'){ openActionItemModal(ticketId); return; }
+  }
   _currentTicketId = ticketId;
   var isNew = !ticketId || !TICKETS[ticketId];
   var t = isNew ? {title:'',desc:'',category:'',status:'open',priority:'medium',unit:'',reporter:'',dateOpen:new Date().toISOString().slice(0,10),dateClose:'',linkedDocIds:[],log:[]} : TICKETS[ticketId];
@@ -12205,6 +12555,7 @@ function _buildTicketFromForm(id, prev){
   function vt(elId){ return v(elId).trim(); }
   return {
     id: id,
+    type: prev.type || 'maintenance',
     title: vt('tkt-title'),
     ticketNumber: (prev.ticketNumber !== undefined && prev.ticketNumber !== null) ? prev.ticketNumber : nextTicketNumber(),
     desc: vt('tkt-desc'),
@@ -14480,6 +14831,352 @@ document.addEventListener('visibilitychange', function(){
   }).catch(function(){});
 });
 
+// ── Tracker Type Chooser ──────────────────────────────────────────────────
+// The "+ New" button on the Tracker opens this chooser, which routes to
+// either the maintenance-ticket sheet (existing) or the action-item sheet
+// (new). Both ultimately save into the TICKETS collection with an explicit
+// 'type' field so the rest of the system can filter/render appropriately.
+function openTrackerTypeChooser(){
+  document.getElementById('tracker-type-chooser').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closeTrackerTypeChooser(){
+  document.getElementById('tracker-type-chooser').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ── New Action Item Sheet ─────────────────────────────────────────────────
+// Lightweight sibling of the new-ticket sheet. Fields: title, description,
+// owner (user picker), due date, parent meeting. No category, no priority,
+// no supplier flow, no trustee approval. Status starts at 'open' and can
+// only move to 'closed' (Done) — handled from the detail modal later.
+function openNewActionItemSheet(){
+  // Reset form fields
+  document.getElementById('nact-title').value = '';
+  document.getElementById('nact-desc').value = '';
+  document.getElementById('nact-due').value = '';
+
+  // Populate owner dropdown from USERS
+  var ownerSel = document.getElementById('nact-owner');
+  ownerSel.innerHTML = '<option value="">— Pick an owner —</option>';
+  var users = (typeof USERS === 'object' && USERS) ? Object.values(USERS) : [];
+  users.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  users.forEach(function(u){
+    var opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name || u.email || u.id;
+    ownerSel.appendChild(opt);
+  });
+  // Default owner = current user (most common case is "I'll do it myself")
+  if(_currentUserObj && _currentUserObj.id) ownerSel.value = _currentUserObj.id;
+
+  // Populate meeting dropdown from MEETINGS (newest first)
+  var mtgSel = document.getElementById('nact-meeting');
+  mtgSel.innerHTML = '<option value="">— Not tied to a meeting —</option>';
+  var meetings = (typeof MEETINGS === 'object' && MEETINGS) ? Object.values(MEETINGS) : [];
+  meetings.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  meetings.forEach(function(m){
+    var opt = document.createElement('option');
+    opt.value = m.id;
+    var lbl = (m.title || m.id);
+    if(m.date) lbl += ' · ' + m.date;
+    opt.textContent = lbl;
+    mtgSel.appendChild(opt);
+  });
+
+  document.getElementById('new-action-sheet').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  nactValidate();
+  setTimeout(function(){ var t = document.getElementById('nact-title'); if(t) t.focus(); }, 100);
+}
+
+function closeNewActionSheet(){
+  document.getElementById('new-action-sheet').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function nactValidate(){
+  var title = (document.getElementById('nact-title').value||'').trim();
+  var owner = document.getElementById('nact-owner').value;
+  var btn = document.getElementById('nact-submit');
+  // Require title + owner. Due date and meeting are optional.
+  var ready = title.length >= 3 && !!owner;
+  btn.disabled = !ready;
+  btn.style.opacity = ready ? '1' : '.45';
+  btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+}
+
+function submitNewActionItem(){
+  var title = (document.getElementById('nact-title').value||'').trim();
+  var desc  = (document.getElementById('nact-desc').value||'').trim();
+  var ownerId = document.getElementById('nact-owner').value;
+  var due = document.getElementById('nact-due').value;
+  var meetingId = document.getElementById('nact-meeting').value;
+  if(!title || !ownerId){ alert('Title and owner are required.'); return; }
+
+  var id = scopedId('tkt_'+Date.now()+'_'+Math.random().toString(36).slice(2,5));
+  var owner = (typeof USERS === 'object' && USERS) ? USERS[ownerId] : null;
+  var ownerName = (owner && (owner.name || owner.email)) || 'Unknown';
+
+  // Build the action item record. It lives in TICKETS but with type='action'
+  // so the rest of the system can distinguish it. Fields parallel a ticket
+  // but several maintenance-only ones are intentionally omitted.
+  TICKETS[id] = {
+    id: id,
+    type: 'action',
+    title: title,
+    desc: desc,
+    ticketNumber: nextTicketNumber(),  // shared number space for now
+    status: 'open',                    // action items: open or closed
+    priority: 'medium',                // unused for actions but kept for shared rendering paths
+    category: '',                       // not used for actions
+    unit: '',                           // not used for actions
+    reporter: ownerName,                // "owner" stored in reporter field for shared rendering
+    reporterUserId: ownerId,            // explicit owner id for filters
+    reporterPhone: '',
+    reporterEmail: (owner && owner.email) || '',
+    dateOpen: new Date().toISOString().slice(0,10),
+    dateClose: '',
+    dueDate: due || '',
+    parentMeetingId: meetingId || '',
+    createdBy: (_currentUserObj && _currentUserObj.id) || null,
+    approvals: [], approvedQuoteId: null, approvedBy: null, approvedByName: null, approvedAt: null,
+    shareToken: null, criteria: null,
+    createdViaPublicForm: false,
+    reporterEditToken: null,
+    linkedDocIds: [], log: [],
+    assignedSupplierIds: [], quotes: {}, quoteTokens: {},
+    added: Date.now(), updated: Date.now(),
+  };
+  // Log the creation so it appears on the timeline if the user opts it in.
+  TICKETS[id].log.push({
+    ts: Date.now(),
+    type: 'status',
+    text: 'Action item created' + (meetingId ? ' from meeting' : ''),
+    byName: (_currentUserObj && _currentUserObj.name) || 'Admin',
+    inTimeline: true,
+  });
+  saveTickets([id]);
+  closeNewActionSheet();
+  if(typeof renderTickets === 'function') renderTickets();
+  if(typeof renderDashboard === 'function') renderDashboard();
+  // If this was created from inside the meeting modal, refresh that list too
+  // so the new item appears immediately when the user returns to the meeting.
+  if(typeof renderMeetingActionItems === 'function' && _currentMeetingId && meetingId === _currentMeetingId){
+    renderMeetingActionItems();
+  }
+}
+
+// ── Action Item Detail Modal ──────────────────────────────────────────────
+// Opened via openTicketModal() when the row's type is 'action'. The modal
+// itself lives in #action-modal. Autosaves on every change like the
+// maintenance modal does.
+var _currentActionItemId = null;
+var _actSaveTimer = null;
+
+function openActionItemModal(id){
+  var t = TICKETS[id];
+  if(!t){ console.warn('openActionItemModal: no ticket', id); return; }
+  _currentActionItemId = id;
+
+  // Header: ticket number
+  document.getElementById('act-number').textContent = t.ticketNumber ? '# '+t.ticketNumber : '';
+  document.getElementById('act-title').value = t.title || '';
+  document.getElementById('act-desc').value = t.desc || '';
+  document.getElementById('act-due').value = t.dueDate || '';
+
+  // Populate owner dropdown
+  var ownerSel = document.getElementById('act-owner');
+  ownerSel.innerHTML = '<option value="">— No owner —</option>';
+  var users = (typeof USERS === 'object' && USERS) ? Object.values(USERS) : [];
+  users.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+  users.forEach(function(u){
+    var opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name || u.email || u.id;
+    ownerSel.appendChild(opt);
+  });
+  ownerSel.value = t.reporterUserId || '';
+
+  // Populate meeting dropdown
+  var mtgSel = document.getElementById('act-meeting');
+  mtgSel.innerHTML = '<option value="">— Not tied to a meeting —</option>';
+  var meetings = (typeof MEETINGS === 'object' && MEETINGS) ? Object.values(MEETINGS) : [];
+  meetings.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+  meetings.forEach(function(m){
+    var opt = document.createElement('option');
+    opt.value = m.id;
+    var lbl = (m.title || m.id);
+    if(m.date) lbl += ' · ' + m.date;
+    opt.textContent = lbl;
+    mtgSel.appendChild(opt);
+  });
+  mtgSel.value = t.parentMeetingId || '';
+
+  // Status badge + done button
+  refreshActionItemStatusUI();
+  // Activity log
+  renderActionItemLog();
+
+  document.getElementById('action-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeActionItemModal(){
+  document.getElementById('action-modal').style.display = 'none';
+  document.body.style.overflow = '';
+  _currentActionItemId = null;
+}
+
+function refreshActionItemStatusUI(){
+  var t = TICKETS[_currentActionItemId];
+  if(!t) return;
+  var done = normalizeStatus(t.status) === 'closed';
+  var badge = document.getElementById('act-status-badge');
+  badge.textContent = done ? '✓ Done' : '○ Open';
+  badge.style.color = done ? '#4ade9e' : '#f59e0b';
+  badge.style.background = done ? 'rgba(74,222,158,.12)' : 'rgba(245,158,11,.1)';
+  badge.style.border = '1px solid '+(done ? 'rgba(74,222,158,.3)' : 'rgba(245,158,11,.3)');
+  var btn = document.getElementById('act-done-btn');
+  if(done){
+    btn.textContent = '↺ Reopen';
+    btn.style.color = '#f59e0b';
+    btn.style.background = 'rgba(245,158,11,.1)';
+    btn.style.border = '1px solid rgba(245,158,11,.3)';
+  } else {
+    btn.textContent = '✓ Mark done';
+    btn.style.color = '#4ade9e';
+    btn.style.background = 'rgba(74,222,158,.12)';
+    btn.style.border = '1px solid rgba(74,222,158,.3)';
+  }
+}
+
+function toggleActionItemDone(){
+  var t = TICKETS[_currentActionItemId];
+  if(!t) return;
+  var done = normalizeStatus(t.status) === 'closed';
+  if(done){
+    // Reopen
+    t.status = 'open';
+    t.dateClose = '';
+    t.log = t.log || [];
+    t.log.push({
+      ts: Date.now(),
+      type: 'status',
+      text: 'Reopened',
+      byName: (_currentUserObj && _currentUserObj.name) || 'Admin',
+      inTimeline: true,
+    });
+  } else {
+    // Mark done
+    t.status = 'closed';
+    t.dateClose = new Date().toISOString().slice(0,10);
+    t.log = t.log || [];
+    t.log.push({
+      ts: Date.now(),
+      type: 'status',
+      text: 'Marked done',
+      byName: (_currentUserObj && _currentUserObj.name) || 'Admin',
+      inTimeline: true,
+    });
+  }
+  t.updated = Date.now();
+  saveTickets([t.id]);
+  refreshActionItemStatusUI();
+  renderActionItemLog();
+  if(typeof renderTickets === 'function') renderTickets();
+  if(typeof renderMeetingActionItems === 'function' && _currentMeetingId && t.parentMeetingId === _currentMeetingId){
+    renderMeetingActionItems();
+  }
+}
+
+function autoSaveActionItem(){
+  if(!_currentActionItemId) return;
+  clearTimeout(_actSaveTimer);
+  _actSaveTimer = setTimeout(function(){
+    var t = TICKETS[_currentActionItemId];
+    if(!t) return;
+    var newTitle = (document.getElementById('act-title').value||'').trim();
+    var newDesc  = (document.getElementById('act-desc').value||'').trim();
+    var newOwner = document.getElementById('act-owner').value;
+    var newDue   = document.getElementById('act-due').value;
+    var newMtg   = document.getElementById('act-meeting').value;
+    if(!newTitle) return; // require title
+    t.title = newTitle;
+    t.desc  = newDesc;
+    if(newOwner !== (t.reporterUserId || '')){
+      var owner = (typeof USERS === 'object' && USERS) ? USERS[newOwner] : null;
+      t.reporterUserId = newOwner;
+      t.reporter = (owner && (owner.name || owner.email)) || '';
+      t.reporterEmail = (owner && owner.email) || '';
+    }
+    t.dueDate = newDue || '';
+    t.parentMeetingId = newMtg || '';
+    t.updated = Date.now();
+    saveTickets([t.id]);
+    if(typeof renderTickets === 'function') renderTickets();
+    if(typeof renderMeetingActionItems === 'function' && _currentMeetingId && t.parentMeetingId === _currentMeetingId){
+      renderMeetingActionItems();
+    }
+  }, 350);
+}
+
+function addActionItemNote(){
+  var t = TICKETS[_currentActionItemId];
+  if(!t) return;
+  var input = document.getElementById('act-note-input');
+  var text = (input.value||'').trim();
+  if(!text) return;
+  t.log = t.log || [];
+  t.log.push({
+    ts: Date.now(),
+    type: 'note',
+    text: text,
+    byName: (_currentUserObj && _currentUserObj.name) || 'Admin',
+    inTimeline: true,
+  });
+  t.updated = Date.now();
+  saveTickets([t.id]);
+  input.value = '';
+  renderActionItemLog();
+  if(typeof renderTickets === 'function') renderTickets();
+}
+
+function renderActionItemLog(){
+  var t = TICKETS[_currentActionItemId];
+  if(!t) return;
+  var host = document.getElementById('act-log');
+  var entries = (t.log || []).slice().sort(function(a,b){ return (b.ts||0) - (a.ts||0); });
+  if(!entries.length){
+    host.innerHTML = '<div style="color:var(--muted);font-size:11px;font-family:var(--mono);padding:6px 0;text-align:center">No activity yet.</div>';
+    return;
+  }
+  host.innerHTML = entries.map(function(e){
+    var when = e.ts ? new Date(e.ts).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    var icon = e.type === 'status' ? '🔁' : '💬';
+    return '<div style="padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px">'
+      +'<div style="font-size:12px;color:#c8d8f0">'+icon+' '+escHtml(e.text||'')+'</div>'
+      +'<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:3px">'+escHtml(e.byName||'')+(when?' · '+when:'')+'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function deleteActionItem(){
+  var t = TICKETS[_currentActionItemId];
+  if(!t) return;
+  if(!confirm('Delete this action item?\n\n"'+(t.title||'(untitled)')+'"\n\nThis cannot be undone.')) return;
+  var id = t.id;
+  delete TICKETS[id];
+  try { localStorage.setItem('pm_tickets', JSON.stringify(TICKETS)); } catch(e){}
+  try { sbDelete('tickets', id); } catch(e){ console.warn('action delete: sb delete failed', e); }
+  closeActionItemModal();
+  if(typeof renderTickets === 'function') renderTickets();
+  if(typeof renderDashboard === 'function') renderDashboard();
+  if(typeof renderMeetingActionItems === 'function' && _currentMeetingId){
+    renderMeetingActionItems();
+  }
+}
+
 // ── New Ticket Sheet ──────────────────────────────────────────────────────
 var _ntktPhotos = []; // array of {name, dataUrl, type}
 
@@ -14959,99 +15656,104 @@ async function renderShareView(){
     + '</div>';
   }
 
-  // Log
-  var logHtml = '';
-  if(Array.isArray(ticket.log) && ticket.log.length){
-    var sortedLog = ticket.log.slice().sort(function(a,b){ return (b.ts||0) - (a.ts||0); });
-    logHtml = '<div style="margin-bottom:24px">'
-      + '<div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Activity log</div>'
-      + sortedLog.map(function(entry){
-          var when = entry.ts ? new Date(entry.ts).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-          return '<div style="padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:6px">'
-            + '<div style="font-size:12px;color:#c8d8f0;line-height:1.5">'+escHtml(entry.text||'')+'</div>'
-            + (when?'<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:3px">'+when+'</div>':'')
-          + '</div>';
-        }).join('')
-    + '</div>';
-  }
+  // Log + attachments are now rendered via the in-app timeline renderer for
+  // a single coherent view. The container element is included below; the
+  // timeline render happens after we've loaded the linked documents into
+  // INVOICES so it has thumbnails/files to display.
+  var timelineHtml = '<div style="margin-bottom:24px">'
+    + '<div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Timeline</div>'
+    + '<div id="tkt-timeline-body"><div style="font-size:12px;color:var(--muted);font-family:var(--mono);text-align:center;padding:30px 0">Loading timeline…</div></div>'
+  + '</div>';
 
-  // Photos: fetch linked invoices and render any that have file data
-  var photosHtml = '';
+  showContent(headerHtml + descHtml + approvalsHtml + timelineHtml);
+
+  // Stage the ticket and load its linked documents so renderTicketTimeline()
+  // has everything it needs. The renderer reads from the global INVOICES map
+  // and uses TICKETS[_timelineTicketId] for some path metadata, so we fill
+  // both before calling it.
   var ids = ticket.linkedDocIds || [];
-  if(ids.length){
-    photosHtml = '<div style="margin-bottom:24px">'
-      + '<div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Attachments ('+ids.length+')</div>'
-      + '<div id="share-photos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"><div style="grid-column:1/-1;color:var(--muted);font-size:11px;font-family:var(--mono)">Loading attachments…</div></div>'
-    + '</div>';
-  }
+  if(typeof TICKETS !== 'undefined') TICKETS[ticket.id] = ticket;
+  if(typeof window !== 'undefined') window._timelineTicketId = ticket.id;
 
-  showContent(headerHtml + descHtml + approvalsHtml + photosHtml + logHtml);
+  // In the share view, clicks on a document in the timeline open a lightbox
+  // (read-only) instead of the editable invoice modal. Override the click
+  // handler with a share-safe version that just shows the file inline.
+  window.openTimelineDoc = function(docId){
+    var inv = (typeof INVOICES !== 'undefined') ? INVOICES[docId] : null;
+    if(!inv) return;
+    _shareOpenLightbox(inv);
+  };
+  // The timeline also wires a "retry" button for stuck docs — make it a
+  // no-op in share view since we already loaded everything we could.
+  window.retryTimelineDoc = function(){ /* no-op in share view */ };
 
-  // Asynchronously fetch the invoice metadata + file_data for each linkedDocId
+  // Render the timeline once with what we have (just the ticket creation
+  // event + log entries), then fetch the linked docs and re-render so any
+  // images/videos/PDFs appear inline. If there are no linked docs, the
+  // initial render is the final one.
+  if(typeof renderTicketTimeline === 'function') renderTicketTimeline(ticket);
   if(ids.length){
-    var grid = document.getElementById('share-photos-grid');
-    var renderedCount = 0;
-    var renderedTiles = [];
-    function flushGrid(){
-      if(!grid) return;
-      if(!renderedTiles.length){ grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:11px;font-family:var(--mono)">No attachments available.</div>'; return; }
-      grid.innerHTML = renderedTiles.join('');
-    }
-    for(var i=0;i<ids.length;i++){
-      (function(invId){
-        Promise.all([
-          fetch(SUPA_BASE+'/rest/v1/invoices?id=eq.'+encodeURIComponent(scopedId(invId))+'&select=*&limit=1',
-            {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}).then(function(r){ return r.ok?r.json():[]; }),
-          fetch(SUPA_BASE+'/rest/v1/invoice_files?id=eq.'+encodeURIComponent(scopedId(invId))+'&select=file_data&limit=1',
-            {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}).then(function(r){ return r.ok?r.json():[]; })
-        ]).then(function(results){
-          var meta = (results[0]&&results[0][0]) ? (results[0][0].data || results[0][0]) : null;
-          var file = (results[1]&&results[1][0]) ? results[1][0].file_data : null;
-          if(meta){
-            var name = meta.invCompany || meta.name || invId;
-            var src = file || meta.data || '';
-            // Type detection: prefer the explicit type field, but fall back to
-            // the filename extension. Many older records (and some upload
-            // paths) leave meta.type empty, so without the fallback every
-            // such image would render as a generic 📄 placeholder. This is
-            // the same detection rule used by the in-app viewer.
-            var nm = ((meta.name||'') + ' ' + (meta.filename||'') + ' ' + name).toLowerCase();
-            var isImg = (meta.type && meta.type.indexOf('image/') === 0)
-                      || /\.(jpe?g|png|gif|webp|bmp|heic)(\s|$)/i.test(nm);
-            var isPdf = meta.type === 'application/pdf'
-                      || /\.pdf(\s|$)/i.test(nm);
-            var isVid = (meta.type && meta.type.indexOf('video/') === 0)
-                      || /\.(mp4|webm|ogg|mov|m4v|3gp|quicktime)(\s|$)/i.test(nm);
-            var isAud = (meta.type && meta.type.indexOf('audio/') === 0)
-                      || /\.(mp3|wav|m4a|aac|oga|opus|weba|flac|amr)(\s|$)/i.test(nm);
-            var thumb;
-            if(isImg && src){
-              thumb = '<img src="'+src+'" style="width:100%;height:140px;object-fit:cover;display:block" '
-                    + 'onerror="this.parentNode.innerHTML=\'<div style=&quot;display:flex;align-items:center;justify-content:center;height:140px;background:var(--surface2);color:var(--muted);font-family:var(--mono);font-size:11px&quot;>📄 (image unavailable)</div>\'">';
-            } else if(isPdf && src){
-              thumb = '<a href="'+src+'" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;height:140px;background:rgba(123,104,238,.08);color:#9d8ff7;font-family:var(--mono);font-size:11px;text-decoration:none;border-bottom:1px solid var(--border)">📄 Open PDF</a>';
-            } else if(isVid && src){
-              thumb = '<video src="'+src+'" controls preload="metadata" style="width:100%;height:140px;object-fit:cover;display:block;background:#000"></video>';
-            } else if(isAud && src){
-              thumb = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:140px;background:var(--surface2);gap:6px;padding:10px">'
-                    +   '<div style="font-size:24px">🎵</div>'
-                    +   '<audio src="'+src+'" controls style="width:100%;max-width:200px"></audio>'
-                    + '</div>';
-            } else {
-              thumb = '<div style="display:flex;align-items:center;justify-content:center;height:140px;background:var(--surface2);color:var(--muted);font-family:var(--mono);font-size:11px">📄</div>';
-            }
-            renderedTiles.push('<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden">'
-              + thumb
-              + '<div style="padding:8px 10px;font-size:11px;color:#c8d8f0;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escHtml(name)+'">'+escHtml(name)+'</div>'
-            + '</div>');
-          }
-        }).catch(function(e){ console.warn('share attachment fetch failed', invId, e); }).then(function(){
-          renderedCount++;
-          if(renderedCount === ids.length) flushGrid();
-        });
-      })(ids[i]);
-    }
+    _shareFetchLinkedDocs(ids).then(function(){
+      // Re-render now that thumbnails and inline data are available.
+      if(typeof renderTicketTimeline === 'function') renderTicketTimeline(ticket);
+    });
   }
+}
+
+// Fetch linked documents from Supabase into the global INVOICES map so the
+// timeline renderer can find them. Returns a promise that resolves when all
+// fetches have completed (success or failure). Failures are logged but don't
+// reject — partial timelines are better than no timeline.
+function _shareFetchLinkedDocs(ids){
+  if(typeof INVOICES === 'undefined') return Promise.resolve();
+  var promises = ids.map(function(invId){
+    if(INVOICES[invId]) return Promise.resolve();
+    return Promise.all([
+      fetch(SUPA_BASE+'/rest/v1/invoices?id=eq.'+encodeURIComponent(scopedId(invId))+'&select=*&limit=1',
+        {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}).then(function(r){ return r.ok?r.json():[]; }),
+      fetch(SUPA_BASE+'/rest/v1/invoice_files?id=eq.'+encodeURIComponent(scopedId(invId))+'&select=file_data&limit=1',
+        {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}).then(function(r){ return r.ok?r.json():[]; })
+    ]).then(function(results){
+      var meta = (results[0]&&results[0][0]) ? (results[0][0].data || results[0][0]) : null;
+      var file = (results[1]&&results[1][0]) ? results[1][0].file_data : null;
+      if(meta){
+        // Land the doc in INVOICES — same shape the in-app code expects.
+        // The fetched file_data goes into inv.data so the timeline can
+        // render thumbnails inline without further round trips.
+        INVOICES[invId] = Object.assign({}, meta, { id: invId, data: file || meta.data || '' });
+      }
+    }).catch(function(e){ console.warn('share doc fetch failed', invId, e); });
+  });
+  return Promise.all(promises);
+}
+
+// Lightbox / inline viewer for share-view clicks. Read-only — no edit form,
+// no delete button, just the file. Clicking the backdrop closes.
+function _shareOpenLightbox(inv){
+  var existing = document.getElementById('share-lightbox');
+  if(existing) existing.remove();
+  var src = inv.data || inv.url || '';
+  if(!src){
+    alert('This file is not available.');
+    return;
+  }
+  var nm = ((inv.name||'') + ' ' + (inv.filename||'')).toLowerCase();
+  var isImg = (inv.type && inv.type.indexOf('image/')===0) || /\.(jpe?g|png|gif|webp|bmp|heic)(\s|$)/i.test(nm);
+  var isPdf = inv.type === 'application/pdf' || /\.pdf(\s|$)/i.test(nm);
+  var isVid = (inv.type && inv.type.indexOf('video/')===0) || /\.(mp4|webm|ogg|mov|m4v|3gp|quicktime)(\s|$)/i.test(nm);
+  var isAud = (inv.type && inv.type.indexOf('audio/')===0) || /\.(mp3|wav|m4a|aac|oga|opus|weba|flac|amr)(\s|$)/i.test(nm);
+  var content;
+  if(isImg) content = '<img src="'+src+'" style="max-width:96vw;max-height:92vh;object-fit:contain;border-radius:6px;box-shadow:0 8px 30px rgba(0,0,0,.6)">';
+  else if(isVid) content = '<video src="'+src+'" controls autoplay style="max-width:96vw;max-height:92vh;border-radius:6px;background:#000;box-shadow:0 8px 30px rgba(0,0,0,.6)"></video>';
+  else if(isAud) content = '<audio src="'+src+'" controls autoplay style="width:80vw;max-width:500px"></audio>';
+  else if(isPdf) content = '<iframe src="'+src+'" style="width:90vw;height:90vh;border:none;border-radius:6px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.6)"></iframe>';
+  else content = '<div style="padding:30px;background:var(--surface);border-radius:10px;text-align:center;color:var(--muted)"><div style="font-size:48px;margin-bottom:10px">📄</div><div style="font-size:13px">'+escHtml(inv.name||'File')+'</div><a href="'+src+'" download style="display:inline-block;margin-top:14px;padding:8px 16px;background:var(--accent);color:#fff;text-decoration:none;border-radius:6px;font-size:12px">Download</a></div>';
+  var box = document.createElement('div');
+  box.id = 'share-lightbox';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out';
+  box.innerHTML = content;
+  box.addEventListener('click', function(e){ if(e.target === box) box.remove(); });
+  document.body.appendChild(box);
 }
 
 // Run share-view bootstrap on DOM ready. Done LATE so TKT_STATUS / escHtml /
