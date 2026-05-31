@@ -1172,12 +1172,24 @@ async function checkStorageSetup(){
   .tkt-prio-dot{width:10px;height:10px;border-radius:50%}
   .new-tkt-sheet{display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center}
   @media(min-width:600px){.new-tkt-sheet{align-items:center}}
-  .new-tkt-inner{background:var(--surface);width:100%;max-width:520px;border-radius:20px 20px 0 0;max-height:92dvh;display:flex;flex-direction:column;animation:slideUp .25s ease}
-  @media(min-width:600px){.new-tkt-inner{border-radius:20px;max-height:88vh}}
+  .new-tkt-inner{background:var(--surface);width:100%;max-width:520px;border-radius:20px 20px 0 0;max-height:calc(100dvh - 24px);display:flex;flex-direction:column;animation:slideUp .25s ease;padding-bottom:env(safe-area-inset-bottom,0)}
+  @media(min-width:600px){.new-tkt-inner{border-radius:20px;max-height:88vh;padding-bottom:0}}
   @keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .new-tkt-drag{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0}
-  .new-tkt-body{overflow-y:auto;padding:20px;flex:1}
+  .new-tkt-drag{width:40px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0;flex-shrink:0}
+  .new-tkt-body{overflow-y:auto;padding:20px;flex:1;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   .new-tkt-section{margin-bottom:20px}
+  /* Status-flow pill row scroll polish.
+     Container has overflow-x:auto via inline style. We hide the scrollbar
+     (it's ugly inside a card border), give iOS momentum scroll, and on
+     narrow screens tighten padding so more pills fit without scrolling. */
+  #tkt-status-flow{ scrollbar-width:none; -webkit-overflow-scrolling:touch; scroll-behavior:smooth }
+  #tkt-status-flow::-webkit-scrollbar{ display:none }
+  @media(max-width:600px){
+    #tkt-status-flow{ padding:10px 14px !important; gap:0 !important }
+    /* Tighter pills + smaller arrows on phones; rely on inline styles for
+       the rest so we don't fight specificity. */
+    #tkt-status-flow > div > div:first-child{ padding:4px 8px !important; font-size:10px !important }
+  }
   /* Mobile ticket modal overrides */
   @media(max-width:600px){
     #ticket-modal > div{width:100vw !important;max-width:100vw !important;border-radius:0 !important;min-height:100dvh}
@@ -4381,7 +4393,7 @@ function renderDashboard(){
   (TKT_FLOW||[]).forEach(function(s){ statusMeta[s.value] = s; });
   var counts = {};
   maintTks.forEach(function(t){ var s = t.status||'open'; counts[s] = (counts[s]||0)+1; });
-  var activeStatuses = ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress'];
+  var activeStatuses = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress'];
   var activeCount = activeStatuses.reduce(function(a,s){ return a+(counts[s]||0); }, 0);
   var resolvedCount = (counts['resolved']||0) + (counts['closed']||0);
   var awaitingApproval = counts['awaiting_trustee_approval']||0;
@@ -5919,7 +5931,6 @@ document.getElementById('tbody').addEventListener('click', function(e){
             <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Status</div>
             <select id="tkt-status" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none" onchange="autoSaveTicket()">
               <option value="open">Open</option>
-              <option value="in_progress">Investigating</option>
               <option value="awaiting_quote">Obtaining Quotes</option>
               <option value="awaiting_trustee_approval">Awaiting Trustee Approval</option>
               <option value="work_in_progress">Work In Progress</option>
@@ -6022,6 +6033,16 @@ document.getElementById('tbody').addEventListener('click', function(e){
         </div>
         <div id="tkt-quote-received-banner" style="display:none;margin-bottom:10px"></div>
         <div id="tkt-assigned-suppliers" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+
+      <!-- WORK RATING (closed tickets with an accepted supplier quote) -->
+      <!-- Appears at the bottom of the ticket detail when the ticket is closed
+           AND the approved quote came from a supplier (not "handled internally").
+           Lets admins/trustees rate the work that was done. Rating is stored on
+           the ticket and aggregated onto the supplier wherever they appear. -->
+      <div id="tkt-rating-section" style="display:none;padding:14px 16px;border-top:1px solid var(--border)">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Rate the work</div>
+        <div id="tkt-rating-body"></div>
       </div>
     </div>
   </div>
@@ -7734,6 +7755,330 @@ function getSupplierQuote(ticket, supId){
   return ticket.quotes[supId] || null;
 }
 
+// ── Supplier work ratings ────────────────────────────────────────────────
+// Ratings live on the ticket as t.rating = {stars, comment, by, byName, at}.
+// We aggregate them per-supplier by scanning TICKETS — no double-write to
+// SUPPLIERS, so editing/deleting a ticket keeps the supplier view consistent.
+
+// Find the supplier who did the work, so we know who to rate. Tickets reach
+// Closed via several paths and the data is often messy — deleted quote
+// documents, supplier name typos, admin force-closes — so we try in order:
+//   0. t.ratedSupplierId — explicit override an admin set via the picker
+//   1. t.approvedQuoteId — legacy flat field (older tickets)
+//   2. Vote tally on t.approvals[] — winning quoteId resolved to a supplier.
+//      Ghost votes (quoteIds that no longer point at anything) are excluded
+//      from the tally because they can't tell us who did the work.
+//   3. Single-supplier shortcut — exactly one supplier has a submitted quote
+// Quote ids are 'supquote_<supId>' (supplier-portal quote) or an INVOICES
+// key (document quote). Document quotes are mapped to a supplier directory
+// entry by case-insensitive exact name match on invCompany, then substring
+// match as a fallback for typos like "Boris Plumbing PTY" vs "Boris Plumbing".
+// Returns null when nothing matches — callers then offer a manual picker.
+function getApprovedSupplierId(ticket){
+  if(!ticket) return null;
+  // Path 0: admin override
+  if(ticket.ratedSupplierId && SUPPLIERS[ticket.ratedSupplierId]) return ticket.ratedSupplierId;
+
+  // Resolves a quoteId to a supplier id, or null if it can't.
+  function resolveQuoteIdToSupplier(qid){
+    if(!qid) return null;
+    var aid = String(qid);
+    if(aid.indexOf('supquote_') === 0){
+      var supId = aid.slice('supquote_'.length);
+      return SUPPLIERS[supId] ? supId : null;
+    }
+    var inv = (typeof INVOICES === 'object' && INVOICES) ? INVOICES[aid] : null;
+    if(!inv) return null;
+    var company = (inv.invCompany || '').toLowerCase().trim();
+    if(!company) return null;
+    // Try exact match first, then substring (covers "Boris Plumbing PTY"
+    // matching a directory entry of "Boris Plumbing" and vice versa).
+    var exact = null, partial = null;
+    for(var sid in SUPPLIERS){
+      var nm = (SUPPLIERS[sid].name||'').toLowerCase().trim();
+      if(!nm) continue;
+      if(nm === company){ exact = sid; break; }
+      if(!partial && (nm.indexOf(company) !== -1 || company.indexOf(nm) !== -1)) partial = sid;
+    }
+    return exact || partial || null;
+  }
+
+  // Path 1: legacy flat field
+  if(ticket.approvedQuoteId){
+    var sup = resolveQuoteIdToSupplier(ticket.approvedQuoteId);
+    if(sup) return sup;
+  }
+
+  // Path 2: vote tally — pick the most-voted quoteId that resolves to a
+  // real supplier. Ghost votes are filtered out by the resolve step.
+  if(Array.isArray(ticket.approvals) && ticket.approvals.length){
+    var supplierVotes = {};  // supId → count
+    ticket.approvals.forEach(function(a){
+      if(!a || !a.quoteId) return;
+      var s = resolveQuoteIdToSupplier(a.quoteId);
+      if(s) supplierVotes[s] = (supplierVotes[s]||0) + 1;
+    });
+    var winner = null, winnerCount = 0;
+    for(var s in supplierVotes){
+      if(supplierVotes[s] > winnerCount){ winnerCount = supplierVotes[s]; winner = s; }
+    }
+    if(winner) return winner;
+  }
+
+  // Path 3: single-supplier shortcut
+  if(ticket.quotes){
+    var submitted = Object.keys(ticket.quotes).filter(function(supId){
+      var q = ticket.quotes[supId];
+      return SUPPLIERS[supId] && q && (q.status === 'submitted' || typeof q.amount === 'number');
+    });
+    if(submitted.length === 1) return submitted[0];
+  }
+
+  return null;
+}
+
+// All suppliers it could plausibly be on this ticket — used to populate the
+// "Who did the work?" manual picker when auto-detection returns null but the
+// ticket still has supplier signals (assigned/quoted/emailed/named).
+function getCandidateRatableSuppliers(ticket){
+  if(!ticket) return [];
+  var ids = {};
+  (ticket.assignedSupplierIds || []).forEach(function(id){ if(SUPPLIERS[id]) ids[id] = true; });
+  Object.keys(ticket.quotes || {}).forEach(function(id){ if(SUPPLIERS[id]) ids[id] = true; });
+  Object.keys(ticket.quoteTokens || {}).forEach(function(id){ if(SUPPLIERS[id]) ids[id] = true; });
+  // Anyone named in a still-resolvable approval's quote document
+  (ticket.approvals || []).forEach(function(a){
+    if(!a || !a.quoteId) return;
+    var inv = INVOICES[a.quoteId];
+    if(!inv) return;
+    var company = (inv.invCompany || '').toLowerCase().trim();
+    if(!company) return;
+    for(var sid in SUPPLIERS){
+      var nm = (SUPPLIERS[sid].name||'').toLowerCase().trim();
+      if(nm === company || nm.indexOf(company) !== -1 || company.indexOf(nm) !== -1){ ids[sid] = true; }
+    }
+  });
+  return Object.keys(ids).sort(function(a,b){
+    return (SUPPLIERS[a].name||'').localeCompare(SUPPLIERS[b].name||'');
+  });
+}
+
+// Aggregate ratings for a supplier across all tickets. Returns null when the
+// supplier has no rated jobs (callers can then show "Not yet rated" rather
+// than a misleading 0-star figure).
+function getSupplierRating(supId){
+  if(!supId) return null;
+  var ratings = [];
+  Object.values(TICKETS || {}).forEach(function(t){
+    if(!t || !t.rating || typeof t.rating.stars !== 'number') return;
+    if(getApprovedSupplierId(t) !== supId) return;
+    ratings.push(t.rating);
+  });
+  if(!ratings.length) return null;
+  var sum = ratings.reduce(function(s, r){ return s + r.stars; }, 0);
+  ratings.sort(function(a,b){ return (b.at||0) - (a.at||0); });
+  return {
+    average: sum / ratings.length,
+    count: ratings.length,
+    ratings: ratings  // newest first
+  };
+}
+
+// Compact star-rating display (e.g. "★ 4.2 (5)"). Returns short HTML for use
+// in lists, dropdowns, and supplier cards. Falls back to a muted "not rated"
+// pill when the supplier has no ratings yet.
+function supplierRatingPillHtml(supId, opts){
+  opts = opts || {};
+  var r = getSupplierRating(supId);
+  if(!r){
+    if(opts.hideWhenEmpty) return '';
+    return '<span style="font-size:9px;font-family:var(--mono);color:#5a7fa8;background:rgba(90,127,168,.08);border:1px solid rgba(90,127,168,.18);padding:1px 7px;border-radius:9px;white-space:nowrap">Not yet rated</span>';
+  }
+  // Use a colour that scales with the score so high-rated suppliers stand out
+  // green and poor-rated ones go amber/red — quick visual signal.
+  var col = r.average >= 4.0 ? '#4ade9e'
+          : r.average >= 3.0 ? '#f59e0b'
+          : '#f06f6f';
+  var bg  = r.average >= 4.0 ? 'rgba(74,222,158,.1)'
+          : r.average >= 3.0 ? 'rgba(245,158,11,.1)'
+          : 'rgba(240,111,111,.1)';
+  var bd  = r.average >= 4.0 ? 'rgba(74,222,158,.3)'
+          : r.average >= 3.0 ? 'rgba(245,158,11,.3)'
+          : 'rgba(240,111,111,.3)';
+  var label = '★ ' + r.average.toFixed(1) + ' / 5 · ' + r.count + ' job' + (r.count!==1?'s':'');
+  return '<span title="Average rating across ' + r.count + ' closed jobs" style="font-size:9px;font-family:var(--mono);font-weight:600;color:'+col+';background:'+bg+';border:1px solid '+bd+';padding:1px 7px;border-radius:9px;white-space:nowrap">'+label+'</span>';
+}
+
+// Plain-text version for select/option labels (no HTML allowed there).
+function supplierRatingTextSuffix(supId){
+  var r = getSupplierRating(supId);
+  if(!r) return '';
+  return '  ·  ★ ' + r.average.toFixed(1) + ' (' + r.count + ')';
+}
+
+// Render the rating UI inside the ticket modal. Called from openTicketModal
+// and after any rating save. Visible only when the ticket is closed AND a
+// supplier quote was the approved one. Roles allowed to rate: same set that
+// can manage tickets (admin/trustee/management).
+function renderTicketRating(ticket){
+  var section = document.getElementById('tkt-rating-section');
+  var body = document.getElementById('tkt-rating-body');
+  if(!section || !body) return;
+  var canRate = (_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management');
+  var statusNorm = ticket ? normalizeStatus(ticket.status) : '';
+  // Only closed tickets can be rated. Resident/viewer/supplier never see this.
+  if(!ticket || statusNorm !== 'closed' || !canRate){
+    section.style.display = 'none';
+    body.innerHTML = '';
+    return;
+  }
+  var supId = getApprovedSupplierId(ticket);
+  // No auto-detected supplier? Offer a picker if there are plausible candidates
+  // (assigned suppliers, anyone who quoted, anyone named in an approval). If
+  // there are no candidates at all, the ticket was clearly closed without
+  // supplier work — hide the section.
+  if(!supId){
+    var candidates = getCandidateRatableSuppliers(ticket);
+    if(!candidates.length){ section.style.display = 'none'; body.innerHTML = ''; return; }
+    section.style.display = 'block';
+    body.innerHTML = ''
+      + '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;line-height:1.5">I couldn\'t automatically determine which supplier did the work — pick the one to rate:</div>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+      + '<select id="tkt-rating-picker" style="flex:1;min-width:180px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none">'
+      +   '<option value="">— Choose supplier —</option>'
+      +   candidates.map(function(id){ return '<option value="'+escHtml(id)+'">'+escHtml(SUPPLIERS[id].name||'(unnamed)')+'</option>'; }).join('')
+      + '</select>'
+      + '<button type="button" onclick="setRatedSupplierFromPicker()" style="padding:7px 14px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">Set</button>'
+      + '</div>';
+    return;
+  }
+
+  // Have a supplier — render the actual rating UI.
+  section.style.display = 'block';
+  var sup = SUPPLIERS[supId];
+  var supName = (sup && sup.name) || '(supplier no longer in directory)';
+  var existing = ticket.rating || null;
+  var currentStars = existing ? existing.stars : 0;
+  var currentComment = existing ? (existing.comment || '') : '';
+
+  var stars = '';
+  for(var i=1;i<=5;i++){
+    var filled = i <= currentStars;
+    var ch = filled ? '★' : '☆';
+    var color = filled ? '#f59e0b' : '#3a5070';
+    stars += '<button type="button" onclick="setTicketRatingStars('+i+')" title="'+i+' star'+(i!==1?'s':'')+'" style="background:none;border:none;color:'+color+';font-size:26px;line-height:1;cursor:pointer;padding:2px 4px;transition:transform .1s" onmouseover="this.style.transform=\'scale(1.18)\'" onmouseout="this.style.transform=\'scale(1)\'">'+ch+'</button>';
+  }
+
+  var meta = '';
+  if(existing){
+    var when = existing.at ? new Date(existing.at).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}) : '';
+    meta = '<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:6px">Rated by '+escHtml(existing.byName||'admin')+(when?(' on '+when):'')+'</div>';
+  }
+
+  // Small "change" link to let admin pick a different supplier if auto-detect
+  // landed on the wrong one. Visible only when there are other candidates.
+  var allCandidates = getCandidateRatableSuppliers(ticket);
+  var changeLink = '';
+  if(allCandidates.length > 1 || (ticket.ratedSupplierId && allCandidates.indexOf(ticket.ratedSupplierId) === -1)){
+    changeLink = ' <button type="button" onclick="clearRatedSupplier()" title="Pick a different supplier" style="background:none;border:none;color:#5a7fa8;font-size:10px;font-family:var(--mono);cursor:pointer;text-decoration:underline;padding:0;margin-left:6px">change</button>';
+  }
+
+  body.innerHTML =
+    '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px">Work delivered by <span style="color:#c8d8f0;font-weight:600">'+escHtml(supName)+'</span>'+changeLink+'</div>'
+    + '<div style="display:flex;align-items:center;gap:2px">'+stars+'</div>'
+    + '<textarea id="tkt-rating-comment" rows="2" placeholder="Optional: a short note about the work (visible to admins)" oninput="autoSaveTicketRating()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--sans);padding:8px 10px;outline:none;resize:vertical;box-sizing:border-box;margin-top:10px">'+escHtml(currentComment)+'</textarea>'
+    + meta;
+}
+
+// Picker handler — admin chose the supplier who did the work, save the
+// override on the ticket and re-render.
+function setRatedSupplierFromPicker(){
+  if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
+  var sel = document.getElementById('tkt-rating-picker');
+  var supId = sel ? sel.value : '';
+  if(!supId || !SUPPLIERS[supId]){ alert('Pick a supplier first.'); return; }
+  var t = TICKETS[_currentTicketId];
+  t.ratedSupplierId = supId;
+  t.updated = Date.now();
+  if(!Array.isArray(t.log)) t.log = [];
+  t.log.push({
+    ts: Date.now(),
+    type: 'rating',
+    text: 'Identified ' + (SUPPLIERS[supId].name||'supplier') + ' as the supplier who did the work',
+    by: (_currentUserObj && _currentUserObj.id) || null,
+    byName: (_currentUserObj && _currentUserObj.name) || 'admin',
+    inTimeline: false,
+  });
+  saveTickets([t.id]);
+  renderTicketRating(t);
+}
+
+// Clears the explicit override so the admin can pick a different supplier
+// (auto-detect runs again — or shows the picker if it still can't decide).
+function clearRatedSupplier(){
+  if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
+  var t = TICKETS[_currentTicketId];
+  if(!confirm('Reset the rated supplier? Existing star rating stays — you can re-pick the supplier and the rating sticks to whoever you pick.')) return;
+  t.ratedSupplierId = null;
+  t.updated = Date.now();
+  saveTickets([t.id]);
+  renderTicketRating(t);
+}
+
+var _tktRatingSaveTimer = null;
+
+// Update the displayed stars and persist immediately (no debounce — single
+// click on a star is the user's full intent). Save the comment too in case
+// they typed but haven't blurred.
+function setTicketRatingStars(stars){
+  if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
+  var t = TICKETS[_currentTicketId];
+  if(getApprovedSupplierId(t) == null) return;
+  var prev = t.rating || {};
+  var commentEl = document.getElementById('tkt-rating-comment');
+  var comment = commentEl ? commentEl.value : (prev.comment || '');
+  t.rating = {
+    stars: stars,
+    comment: comment,
+    by: (_currentUserObj && _currentUserObj.id) || null,
+    byName: (_currentUserObj && _currentUserObj.name) || 'admin',
+    at: Date.now(),
+  };
+  t.updated = Date.now();
+  // Log the rating change so it shows up on the timeline.
+  if(!Array.isArray(t.log)) t.log = [];
+  t.log.push({
+    ts: Date.now(),
+    type: 'rating',
+    text: 'Rated work ' + stars + ' / 5' + (comment ? ': ' + comment.slice(0,80) : ''),
+    by: (_currentUserObj && _currentUserObj.id) || null,
+    byName: (_currentUserObj && _currentUserObj.name) || 'admin',
+    inTimeline: true,
+  });
+  saveTickets([t.id]);
+  renderTicketRating(t);
+  if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(t);
+  if(typeof renderTickets === 'function') renderTickets();
+}
+
+// Debounced save for comment text changes — stars are persisted on click, so
+// this only fires when the user keeps typing in the comment box.
+function autoSaveTicketRating(){
+  if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
+  clearTimeout(_tktRatingSaveTimer);
+  _tktRatingSaveTimer = setTimeout(function(){
+    var t = TICKETS[_currentTicketId];
+    if(!t || !t.rating) return;
+    var commentEl = document.getElementById('tkt-rating-comment');
+    var comment = commentEl ? commentEl.value : '';
+    if(comment === (t.rating.comment || '')) return;
+    t.rating.comment = comment;
+    t.rating.at = Date.now();
+    t.updated = Date.now();
+    saveTickets([t.id]);
+  }, 500);
+}
+
 // Assign / unassign a supplier company to a ticket. Admin/trustee only; the
 // caller is responsible for the permission check. Persists immediately.
 async function setTicketSupplierAssigned(ticketId, supId, assigned){
@@ -7849,7 +8194,7 @@ async function saveSupplierQuote(ticketId, supId, patch){
     // approval panel renders the quote list. We advance only from a PRE-approval
     // status; we never move a ticket BACKWARD from work-in-progress / resolved /
     // closed just because another quote arrived late.
-    var preApproval = (t.status === 'open' || t.status === 'in_progress' || t.status === 'awaiting_quote' || t.status === 'awaiting_parts' || !t.status);
+    var preApproval = (t.status === 'open' || t.status === 'awaiting_quote' || t.status === 'awaiting_parts' || !t.status);
     if(preApproval){ t.status = 'awaiting_trustee_approval'; }
   }
   t.updated = Date.now();
@@ -8452,7 +8797,10 @@ function renderTicketSuppliers(ticket){
       .filter(function(s){ return assignedIds.indexOf(s.id) === -1; })
       .sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
     sel.innerHTML = '<option value="">— Assign a supplier… —</option>'
-      + available.map(function(s){ return '<option value="'+escHtml(s.id)+'">'+escHtml(s.name||'(unnamed)')+'</option>'; }).join('');
+      + available.map(function(s){
+          var suffix = supplierRatingTextSuffix(s.id);
+          return '<option value="'+escHtml(s.id)+'">'+escHtml(s.name||'(unnamed)')+escHtml(suffix)+'</option>';
+        }).join('');
   }
 
   // Quote-received indicator: count assigned suppliers who have SUBMITTED a
@@ -8505,7 +8853,7 @@ function renderTicketSuppliers(ticket){
       : '';
     return '<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;flex-wrap:wrap">'
       +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:12px;font-weight:600;color:#c8d8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(name)+'</div>'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font-size:12px;font-weight:600;color:#c8d8f0">'+escHtml(name)+'</span>'+supplierRatingPillHtml(supId,{hideWhenEmpty:true})+'</div>'
         +'<div style="display:flex;gap:8px;align-items:center;margin-top:3px;flex-wrap:wrap">'+stateHtml+loginWarn+'</div>'
       +'</div>'
       +emailBtn
@@ -8520,6 +8868,36 @@ async function tktAssignSupplierFromDropdown(){
   var sel = document.getElementById('tkt-supplier-add');
   var supId = sel ? sel.value : '';
   if(!supId){ return; }
+  var t = TICKETS[_currentTicketId];
+  // Stale-quote guard: if a quote for this supplier already lives on the
+  // ticket from a prior assignment cycle (or any other historical data path),
+  // it will render the moment the supplier reappears in the assigned list —
+  // misleadingly showing "Quoted R X" even though they haven't quoted on this
+  // assignment yet. Ask the user whether to keep that history or start fresh
+  // so the workflow is predictable.
+  var existing = t.quotes && t.quotes[supId];
+  if(existing && (typeof existing.amount === 'number' || existing.status === 'submitted' || existing.description)){
+    var supName = (SUPPLIERS[supId] && SUPPLIERS[supId].name) || 'this supplier';
+    var amtStr = (typeof existing.amount === 'number') ? fmtZAR(existing.amount) : '(no amount on record)';
+    var keep = confirm(
+      supName + ' already has a quote on this ticket: ' + amtStr + '.\n\n'
+      + 'This is usually leftover from a previous assignment cycle.\n\n'
+      + 'OK = keep the existing quote (rare — only if you actually want it preserved)\n'
+      + 'Cancel = clear it and start fresh (recommended)'
+    );
+    if(!keep){
+      delete t.quotes[supId];
+      // Clear the old token too so the supplier gets a fresh URL on re-assign,
+      // and old emailed links from the previous cycle stop working.
+      if(t.quoteTokens && t.quoteTokens[supId]) delete t.quoteTokens[supId];
+      if(!Array.isArray(t.log)) t.log = [];
+      t.log.push({
+        ts: Date.now(),
+        by: (_currentUserObj && _currentUserObj.name) || 'admin',
+        text: 'Cleared stale quote (' + amtStr + ') for ' + supName + ' before re-assigning.'
+      });
+    }
+  }
   await setTicketSupplierAssigned(_currentTicketId, supId, true);
   renderTicketSuppliers(TICKETS[_currentTicketId]);
 }
@@ -8577,7 +8955,34 @@ async function tktUnassignSupplier(supId){
   if(!_currentTicketId || !TICKETS[_currentTicketId]) return;
   var sup = SUPPLIERS[supId];
   var name = sup ? (sup.name||'this supplier') : 'this supplier';
-  if(!confirm('Unassign '+name+' from this job?\n\nThey will no longer see it in their portal. Any quote they already submitted stays on the job.')) return;
+  var t = TICKETS[_currentTicketId];
+  var existing = t.quotes && t.quotes[supId];
+  var hasQuoteData = !!(existing && (typeof existing.amount === 'number' || existing.status === 'submitted' || existing.description));
+  if(hasQuoteData){
+    // Three-state choice: cancel, unassign keeping quote (rare — only useful
+    // as an audit trail), unassign + clear (clean re-assignment path). Using
+    // two prompts because there's no native three-button dialog in the browser.
+    var amtStr = (typeof existing.amount === 'number') ? fmtZAR(existing.amount) : '(no amount on record)';
+    if(!confirm('Unassign ' + name + ' from this job?\n\nThey will no longer see it in their portal.')) return;
+    var clear = !confirm(
+      name + ' has a quote on this ticket: ' + amtStr + '.\n\n'
+      + 'Clear it now or keep it for audit/history?\n\n'
+      + 'OK = keep the quote on the ticket (history)\n'
+      + 'Cancel = clear it (recommended if you may re-assign this supplier later)'
+    );
+    if(clear){
+      delete t.quotes[supId];
+      if(t.quoteTokens && t.quoteTokens[supId]) delete t.quoteTokens[supId];
+      if(!Array.isArray(t.log)) t.log = [];
+      t.log.push({
+        ts: Date.now(),
+        by: (_currentUserObj && _currentUserObj.name) || 'admin',
+        text: 'Cleared quote (' + amtStr + ') for ' + name + ' on unassignment.'
+      });
+    }
+  } else {
+    if(!confirm('Unassign '+name+' from this job?\n\nThey will no longer see it in their portal.')) return;
+  }
   await setTicketSupplierAssigned(_currentTicketId, supId, false);
   renderTicketSuppliers(TICKETS[_currentTicketId]);
 }
@@ -8844,7 +9249,7 @@ function renderSuppliers(){
         + '</div>';
     }
     return '<div onclick="openSupplierModal(\''+s.id+'\')" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
-      +'<div style="font-size:13px;font-weight:600;color:#c8d8f0;margin-bottom:6px">'+escHtml(s.name)+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap"><span style="font-size:13px;font-weight:600;color:#c8d8f0">'+escHtml(s.name)+'</span>'+supplierRatingPillHtml(s.id,{hideWhenEmpty:true})+'</div>'
       +(s.phone?'<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">📞 '+escHtml(s.phone)+'</div>':'')
       +(s.email?'<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:2px">✉ '+escHtml(s.email)+'</div>':'')
       +(s.address?'<div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📍 '+escHtml(s.address.replace(/\n/g,', '))+'</div>':'')
@@ -10287,7 +10692,7 @@ var _ticketStatusFilter = (function(){
   var s = {};
   // Default: show only active work, hide resolved/closed. User can toggle
   // them on from the chip strip when they want history.
-  ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress']
+  ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress']
     .forEach(function(k){ s[k] = true; });
   return s;
 })();
@@ -10407,46 +10812,49 @@ async function saveTickets(idsToSave){
 
 function updateTicketBadge(){
   var open = Object.values(TICKETS).filter(function(t){
-    return t.status==='open'||t.status==='in_progress'||t.status==='awaiting_quote'||t.status==='awaiting_parts';
+    return t.status==='open'||t.status==='awaiting_quote'||t.status==='awaiting_parts';
   }).length;
   var badge = document.getElementById('tickets-badge');
   if(badge){ badge.style.display=open?'inline':'none'; badge.textContent=open; }
 }
 
 // ── Status / priority helpers ─────────────────────────────────────────────
-// "in_progress" was previously labelled "In Progress" — easily confused with
-// "Work In Progress" further down the flow. Now labelled "Investigating" to
-// make the distinction clear (Investigating = admin triaging the issue;
-// Work In Progress = supplier doing the approved paid work).
-//
-// "resolved" was merged into "closed" — they were functionally identical in
-// our workflow and users couldn't articulate the difference. Old tickets
-// stored as 'resolved' are normalised to 'closed' on read via normalizeStatus
-// below; they persist as 'closed' the next time they're saved for any reason.
+// Status set history (see normalizeStatus below for the migration map):
+// - "in_progress" (Investigating) was retired. The stage was almost always
+//   skipped in practice — tickets went either to Obtaining Quotes (if work
+//   was needed) or straight to Closed (if trivial). Legacy in_progress
+//   tickets render as Open and persist as 'open' next time they're saved.
+// - "resolved" was merged into "closed" — they were functionally identical
+//   and users couldn't articulate the difference. Same legacy treatment.
 var TKT_STATUS = {
   open:           {label:'Open',           bg:'rgba(245,158,11,.15)', color:'#f59e0b', border:'rgba(245,158,11,.3)'},
-  in_progress:    {label:'Investigating',  bg:'rgba(59,130,246,.15)', color:'#60a5fa', border:'rgba(59,130,246,.3)'},
   awaiting_quote: {label:'Obtaining Quotes', bg:'rgba(245,158,11,.1)',  color:'#f59e0b', border:'rgba(245,158,11,.25)'},
   awaiting_trustee_approval: {label:'Awaiting Trustee Approval', bg:'rgba(168,85,247,.12)', color:'#c084fc', border:'rgba(168,85,247,.3)'},
   work_in_progress:{label:'Work In Progress', bg:'rgba(167,139,250,.15)', color:'#a78bfa', border:'rgba(167,139,250,.3)'},
   closed:         {label:'Closed',         bg:'rgba(74,222,158,.1)',  color:'#4ade9e', border:'rgba(74,222,158,.25)'}
 };
-// Legacy alias: any data still carrying 'resolved' should render as Closed.
-// This entry lets existing code that does TKT_STATUS[ticket.status] still
-// find a definition without special-casing. Visual style matches 'closed'.
+// Legacy aliases: data carrying retired status keys still needs a definition
+// when rendered before normalizeStatus runs. 'resolved' was merged into
+// 'closed'; 'in_progress' (Investigating) was retired and treated as 'open'.
 TKT_STATUS.resolved = TKT_STATUS.closed;
+TKT_STATUS.in_progress = TKT_STATUS.open;
 
 // Normalise a stored status value to its current canonical form. Use this
-// anywhere we read ticket.status for comparison or rendering logic, so the
-// merged 'resolved' → 'closed' migration is invisible to the rest of the app.
+// anywhere we read ticket.status for comparison or rendering logic, so old
+// data migrations stay invisible to the rest of the app:
+//   - 'resolved' was merged into 'closed' (functionally identical)
+//   - 'in_progress' (Investigating) was retired because the stage was almost
+//     always skipped — tickets go either to Obtaining Quotes (if work is
+//     needed) or straight to Closed (if trivial). Legacy in_progress tickets
+//     render as Open and are re-saved as 'open' next time anything edits them.
 function normalizeStatus(s){
   if(s === 'resolved') return 'closed';
+  if(s === 'in_progress') return 'open';
   return s;
 }
 
 var TKT_FLOW = [
   {value:'open',          label:'Open',           color:'#f59e0b'},
-  {value:'in_progress',   label:'Investigating',  color:'#60a5fa'},
   {value:'awaiting_quote',label:'Obtaining Quotes', color:'#f59e0b'},
   {value:'awaiting_trustee_approval', label:'Awaiting Approval', color:'#c084fc'},
   {value:'work_in_progress', label:'Work In Progress', color:'#a78bfa'},
@@ -10480,13 +10888,28 @@ function renderStatusFlow(currentStatus){
       ? '<span style="width:7px;height:7px;border-radius:50%;background:'+step.color+';display:inline-block;margin-right:5px;flex-shrink:0;box-shadow:0 0 6px '+step.color+'"></span>'
       : '<span style="width:6px;height:6px;border-radius:50%;background:var(--border2);display:inline-block;margin-right:5px;flex-shrink:0"></span>';
 
-    return '<div '+(canChange?'onclick="setTicketStatus(\''+step.value+'\')" ':'')+' style="display:flex;align-items:center;gap:0;white-space:nowrap">'
+    return '<div '+(canChange?'onclick="setTicketStatus(\''+step.value+'\')" ':'')+' data-step="'+i+'" style="display:flex;align-items:center;gap:0;white-space:nowrap">'
       +'<div style="display:flex;align-items:center;padding:5px 10px;border-radius:20px;border:1px solid '+borderColor+';background:'+bgColor+';cursor:'+cursor+';transition:all .15s;font-size:11px;font-family:var(--mono);color:'+stepColor+';font-weight:'+(isCurrent?'700':'400')+'">'
         +dot+step.label
       +'</div>'
       +arrow
     +'</div>';
   }).join('');
+  // After render, scroll the current pill into view so users on phones don't
+  // have to manually swipe to see where the ticket is in the flow. Skip when
+  // currentIdx is 0 (already at the left edge) to avoid a flicker on open.
+  // Deferred via rAF so it runs after the modal's display:flex is committed
+  // (otherwise scrollIntoView on a hidden element can scroll the page itself).
+  if(currentIdx > 0){
+    requestAnimationFrame(function(){
+      var currentEl = el.querySelector('[data-step="'+currentIdx+'"]');
+      if(!currentEl || typeof currentEl.scrollIntoView !== 'function') return;
+      // Don't scroll if the container has no width yet (modal still hidden).
+      if(!el.offsetParent) return;
+      try { currentEl.scrollIntoView({ behavior:'smooth', inline:'center', block:'nearest' }); }
+      catch(e){ /* very old browsers — silent fail */ }
+    });
+  }
 }
 
 function hexToRgb(hex){
@@ -10518,6 +10941,7 @@ async function setTicketStatus(newStatus){
   if(_currentTicketId && TICKETS[_currentTicketId]){
     TICKETS[_currentTicketId].status = newStatus;
     if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(TICKETS[_currentTicketId]);
+  if(typeof renderTicketRating === 'function') renderTicketRating(TICKETS[_currentTicketId]);
   }
   autoSaveTicket();
 }
@@ -11552,7 +11976,7 @@ function toggleTicketFilter(statusKey){
 function renderTicketFilterChips(){
   var host = document.getElementById('tkt-filter-chips');
   if(!host) return;
-  var order = ['open','in_progress','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
+  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
   host.innerHTML = order.filter(function(k){ return TKT_STATUS[k]; }).map(function(k){
     var s = TKT_STATUS[k];
     var active = !!_ticketStatusFilter[k];
@@ -12081,6 +12505,7 @@ function openTicketModal(ticketId){
   renderTicketLog(t);
   renderTicketLinkedDocs(t);
   renderTicketSuppliers(t);
+  renderTicketRating(t);
   document.getElementById('ticket-modal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   if(isNew) setTimeout(function(){ document.getElementById('tkt-title').focus(); }, 50);
@@ -12584,6 +13009,8 @@ function _buildTicketFromForm(id, prev){
     assignedSupplierIds: prev.assignedSupplierIds || [],
     quotes: prev.quotes || {},
     quoteTokens: prev.quoteTokens || {},
+    rating: prev.rating || null,
+    ratedSupplierId: prev.ratedSupplierId || null,
     added: prev.added || Date.now(),
     updated: Date.now(),
   };
@@ -12599,6 +13026,7 @@ function autoSaveTicketNow(){
   // section so it shows/hides based on the current status (it only appears in
   // the Obtaining Quotes stage) without needing the modal reopened.
   if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(TICKETS[_currentTicketId]);
+  if(typeof renderTicketRating === 'function') renderTicketRating(TICKETS[_currentTicketId]);
 }
 
 function autoSaveTicket(){
@@ -12635,7 +13063,7 @@ function autoSaveTicket(){
     // awaiting_trustee_approval) and there WERE approvals, clear them so the
     // workflow restarts cleanly. Moving forward (work_in_progress, resolved,
     // closed) preserves the audit trail.
-    var revokeStatuses = ['open','in_progress','awaiting_quote','awaiting_trustee_approval'];
+    var revokeStatuses = ['open','awaiting_quote','awaiting_trustee_approval'];
     var hadAnyApproval = (prev.approvals && prev.approvals.length) || prev.approvedQuoteId;
     if(hadAnyApproval && revokeStatuses.indexOf(status) !== -1 && status !== prev.status){
       TICKETS[id].approvals = [];
