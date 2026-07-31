@@ -325,5 +325,23 @@ window.PARK_MANOR_TESTS = [
       {id:'split-014', title:'Meeting attendee badges distinguish O and Tn', pre:'Owner and tenant users exist; meeting modal open', steps:['Open attendee picker'], expect:'Owner chip shows green O badge; tenant chip shows teal Tn badge.', roles:['admin','trustee'], priority:'medium'},
       {id:'split-015', title:'Public report edit-links still work for owner/tenant reporters', pre:'Owner submits a ticket via ?contact-public with edit link', steps:['Use the ?reportEdit=<token> link'], expect:'Edit form loads exactly as it did for residents.', roles:['unauth'], priority:'medium'},
     ]
+  },
+
+  {
+    id: 'redesign',
+    name: 'Portal redesign',
+    icon: '🏢',
+    tests: [
+      {id:'rd-001', title:'Tracker shows stat cards, not a text summary line', pre:'Logged in; tickets exist in several statuses', steps:['Open the Tracker tab'], expect:'A row of cards — Open, Obtaining Quotes, Awaiting Trustee Approval, Work In Progress, Closed — each with a big count and a coloured left border, replacing the old “2 Open · 4 Awaiting…” text line.', roles:['all'], priority:'high'},
+      {id:'rd-002', title:'Clicking a stat card filters the list', pre:'Tracker open, stat cards visible', steps:['Click the Open stat card','Observe the list and the filter chips','Click it again'], expect:'List filters to Open tickets; the matching filter chip lights up too (they stay in sync). Clicking again clears the filter.', roles:['all'], priority:'high'},
+      {id:'rd-003', title:'Ticket cards use pill badges and icon metadata', pre:'Tracker open with tickets', steps:['Look at any ticket card'], expect:'Status is a rounded pill; category and unit are outlined chips; the meta row shows 📅 date, 👤 reporter, 📎 docs, 💬 notes in the sans font.', roles:['all'], priority:'medium'},
+      {id:'rd-004', title:'Mobile bottom navigation bar appears', pre:'Logged in as admin; window narrower than 768px', steps:['Look at the bottom of the screen'], expect:'Fixed bar with Tracker, Finances, Docs, Dash, and More. Active tab highlighted. Content is not hidden behind the bar.', roles:['admin'], priority:'critical'},
+      {id:'rd-005', title:'Bottom nav respects roles', pre:'Logged in as owner or tenant on mobile', steps:['Look at the bottom bar'], expect:'Only Tracker and More are visible — Finances, Docs, and Dash are hidden for non-admin roles.', roles:['owner','tenant'], priority:'critical'},
+      {id:'rd-006', title:'Bottom nav More opens the drawer', pre:'Mobile view', steps:['Tap More'], expect:'The navigation drawer slides in from the left, exactly as the burger button does.', roles:['all'], priority:'high'},
+      {id:'rd-007', title:'Desktop sidebar replaces the burger', pre:'Logged in as admin; window wider than 900px', steps:['Look at the left edge'], expect:'A fixed sidebar with 🏢 Park Manor at top and icon+label items (Dashboard, Transactions, Expenses, Income, Documents, Suppliers, Resolutions, Tracker, Users…). The burger button is hidden. Header and content shift right; nothing is overlapped.', roles:['admin'], priority:'critical'},
+      {id:'rd-008', title:'Sidebar active item is highlighted', pre:'Desktop sidebar visible', steps:['Click Tracker, then Transactions'], expect:'The active item gets a tinted background and a purple left bar; panels switch exactly as before.', roles:['admin'], priority:'high'},
+      {id:'rd-009', title:'Sidebar respects roles', pre:'Logged in as owner or tenant on desktop', steps:['Look at the sidebar'], expect:'Only Tracker is listed — admin-only sections do not appear.', roles:['owner','tenant'], priority:'critical'},
+      {id:'rd-010', title:'Supplier portal job cards match the new style', pre:'Logged in as a supplier with assigned jobs', steps:['View My Jobs'], expect:'Category and unit render as outlined chips, consistent with the Tracker cards.', roles:['all'], priority:'medium'},
+    ]
   }
 ];
