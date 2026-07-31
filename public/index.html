@@ -2511,7 +2511,7 @@ async function assignInvoiceToTx(invId, txKey){
 
 function clickAttach(e, btn){
   e.stopPropagation();
-  if(_currentRole==='guest'||_currentRole==='resident') return;
+  if(_currentRole==='guest'||isResRole(_currentRole)) return;
   var txKey = btn.getAttribute('data-txk');
   if(!txKey) return;
   var atts = getAttachments(txKey);
@@ -2527,7 +2527,7 @@ function clickAttach(e, btn){
 
 function clickDrawerAttach(e, btn){
   e.stopPropagation();
-  if(_currentRole==='guest'||_currentRole==='resident') return;
+  if(_currentRole==='guest'||isResRole(_currentRole)) return;
   var txKey = btn.getAttribute('data-txk');
   if(!txKey) return;
   var atts = getAttachments(txKey);
@@ -6131,10 +6131,16 @@ document.getElementById('tbody').addEventListener('click', function(e){
             <div style="font-size:11px;font-weight:600;color:#60a5fa">Viewer</div>
             <div style="font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px">Read-only</div>
           </label>
-          <label id="role-resident-lbl" style="flex:1;min-width:90px;padding:10px;border-radius:8px;border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .15s">
-            <input type="radio" name="usr-role" value="resident" style="display:none" onchange="updateRoleUI()">
+          <label id="role-owner-lbl" style="flex:1;min-width:90px;padding:10px;border-radius:8px;border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .15s">
+            <input type="radio" name="usr-role" value="owner" style="display:none" onchange="updateRoleUI()">
             <div style="font-size:13px;margin-bottom:3px">🏠</div>
-            <div style="font-size:11px;font-weight:600;color:#34d399">Resident</div>
+            <div style="font-size:11px;font-weight:600;color:#34d399">Owner</div>
+            <div style="font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px">Tickets only</div>
+          </label>
+          <label id="role-tenant-lbl" style="flex:1;min-width:90px;padding:10px;border-radius:8px;border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .15s">
+            <input type="radio" name="usr-role" value="tenant" style="display:none" onchange="updateRoleUI()">
+            <div style="font-size:13px;margin-bottom:3px">🔑</div>
+            <div style="font-size:11px;font-weight:600;color:#2dd4bf">Tenant</div>
             <div style="font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px">Tickets only</div>
           </label>
           <label id="role-supplier-lbl" style="flex:1;min-width:90px;padding:10px;border-radius:8px;border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .15s">
@@ -6687,7 +6693,7 @@ function postLoginUiSetup(userObj, opts){
   var firstTab;
   if(userObj.role === 'admin') firstTab = 'dashboard';
   else if(userObj.role === 'supplier') firstTab = 'supplier-portal';
-  else if(userObj.role === 'trustee' || userObj.role === 'management' || userObj.role === 'resident') firstTab = 'tickets';
+  else if(userObj.role === 'trustee' || userObj.role === 'management' || isResRole(userObj.role)) firstTab = 'tickets';
   else if(userObj.role === 'viewer') firstTab = (userObj.tabs && userObj.tabs.length) ? userObj.tabs[0] : 'tickets';
   else firstTab = 'tickets';
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
@@ -10396,8 +10402,8 @@ function renderMeetingAttendeeList(){
   if(!all.length){ host.innerHTML = '<span style="font-size:10px;color:#3a5070;font-family:var(--mono);font-style:italic">No users yet. Add users in the Users tab.</span>'; return; }
   host.innerHTML = all.map(function(u){
     var present = _meetingModalAttendees.indexOf(u.id) !== -1;
-    var roleColor = u.role==='admin'?'#f59e0b':u.role==='trustee'?'#9d8ff7':u.role==='management'?'#22d3ee':u.role==='resident'?'#34d399':'#60a5fa';
-    var roleLabel = u.role==='admin'?'A':u.role==='trustee'?'T':u.role==='management'?'M':u.role==='resident'?'R':'V';
+    var roleColor = u.role==='admin'?'#f59e0b':u.role==='trustee'?'#9d8ff7':u.role==='management'?'#22d3ee':u.role==='owner'?'#34d399':u.role==='tenant'?'#2dd4bf':u.role==='resident'?'#34d399':'#60a5fa';
+    var roleLabel = u.role==='admin'?'A':u.role==='trustee'?'T':u.role==='management'?'M':u.role==='owner'?'O':u.role==='tenant'?'Tn':u.role==='resident'?'R':'V';
     var isChair = u.isChair === true;
     // Management attends and may vote but does NOT count toward quorum — flag
     // that visually so it's clear why the quorum tally might look short.
@@ -12293,7 +12299,7 @@ function renderTickets(){
   // or tickets on a unit number associated with their user. Admin/trustee/
   // guest are unaffected. A user with no units AND no created tickets will
   // see an empty list — set their units (or change their role) to widen it.
-  if(_currentRole === 'resident' || _currentRole === 'viewer'){
+  if(isResRole(_currentRole) || _currentRole === 'viewer'){
     var myId = _currentUserObj && _currentUserObj.id;
     var myName = _currentUserObj && (_currentUserObj.name || _currentUserObj.username);
     var myUnits = (_currentUserObj && Array.isArray(_currentUserObj.units))
@@ -12617,10 +12623,10 @@ function openTicketModal(ticketId){
       t.reporter === _currentUserObj.username
     ))
   );
-  var isResidentOwn = (_currentRole==='resident' && isOwnTicket);
+  var isResidentOwn = (isResRole(_currentRole) && isOwnTicket);
   // Read-only: guest, viewer, and residents viewing someone else's ticket
   var isReadOnly = (_currentRole==='guest' || _currentRole==='viewer' ||
-    (_currentRole==='resident' && !isOwnTicket));
+    (isResRole(_currentRole) && !isOwnTicket));
 
   document.getElementById('tkt-title').value = t.title||'';
   // Ticket number display: shown for saved tickets, with status pill and a
@@ -12792,7 +12798,7 @@ function closeTicketModal(){
     return;
   }
   // Residents: only save category on their own ticket
-  if(_currentRole==='resident'){
+  if(isResRole(_currentRole)){
     if(_currentTicketId && TICKETS[_currentTicketId]){
       var newCat = (document.getElementById('tkt-category')||{value:''}).value;
       if(newCat !== TICKETS[_currentTicketId].category){
@@ -13302,7 +13308,7 @@ function autoSaveTicketNow(){
 function autoSaveTicket(){
   // Guests and viewers never save; residents only save their own tickets
   if(_currentRole==='guest' || _currentRole==='viewer') return;
-  if(_currentRole==='resident'){
+  if(isResRole(_currentRole)){
     // Only allow saving category on own ticket - handled separately
     return;
   }
@@ -14173,7 +14179,11 @@ window.addEventListener('keydown', function(e){
 // ══════════════════════════════════════════════════════════════════════════
 var USERS = {};
 var _currentUserId2 = null; // for user modal editing
-var _currentRole = 'guest'; // 'admin' | 'trustee' | 'resident' | 'viewer' | 'guest'
+var _currentRole = 'guest'; // 'admin' | 'trustee' | 'owner' | 'tenant' | 'resident' (legacy) | 'viewer' | 'guest'
+// Owner and Tenant behave identically to the legacy Resident role. Any check
+// that used to test role==='resident' now goes through this helper so old
+// user records in Supabase keep working unchanged.
+function isResRole(r){ return r==='resident' || r==='owner' || r==='tenant'; }
 var _currentUserObj = null;
 
 // ── Permission model ─────────────────────────────────────────────────────
@@ -14229,6 +14239,32 @@ var DEFAULT_ROLE_PERMISSIONS = {
     canMakeAnonymous:     false
   },
   resident: {
+    canDeleteTickets:     'own',
+    canEditOthersTickets: false,
+    canChangeStatus:      false,
+    canApproveQuotes:     false,
+    canAttachFiles:       true,
+    canDeleteAttachments: 'own',
+    canEditDocuments:     false,
+    canShareLink:         false,
+    canManageCriteria:    false,
+    canMakeAnonymous:     true
+  },
+  // Owner and Tenant were split out of Resident (July 2026). Both start with
+  // identical permissions; adjust independently in Settings → Permissions.
+  owner: {
+    canDeleteTickets:     'own',
+    canEditOthersTickets: false,
+    canChangeStatus:      false,
+    canApproveQuotes:     false,
+    canAttachFiles:       true,
+    canDeleteAttachments: 'own',
+    canEditDocuments:     false,
+    canShareLink:         false,
+    canManageCriteria:    false,
+    canMakeAnonymous:     true
+  },
+  tenant: {
     canDeleteTickets:     'own',
     canEditOthersTickets: false,
     canChangeStatus:      false,
@@ -14473,8 +14509,8 @@ function renderUsers(){
     grid.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:12px">No users yet. The built-in admin account (admin/admin) always works.<br>Add users below to give others access.</div>';
     return;
   }
-  var roleColors = {admin:'#f59e0b', trustee:'#9d8ff7', management:'#22d3ee', viewer:'#60a5fa', resident:'#34d399'};
-  var roleIcons  = {admin:'⚙', trustee:'🛡', management:'🧑‍💼', viewer:'👁', resident:'🏠'};
+  var roleColors = {admin:'#f59e0b', trustee:'#9d8ff7', management:'#22d3ee', viewer:'#60a5fa', resident:'#34d399', owner:'#34d399', tenant:'#2dd4bf'};
+  var roleIcons  = {admin:'⚙', trustee:'🛡', management:'🧑‍💼', viewer:'👁', resident:'🏠', owner:'🏠', tenant:'🔑'};
   grid.innerHTML = all.map(function(u){
     var rc = roleColors[u.role]||'#94a3b8';
     var ri = roleIcons[u.role]||'👤';
@@ -14497,7 +14533,7 @@ function renderUsers(){
 }
 
 function hexToRgb2(hex){
-  var m={'#34d399':'52,211,153','#f59e0b':'245,158,11','#9d8ff7':'157,143,247','#60a5fa':'96,165,250','#94a3b8':'148,163,184','#4ade9e':'74,222,158','#f06f6f':'240,111,111','#22d3ee':'34,211,238','#fbbf24':'251,191,36'};
+  var m={'#34d399':'52,211,153','#f59e0b':'245,158,11','#9d8ff7':'157,143,247','#60a5fa':'96,165,250','#94a3b8':'148,163,184','#4ade9e':'74,222,158','#f06f6f':'240,111,111','#22d3ee':'34,211,238','#fbbf24':'251,191,36','#2dd4bf':'45,212,191'};
   return m[hex]||'123,104,238';
 }
 
@@ -14610,10 +14646,10 @@ function populateSupplierCompanyDropdown(){
 function updateRoleUI(){
   var role = '';
   document.querySelectorAll('input[name="usr-role"]').forEach(function(r){ if(r.checked) role=r.value; });
-  ['admin','trustee','management','viewer','resident','supplier'].forEach(function(r){
+  ['admin','trustee','management','viewer','owner','tenant','supplier'].forEach(function(r){
     var lbl = document.getElementById('role-'+r+'-lbl');
     if(lbl){
-      var colors = {admin:'#f59e0b',trustee:'#9d8ff7',management:'#22d3ee',viewer:'#60a5fa',resident:'#34d399',supplier:'#fbbf24'};
+      var colors = {admin:'#f59e0b',trustee:'#9d8ff7',management:'#22d3ee',viewer:'#60a5fa',owner:'#34d399',tenant:'#2dd4bf',supplier:'#fbbf24'};
       lbl.style.borderColor = role===r ? colors[r] : 'var(--border)';
       lbl.style.background = role===r ? 'rgba('+hexToRgb2(colors[r])+',.08)' : 'transparent';
     }
@@ -14631,11 +14667,11 @@ function updateRoleUI(){
   // Units section: resident or viewer (used to scope ticket visibility).
   // Admin/trustee/management see everything anyway so units don't matter.
   var unitsSection = document.getElementById('usr-units-section');
-  if(unitsSection) unitsSection.style.display = (role==='resident' || role==='viewer') ? '' : 'none';
+  if(unitsSection) unitsSection.style.display = (isResRole(role) || role==='viewer') ? '' : 'none';
   // Image-permission section: resident only (admin/trustee/management always can; viewer/guest never can)
   var imgSection = document.getElementById('usr-img-perms-section');
   if(imgSection){
-    imgSection.style.display = role==='resident' ? '' : 'none';
+    imgSection.style.display = isResRole(role) ? '' : 'none';
   }
   // Chair section: trustees and admins only. A managing agent cannot chair
   // a trustee meeting, so the chair flag is hidden for the management role.
@@ -14687,12 +14723,12 @@ async function saveUser(){
   document.querySelectorAll('input[name="usr-tab"]').forEach(function(c){ if(c.checked) tabs.push(c.value); });
 
   // Image permissions: only relevant for residents. Viewers never add; admin/trustee always can.
-  var canAddImages = role==='resident' ? document.getElementById('usr-can-add-images').checked : false;
+  var canAddImages = isResRole(role) ? document.getElementById('usr-can-add-images').checked : false;
 
   // Units only meaningful for resident or viewer (admins/trustees see all
   // tickets regardless). Empty array for the other roles to keep the
   // persisted shape consistent.
-  var units = (role==='resident' || role==='viewer') ? _editingUserUnits.slice() : [];
+  var units = (isResRole(role) || role==='viewer') ? _editingUserUnits.slice() : [];
 
   // Password: a blank field means "keep the existing password". A typed
   // value is hashed before storage. (prev.password is already a hash for
@@ -14704,7 +14740,7 @@ async function saveUser(){
     id: id, username: username,
     password: storedPassword,
     name: name, role: role,
-    tabs: role==='viewer' ? tabs : (role==='resident' ? ['tickets'] : []),
+    tabs: role==='viewer' ? tabs : (isResRole(role) ? ['tickets'] : []),
     canAddImages: canAddImages,
     units: units,
     supplierId: role==='supplier' ? supplierId : (prev.supplierId && role!=='supplier' ? undefined : prev.supplierId),
@@ -14817,7 +14853,7 @@ function applyUserSession(userObj){
       var tab = document.querySelector('[data-tab="'+t+'"]');
       if(tab) tab.style.display = tabs.includes(t) ? 'inline-flex' : 'none';
     });
-  } else if(role==='resident'){
+  } else if(isResRole(role)){
     // Residents only see Tickets tab — hide everything else
     ['transactions','expenses','income','invoices','suppliers','resolutions','users','recon'].forEach(function(t){
       var tab = document.querySelector('[data-tab="'+t+'"]');
@@ -14840,7 +14876,7 @@ function applyUserSession(userObj){
   // Update logout button label
   var logoutBtn = document.getElementById('logout-btn');
   if(logoutBtn){
-    var roleLabel = role==='admin'?'Admin':role==='trustee'?'Trustee':role==='management'?'Management':role==='resident'?'Resident':role==='viewer'?'Viewer':role==='supplier'?'Supplier':'User';
+    var roleLabel = role==='admin'?'Admin':role==='trustee'?'Trustee':role==='management'?'Management':role==='resident'?'Resident':role==='owner'?'Owner':role==='tenant'?'Tenant':role==='viewer'?'Viewer':role==='supplier'?'Supplier':'User';
     logoutBtn.textContent = '✓ '+(userObj.name||userObj.username)+' ('+roleLabel+')';
   }
 }
@@ -14857,7 +14893,7 @@ function canAddTicketImages(){
   // Backward-compat: if a resident has the old canAddImages: false field
   // set explicitly, honour it. Otherwise fall through to the permission
   // helper.
-  if(_currentUserObj && _currentRole === 'resident' && _currentUserObj.canAddImages === false){
+  if(_currentUserObj && isResRole(_currentRole) && _currentUserObj.canAddImages === false){
     return false;
   }
   return userCan('canAttachFiles');
@@ -15030,7 +15066,7 @@ function closeRolePermissionsModal(){
 function renderRolePermissionsBody(){
   var host = document.getElementById('role-perms-body');
   if(!host) return;
-  var roles = ['trustee','resident','viewer','guest'];
+  var roles = ['trustee','owner','tenant','resident','viewer','guest'];
   // Header row
   var header = '<div style="display:grid;grid-template-columns:1.8fr repeat('+roles.length+', 1fr);gap:6px;font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;padding:6px 0;border-bottom:1px solid var(--border)">'
     + '<div></div>'

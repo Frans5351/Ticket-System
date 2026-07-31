@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Park Manor — Test Suite Runner</title>
+<style>
+  :root {
+    --bg: #0d1421;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --border2: #253651;
+    --text: #c8d8f0;
+    --muted: #6b7d99;
+    --accent: #7b68ee;
+    --accent-glow: #9d8ff7;
+    --green: #4ade9e;
+    --amber: #f59e0b;
+    --red: #f06f6f;
+    --blue: #60a5fa;
+    --mono: 'DM Mono', 'JetBrains Mono', ui-monospace, 'Menlo', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  a { color: var(--accent-glow); }
+
+  /* ── Layout ─────────────────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .sidebar.mobile-open { display: flex; position: fixed; inset: 0; z-index: 100; background: var(--surface); }
+  }
+
+  /* ── Sidebar ───────────────────────────────────────────────────────── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-header {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .sidebar-subtitle {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .overall-progress {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .progress-bar-outer {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .progress-bar-inner {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--accent-glow));
+    transition: width 0.3s;
+  }
+  .progress-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .progress-label strong { color: var(--text); font-weight: 600; }
+
+  .category-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .category-item {
+    padding: 10px 18px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.12s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .category-item:hover { background: var(--surface2); }
+  .category-item.active {
+    background: var(--surface2);
+    border-left-color: var(--accent);
+  }
+  .category-icon { font-size: 16px; }
+  .category-name {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .category-progress {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: var(--mono);
+    text-align: right;
+    line-height: 1.3;
+  }
+  .category-progress .pass { color: var(--green); }
+  .category-progress .fail { color: var(--red); }
+
+  .sidebar-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .btn {
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: var(--mono);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.12s;
+  }
+  .btn:hover { background: var(--border2); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: var(--accent-glow); }
+  .btn.danger { color: var(--red); }
+  .btn.danger:hover { background: rgba(240,111,111,0.1); }
+
+  /* ── Main pane ─────────────────────────────────────────────────────── */
+  .main {
+    overflow-y: auto;
+    padding: 24px 28px 60px;
+  }
+  .main-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .main-title {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .main-subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 18px;
+  }
+  .mobile-menu-btn {
+    display: none;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    cursor: pointer;
+  }
+  @media (max-width: 900px) {
+    .mobile-menu-btn { display: inline-block; margin-bottom: 12px; }
+    .main { padding: 16px 18px 40px; }
+  }
+
+  /* ── Filter row ────────────────────────────────────────────────────── */
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .chip {
+    padding: 5px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .chip:hover { background: var(--border2); color: var(--text); }
+  .chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .search-box {
+    padding: 7px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    width: 240px;
+    outline: none;
+  }
+  .search-box:focus { border-color: var(--accent); }
+
+  /* ── Test cards ────────────────────────────────────────────────────── */
+  .test-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-left-width: 3px;
+    transition: border-color 0.12s;
+  }
+  .test-card.status-pass { border-left-color: var(--green); }
+  .test-card.status-fail { border-left-color: var(--red); }
+  .test-card.status-skip { border-left-color: var(--muted); }
+  .test-card.status-block { border-left-color: var(--amber); }
+  .test-card.status-none { border-left-color: transparent; }
+
+  .test-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .test-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .test-id {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .test-meta {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .priority-pill {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .priority-critical { background: rgba(240,111,111,0.15); color: var(--red); border: 1px solid rgba(240,111,111,0.3); }
+  .priority-high { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+  .priority-medium { background: rgba(96,165,250,0.12); color: var(--blue); border: 1px solid rgba(96,165,250,0.3); }
+  .priority-low { background: rgba(107,125,153,0.15); color: var(--muted); border: 1px solid var(--border2); }
+
+  .role-pill {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 6px;
+    color: var(--muted);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    background: var(--surface2);
+  }
+  .test-body {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .test-body .label {
+    font-family: var(--mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--accent-glow);
+    margin-top: 8px;
+    margin-bottom: 3px;
+  }
+  .test-body .steps {
+    margin: 4px 0 0 0;
+    padding-left: 20px;
+  }
+  .test-body .steps li { margin-bottom: 2px; }
+  .test-body .expect { color: var(--text); }
+
+  .test-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .verdict-btn {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--muted);
+    transition: all 0.1s;
+  }
+  .verdict-btn:hover { background: var(--border2); }
+  .verdict-btn.active-pass { background: var(--green); color: #062; border-color: var(--green); }
+  .verdict-btn.active-fail { background: var(--red); color: #fff; border-color: var(--red); }
+  .verdict-btn.active-skip { background: var(--muted); color: var(--surface); border-color: var(--muted); }
+  .verdict-btn.active-block { background: var(--amber); color: #fff; border-color: var(--amber); }
+
+  .test-note {
+    width: 100%;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    outline: none;
+    resize: vertical;
+    min-height: 32px;
+  }
+  .test-note:focus { border-color: var(--accent); }
+
+  /* ── Summary view ─────────────────────────────────────────────────── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat-num {
+    font-size: 24px;
+    font-weight: 600;
+    font-family: var(--mono);
+    margin-bottom: 4px;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-family: var(--mono);
+  }
+  .stat-num.pass { color: var(--green); }
+  .stat-num.fail { color: var(--red); }
+  .stat-num.skip { color: var(--muted); }
+  .stat-num.block { color: var(--amber); }
+  .stat-num.none { color: var(--text); }
+
+  .fail-list {
+    margin-top: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+  }
+  .fail-list h3 {
+    font-size: 12px;
+    color: var(--red);
+    margin: 0 0 8px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: var(--mono);
+  }
+  .fail-item {
+    padding: 6px 0;
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .fail-item:first-of-type { border-top: none; }
+  .fail-item .fail-id { font-family: var(--mono); color: var(--muted); margin-right: 8px; }
+  .fail-item .fail-note { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-top: 3px; }
+
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar with categories + overall progress -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Park Manor Test Suite</div>
+      <div class="sidebar-subtitle">Handover verification</div>
+    </div>
+    <div class="overall-progress">
+      <div class="progress-label">
+        <span>Overall</span>
+        <span><strong id="overall-count">0 / 0</strong></span>
+      </div>
+      <div class="progress-bar-outer">
+        <div class="progress-bar-inner" id="overall-bar" style="width:0"></div>
+      </div>
+    </div>
+    <div class="category-list" id="category-list"></div>
+    <div class="sidebar-footer">
+      <button class="btn primary" onclick="showSummary()">📊 Summary & report</button>
+      <button class="btn" onclick="exportResults()">⬇ Export report (markdown)</button>
+      <button class="btn danger" onclick="resetRun()">↻ Reset this run</button>
+    </div>
+  </aside>
+
+  <!-- Main content pane -->
+  <main class="main">
+    <button class="mobile-menu-btn" onclick="toggleMobileSidebar()">☰ Categories</button>
+    <div class="main-header">
+      <div>
+        <div class="main-title" id="main-title">Loading…</div>
+        <div class="main-subtitle" id="main-subtitle"></div>
+      </div>
+    </div>
+    <div class="filter-row" id="filter-row" style="display:none">
+      <div class="chip active" data-filter="all" onclick="setFilter('all')">All</div>
+      <div class="chip" data-filter="none" onclick="setFilter('none')">Not run</div>
+      <div class="chip" data-filter="pass" onclick="setFilter('pass')">✓ Pass</div>
+      <div class="chip" data-filter="fail" onclick="setFilter('fail')">✕ Fail</div>
+      <div class="chip" data-filter="skip" onclick="setFilter('skip')">↷ Skip</div>
+      <div class="chip" data-filter="block" onclick="setFilter('block')">⛔ Block</div>
+      <input class="search-box" id="search-box" placeholder="Search titles / ids…" oninput="renderCurrent()">
+    </div>
+    <div id="content"></div>
+  </main>
+
+</div>
+
+<script src="tests-data.js"></script>
+<script>
+/*
+ * Runner logic. Persists results in localStorage under 'pm_test_run_v1'.
+ * Reset button wipes that key and re-renders everything as fresh.
+ *
+ * Verdicts: 'pass' | 'fail' | 'skip' | 'block' | null (not run)
+ */
+
+var STORAGE_KEY = 'pm_test_run_v1';
+var state = {
+  currentCategory: null,   // category id, or '__summary__'
+  filter: 'all',           // 'all' | 'none' | 'pass' | 'fail' | 'skip' | 'block'
+  results: {},             // { testId: { verdict, note, ts } }
+};
+
+// ── Storage ────────────────────────────────────────────────────────────
+
+function loadResults(){
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) state.results = JSON.parse(raw) || {};
+  } catch(e){ state.results = {}; }
+}
+function saveResults(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.results)); }
+  catch(e){ console.warn('Save failed', e); }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+function allTests(){
+  var out = [];
+  PARK_MANOR_TESTS.forEach(function(cat){
+    cat.tests.forEach(function(t){ out.push({cat: cat, test: t}); });
+  });
+  return out;
+}
+function categoryStats(catId){
+  var cat = PARK_MANOR_TESTS.find(function(c){ return c.id === catId; });
+  if(!cat) return {total:0, pass:0, fail:0, skip:0, block:0, none:0};
+  var stats = {total: cat.tests.length, pass:0, fail:0, skip:0, block:0, none:0};
+  cat.tests.forEach(function(t){
+    var r = state.results[t.id];
+    if(!r || !r.verdict) stats.none++;
+    else stats[r.verdict]++;
+  });
+  return stats;
+}
+function overallStats(){
+  var stats = {total:0, pass:0, fail:0, skip:0, block:0, none:0};
+  PARK_MANOR_TESTS.forEach(function(cat){
+    var cs = categoryStats(cat.id);
+    stats.total += cs.total;
+    stats.pass += cs.pass;
+    stats.fail += cs.fail;
+    stats.skip += cs.skip;
+    stats.block += cs.block;
+    stats.none += cs.none;
+  });
+  return stats;
+}
+function esc(s){
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+// ── Sidebar rendering ──────────────────────────────────────────────────
+
+function renderSidebar(){
+  var list = document.getElementById('category-list');
+  list.innerHTML = PARK_MANOR_TESTS.map(function(cat){
+    var stats = categoryStats(cat.id);
+    var done = stats.pass + stats.fail + stats.skip + stats.block;
+    var active = state.currentCategory === cat.id;
+    return '<div class="category-item' + (active ? ' active' : '') + '" onclick="selectCategory(\''+cat.id+'\')">'
+      + '<span class="category-icon">' + cat.icon + '</span>'
+      + '<div class="category-name">' + esc(cat.name) + '</div>'
+      + '<div class="category-progress">'
+      +   done + ' / ' + stats.total
+      +   (stats.fail ? '<br><span class="fail">' + stats.fail + ' fail</span>' : '')
+      +   (stats.pass && !stats.fail ? '<br><span class="pass">✓</span>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  var o = overallStats();
+  var done = o.pass + o.fail + o.skip + o.block;
+  document.getElementById('overall-count').textContent = done + ' / ' + o.total;
+  var pct = o.total ? Math.round((done / o.total) * 100) : 0;
+  document.getElementById('overall-bar').style.width = pct + '%';
+}
+
+// ── Category selection ────────────────────────────────────────────────
+
+function selectCategory(catId){
+  state.currentCategory = catId;
+  document.getElementById('filter-row').style.display = 'flex';
+  renderCurrent();
+  renderSidebar();
+  // Close mobile sidebar if open
+  document.getElementById('sidebar').classList.remove('mobile-open');
+}
+
+function toggleMobileSidebar(){
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+}
+
+function setFilter(f){
+  state.filter = f;
+  document.querySelectorAll('#filter-row .chip').forEach(function(chip){
+    chip.classList.toggle('active', chip.dataset.filter === f);
+  });
+  renderCurrent();
+}
+
+// ── Test card rendering ───────────────────────────────────────────────
+
+function testCardHtml(cat, test){
+  var r = state.results[test.id] || {};
+  var verdict = r.verdict || null;
+  var note = r.note || '';
+  var stepsHtml = test.steps.map(function(s){ return '<li>' + esc(s) + '</li>'; }).join('');
+  var rolesHtml = (test.roles||[]).map(function(role){
+    return '<span class="role-pill">' + esc(role) + '</span>';
+  }).join('');
+
+  return '<div class="test-card status-' + (verdict || 'none') + '" data-testid="' + test.id + '">'
+    + '<div class="test-head">'
+    +   '<div>'
+    +     '<div class="test-title">' + esc(test.title) + '</div>'
+    +   '</div>'
+    +   '<span class="test-id">' + esc(test.id) + '</span>'
+    + '</div>'
+    + '<div class="test-meta">'
+    +   '<span class="priority-pill priority-' + esc(test.priority) + '">' + esc(test.priority) + '</span>'
+    +   rolesHtml
+    + '</div>'
+    + '<div class="test-body">'
+    +   '<div class="label">Precondition</div>'
+    +   '<div>' + esc(test.pre) + '</div>'
+    +   '<div class="label">Steps</div>'
+    +   '<ol class="steps">' + stepsHtml + '</ol>'
+    +   '<div class="label">Expected result</div>'
+    +   '<div class="expect">' + esc(test.expect) + '</div>'
+    + '</div>'
+    + '<div class="test-actions">'
+    +   verdictBtn(test.id, 'pass', '✓ Pass', verdict === 'pass')
+    +   verdictBtn(test.id, 'fail', '✕ Fail', verdict === 'fail')
+    +   verdictBtn(test.id, 'skip', '↷ Skip', verdict === 'skip')
+    +   verdictBtn(test.id, 'block', '⛔ Blocked', verdict === 'block')
+    + '</div>'
+    + '<textarea class="test-note" placeholder="Notes (optional — what did you see, what browser, screenshot filename, etc.)" oninput="saveNote(\''+test.id+'\', this.value)">' + esc(note) + '</textarea>'
+    + '</div>';
+}
+function verdictBtn(id, v, label, active){
+  return '<button class="verdict-btn' + (active ? ' active-' + v : '') + '" onclick="setVerdict(\''+id+'\',\''+v+'\')">' + label + '</button>';
+}
+
+function setVerdict(id, v){
+  if(!state.results[id]) state.results[id] = {};
+  // Toggle off if clicking the already-active verdict
+  if(state.results[id].verdict === v){
+    state.results[id].verdict = null;
+  } else {
+    state.results[id].verdict = v;
+  }
+  state.results[id].ts = Date.now();
+  saveResults();
+  renderCurrent();
+  renderSidebar();
+}
+
+function saveNote(id, txt){
+  if(!state.results[id]) state.results[id] = {};
+  state.results[id].note = txt;
+  state.results[id].ts = Date.now();
+  saveResults();
+}
+
+// ── Main pane rendering ───────────────────────────────────────────────
+
+function renderCurrent(){
+  var content = document.getElementById('content');
+  var title = document.getElementById('main-title');
+  var subtitle = document.getElementById('main-subtitle');
+
+  if(state.currentCategory === '__summary__'){
+    renderSummary();
+    return;
+  }
+
+  var cat = PARK_MANOR_TESTS.find(function(c){ return c.id === state.currentCategory; });
+  if(!cat){
+    title.textContent = 'Select a category from the sidebar';
+    subtitle.textContent = 'Or view the Summary';
+    content.innerHTML = '<div class="empty">← Pick a category to start walking through its tests.</div>';
+    return;
+  }
+
+  var searchTerm = (document.getElementById('search-box').value || '').toLowerCase().trim();
+  var tests = cat.tests.filter(function(t){
+    // Filter by verdict
+    var r = state.results[t.id];
+    var v = r ? r.verdict : null;
+    if(state.filter === 'none' && v) return false;
+    if(state.filter === 'pass' && v !== 'pass') return false;
+    if(state.filter === 'fail' && v !== 'fail') return false;
+    if(state.filter === 'skip' && v !== 'skip') return false;
+    if(state.filter === 'block' && v !== 'block') return false;
+    // Filter by search
+    if(searchTerm){
+      var hay = (t.id + ' ' + t.title + ' ' + t.pre + ' ' + t.expect + ' ' + t.steps.join(' ')).toLowerCase();
+      if(hay.indexOf(searchTerm) < 0) return false;
+    }
+    return true;
+  });
+
+  var stats = categoryStats(cat.id);
+  title.innerHTML = cat.icon + ' ' + esc(cat.name);
+  var done = stats.pass + stats.fail + stats.skip + stats.block;
+  subtitle.textContent = done + ' of ' + stats.total + ' completed  ·  ' + stats.pass + ' pass  ·  ' + stats.fail + ' fail  ·  ' + stats.skip + ' skip  ·  ' + stats.block + ' blocked  ·  ' + stats.none + ' not run';
+
+  if(!tests.length){
+    content.innerHTML = '<div class="empty">No tests match the current filter.</div>';
+    return;
+  }
+
+  content.innerHTML = tests.map(function(t){ return testCardHtml(cat, t); }).join('');
+}
+
+// ── Summary view ──────────────────────────────────────────────────────
+
+function showSummary(){
+  state.currentCategory = '__summary__';
+  document.getElementById('filter-row').style.display = 'none';
+  renderCurrent();
+  renderSidebar();
+}
+
+function renderSummary(){
+  var title = document.getElementById('main-title');
+  var subtitle = document.getElementById('main-subtitle');
+  var content = document.getElementById('content');
+
+  title.textContent = '📊 Summary';
+
+  var o = overallStats();
+  var done = o.pass + o.fail + o.skip + o.block;
+  subtitle.textContent = done + ' of ' + o.total + ' tests completed  ·  ' + Math.round((done/o.total)*100) + '% coverage';
+
+  // Stat cards
+  var statsHtml = '<div class="summary-grid">'
+    + statCard('Total', o.total, 'none')
+    + statCard('Pass', o.pass, 'pass')
+    + statCard('Fail', o.fail, 'fail')
+    + statCard('Skipped', o.skip, 'skip')
+    + statCard('Blocked', o.block, 'block')
+    + statCard('Not run', o.none, 'none')
+    + '</div>';
+
+  // Fail list
+  var failsHtml = '';
+  var fails = allTests().filter(function(pair){
+    var r = state.results[pair.test.id];
+    return r && r.verdict === 'fail';
+  });
+  if(fails.length){
+    failsHtml = '<div class="fail-list"><h3>Failures (' + fails.length + ')</h3>'
+      + fails.map(function(pair){
+          var r = state.results[pair.test.id];
+          return '<div class="fail-item">'
+            + '<span class="fail-id">' + esc(pair.test.id) + '</span>'
+            + esc(pair.test.title)
+            + (r.note ? '<div class="fail-note">' + esc(r.note) + '</div>' : '')
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  // Blocked list
+  var blocks = allTests().filter(function(pair){
+    var r = state.results[pair.test.id];
+    return r && r.verdict === 'block';
+  });
+  if(blocks.length){
+    failsHtml += '<div class="fail-list"><h3 style="color:var(--amber)">Blocked (' + blocks.length + ')</h3>'
+      + blocks.map(function(pair){
+          var r = state.results[pair.test.id];
+          return '<div class="fail-item">'
+            + '<span class="fail-id">' + esc(pair.test.id) + '</span>'
+            + esc(pair.test.title)
+            + (r.note ? '<div class="fail-note">' + esc(r.note) + '</div>' : '')
+            + '</div>';
+        }).join('')
+      + '</div>';
+  }
+
+  // Per-category breakdown
+  var catBreakdown = '<div class="fail-list"><h3 style="color:var(--accent-glow)">By category</h3>'
+    + PARK_MANOR_TESTS.map(function(cat){
+        var s = categoryStats(cat.id);
+        var d = s.pass + s.fail + s.skip + s.block;
+        return '<div class="fail-item" style="display:flex;justify-content:space-between;align-items:center">'
+          + '<div>' + cat.icon + ' ' + esc(cat.name) + '</div>'
+          + '<div style="font-family:var(--mono);font-size:11px">'
+          +   d + ' / ' + s.total
+          +   (s.fail ? ' · <span style="color:var(--red)">' + s.fail + ' fail</span>' : '')
+          +   (s.pass ? ' · <span style="color:var(--green)">' + s.pass + ' pass</span>' : '')
+          + '</div>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+
+  content.innerHTML = statsHtml + failsHtml + catBreakdown;
+}
+function statCard(label, num, cls){
+  return '<div class="stat-card">'
+    + '<div class="stat-num ' + cls + '">' + num + '</div>'
+    + '<div class="stat-label">' + esc(label) + '</div>'
+    + '</div>';
+}
+
+// ── Export ────────────────────────────────────────────────────────────
+
+function exportResults(){
+  var o = overallStats();
+  var done = o.pass + o.fail + o.skip + o.block;
+  var ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+  var md = '# Park Manor Test Run — ' + ts + '\n\n';
+  md += '**Coverage:** ' + done + ' / ' + o.total + ' (' + Math.round((done/o.total)*100) + '%)\n\n';
+  md += '| Result | Count |\n|--------|-------|\n';
+  md += '| ✓ Pass | ' + o.pass + ' |\n';
+  md += '| ✕ Fail | ' + o.fail + ' |\n';
+  md += '| ↷ Skip | ' + o.skip + ' |\n';
+  md += '| ⛔ Blocked | ' + o.block + ' |\n';
+  md += '| Not run | ' + o.none + ' |\n\n';
+
+  PARK_MANOR_TESTS.forEach(function(cat){
+    var s = categoryStats(cat.id);
+    md += '## ' + cat.icon + ' ' + cat.name + ' — ' + (s.pass + s.fail + s.skip + s.block) + ' / ' + s.total + '\n\n';
+    cat.tests.forEach(function(t){
+      var r = state.results[t.id] || {};
+      var v = r.verdict || 'not run';
+      var symbol = {pass:'✓', fail:'✕', skip:'↷', block:'⛔'}[v] || '·';
+      md += '- `' + t.id + '` ' + symbol + ' **' + t.title + '**';
+      if(r.note){ md += '\n  - Notes: ' + r.note; }
+      md += '\n';
+    });
+    md += '\n';
+  });
+
+  // Trigger download
+  var blob = new Blob([md], {type: 'text/markdown'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'park-manor-test-report-' + new Date().toISOString().slice(0,10) + '.md';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Reset ────────────────────────────────────────────────────────────
+
+function resetRun(){
+  if(!confirm('Reset all test results? This clears all pass/fail/notes for the current run.')) return;
+  state.results = {};
+  saveResults();
+  renderSidebar();
+  renderCurrent();
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────
+
+loadResults();
+renderSidebar();
+if(PARK_MANOR_TESTS.length){
+  selectCategory(PARK_MANOR_TESTS[0].id);
+}
+</script>
+</body>
+</html>
