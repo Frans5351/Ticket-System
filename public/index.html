@@ -1334,6 +1334,17 @@ async function checkStorageSetup(){
     --red:#e35d6a;
     --text2:#3a4354;
   }
+  body.theme-light input[style*="background:var(--surface2)"],
+  body.theme-light textarea[style*="background:var(--surface2)"],
+  body.theme-light select[style*="background:var(--surface2)"],
+  body.theme-green input[style*="background:var(--surface2)"],
+  body.theme-green textarea[style*="background:var(--surface2)"],
+  body.theme-green select[style*="background:var(--surface2)"],
+  body.theme-clean input[style*="background:var(--surface2)"],
+  body.theme-clean textarea[style*="background:var(--surface2)"],
+  body.theme-clean select[style*="background:var(--surface2)"]{
+    background:var(--surface) !important;
+  }
   body.theme-portal .header{ box-shadow:0 1px 4px rgba(25,39,60,.07); }
   body.theme-portal .tab.active{ color:#1fa898; }
   /* Soft shadow on card-like surfaces (subtle; matches the portal look) */
@@ -5958,17 +5969,17 @@ document.getElementById('tbody').addEventListener('click', function(e){
 
       <!-- Photo attachments -->
       <div class="new-tkt-section" id="ntkt-photo-section">
-        <label class="tkt-field-label">Photos (optional)</label>
+        <label class="tkt-field-label">Photos &amp; videos (optional)</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:80px;height:80px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:12px;cursor:pointer;font-size:11px;color:var(--muted);font-family:var(--mono);transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
             <span style="font-size:28px">📷</span>
             Camera
-            <input type="file" id="ntkt-photo-cam" accept="image/*" capture="environment" style="display:none" onchange="ntktAddPhotos(this.files)">
+            <input type="file" id="ntkt-photo-cam" accept="image/*,video/*" capture="environment" style="display:none" onchange="ntktAddPhotos(this.files)">
           </label>
           <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:80px;height:80px;background:var(--surface2);border:1.5px dashed var(--border2);border-radius:12px;cursor:pointer;font-size:11px;color:var(--muted);font-family:var(--mono);transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
             <span style="font-size:28px">🖼️</span>
             Gallery
-            <input type="file" id="ntkt-photo-gal" accept="image/*" multiple style="display:none" onchange="ntktAddPhotos(this.files)">
+            <input type="file" id="ntkt-photo-gal" accept="image/*,video/*" multiple style="display:none" onchange="ntktAddPhotos(this.files)">
           </label>
           <div id="ntkt-photo-previews" style="display:flex;gap:8px;flex-wrap:wrap;flex:1"></div>
         </div>
@@ -16278,6 +16289,42 @@ var _ntktPending = 0; // track async photo processing
 function ntktAddPhotos(files){
   var previews = document.getElementById('ntkt-photo-previews');
   Array.from(files).forEach(function(file){
+    var isVid = file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v|3gp)$/i.test(file.name||'');
+    if(isVid){
+      // Videos are stored as-is (no browser re-encode); cap at 8 MB to match
+      // the server upload limit so we fail early with a clear message.
+      if(file.size > 8 * 1024 * 1024){
+        alert('\u26a0 "'+file.name+'" is too large \u2014 videos must be under 8 MB.\nTip: record a shorter clip, or lower the camera quality.');
+        return;
+      }
+      _ntktPending++;
+      ntktValidate();
+      var vReader = new FileReader();
+      vReader.onload = function(ev){
+        var vUrl = ev.target.result;
+        var finish = function(poster){
+          _ntktPhotos.push({name: file.name, dataUrl: vUrl, type: file.type || 'video/mp4', thumb: poster || ''});
+          _ntktPending--;
+          var thumbEl = document.createElement('div');
+          thumbEl.style.cssText = 'position:relative;width:72px;height:72px;flex-shrink:0';
+          var idx = _ntktPhotos.length - 1;
+          var inner = poster
+            ? '<img src="'+poster+'" style="width:72px;height:72px;object-fit:cover;border-radius:10px;border:1.5px solid var(--border2)">'
+            : '<div style="width:72px;height:72px;border-radius:10px;border:1.5px solid var(--border2);background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:26px">\uD83C\uDFAC</div>';
+          thumbEl.innerHTML = inner
+            +'<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6);pointer-events:none">\u25B6</span>'
+            +'<button onclick="ntktRemovePhoto('+idx+',this.parentNode)" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--red);border:none;color:#fff;font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">\u00D7</button>';
+          previews.appendChild(thumbEl);
+          ntktValidate();
+        };
+        if(typeof captureVideoPoster === 'function'){
+          try { captureVideoPoster(vUrl, finish); } catch(e){ finish(''); }
+        } else { finish(''); }
+      };
+      vReader.onerror = function(){ _ntktPending--; ntktValidate(); };
+      vReader.readAsDataURL(file);
+      return;
+    }
     if(!file.type.startsWith('image/')) return;
     _ntktPending++;
     ntktValidate();
@@ -16532,14 +16579,19 @@ async function submitNewTkt(){
         invCompany: '', invNumber: '', amount: '',
         invDate: new Date().toISOString().slice(0,10),
         notes: 'Attached via ticket: '+title,
-        data: p.dataUrl, filename: p.name, url: '',
+        data: p.dataUrl, thumb: p.thumb || '', filename: p.name, url: '',
         added: Date.now(), linkedTxKeys: []
       };
       linkedDocIds.push(invId);
     } catch(e){ console.warn('build invoice failed:', e); }
   }
   if(linkedDocIds.length){
-    initialLog.push({type:'note', text:'📷 '+linkedDocIds.length+' photo'+(linkedDocIds.length!==1?'s':'')+' attached', ts:Date.now()});
+    var vidN = photos.filter(function(p){ return p && (p.type||'').indexOf('video/') === 0; }).length;
+    var imgN = linkedDocIds.length - vidN;
+    var parts = [];
+    if(imgN) parts.push('\uD83D\uDCF7 '+imgN+' photo'+(imgN!==1?'s':''));
+    if(vidN) parts.push('\uD83C\uDFAC '+vidN+' video'+(vidN!==1?'s':''));
+    initialLog.push({type:'note', text:parts.join(' + ')+' attached', ts:Date.now()});
   }
 
   TICKETS[id] = {
@@ -17303,10 +17355,13 @@ function renderPublicReportForm(){
       return;
     }
     host.innerHTML = ''
-      + '<div style="margin-bottom:18px">'
-      +   '<div style="font-size:11px;color:var(--accent2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Park Manor</div>'
-      +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin-bottom:4px">Submit a report or enquiry</div>'
-      +   '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.5">Use this form to raise a maintenance issue, ask a question, or send any enquiry to the trustees. After submitting you\'ll get a personal link to track or update what you sent.</div>'
+      + '<div style="margin-bottom:18px;display:flex;gap:16px;align-items:flex-start">'
+      +   '<div style="flex:1;min-width:0">'
+      +     '<div style="font-size:22px;font-weight:800;color:var(--text2);font-family:var(--sans);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Park Manor</div>'
+      +     '<div style="font-size:16px;font-weight:600;color:var(--accent2);margin-bottom:6px">Submit a report or enquiry</div>'
+      +     '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.5">Use this form to raise a maintenance issue, ask a question, or send any enquiry to the trustees. After submitting you\'ll get a personal link to track or update what you sent.</div>'
+      +   '</div>'
+      +   '<img src="park-manor-entrance.jpg" alt="Park Manor entrance" style="width:96px;height:96px;object-fit:cover;border-radius:14px;border:1px solid var(--border2);flex-shrink:0">'
       + '</div>'
       // Honeypot — bots fill this in, humans don\'t see it. Submission is rejected if non-empty.
       + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
