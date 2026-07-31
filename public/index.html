@@ -6352,6 +6352,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
       <div>
         <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Full Name</div>
         <input id="usr-name" type="text" placeholder="Display name" style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none;box-sizing:border-box">
+        <input id="usr-email" type="email" placeholder="Email (optional)" style="width:100%;margin-top:6px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none;box-sizing:border-box">
       </div>
       <!-- Role -->
       <div>
@@ -14834,7 +14835,7 @@ function renderUsers(){
           +'<span style="font-size:9px;padding:2px 7px;border-radius:10px;font-family:var(--mono);font-weight:700;background:rgba('+hexToRgb2(rc)+',.15);color:'+rc+';border:1px solid rgba('+hexToRgb2(rc)+',.3)">'+u.role.toUpperCase()+'</span>'
           +chairBadge
         +'</div>'
-        +'<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px">Tabs: '+tabList+'</div>'
+        +'<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:2px">'+(u.email?'\u2709 '+escHtml(u.email)+' \u00b7 ':'')+'Tabs: '+tabList+'</div>'
       +'</div>'
       +'<button onclick="openUserModal(\''+u.id+'\')" style="padding:5px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;cursor:pointer;font-family:var(--mono)">Edit</button>'
     +'</div>';
@@ -14861,6 +14862,7 @@ function openUserModal(userId){
   // means "keep current". On a new user it's blank too.
   document.getElementById('usr-password').value = '';
   document.getElementById('usr-name').value = u.name||'';
+  document.getElementById('usr-email').value = u.email||'';
   document.getElementById('usr-password').placeholder = isNew ? 'Set password' : 'Leave blank to keep current';
   // Set role radio
   var radios = document.querySelectorAll('input[name="usr-role"]');
@@ -14999,6 +15001,7 @@ async function saveUser(){
   var username = document.getElementById('usr-username').value.trim().toLowerCase();
   var password = document.getElementById('usr-password').value;
   var name = document.getElementById('usr-name').value.trim();
+  var uEmail = (document.getElementById('usr-email').value||'').trim();
   var msg = document.getElementById('user-save-msg');
   var role = '';
   document.querySelectorAll('input[name="usr-role"]').forEach(function(r){ if(r.checked) role=r.value; });
@@ -15008,6 +15011,7 @@ async function saveUser(){
   var existing = Object.values(USERS).find(function(u){ return u.username===username && u.id!==_currentUserId; });
   if(existing || username==='admin'){ msg.style.color='#f06f6f'; msg.textContent='Username already taken.'; return; }
   if(!role){ msg.style.color='#f06f6f'; msg.textContent='Select a role.'; return; }
+  if(uEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(uEmail)){ msg.style.color='var(--red)'; msg.textContent='That email address doesn\'t look right \u2014 fix it or leave it blank.'; return; }
 
   // Supplier role must be linked to a supplier company, otherwise their portal
   // has no company to scope jobs to.
@@ -15049,6 +15053,7 @@ async function saveUser(){
     id: id, username: username,
     password: storedPassword,
     name: name, role: role,
+    email: uEmail,
     tabs: role==='viewer' ? tabs : (isResRole(role) ? ['tickets'] : []),
     canAddImages: canAddImages,
     units: units,
@@ -17409,7 +17414,7 @@ function buildPublicFormFields(editing, existing){
   }
   var photoLabel = editing
     ? ('Add more photos' + (photosLeft > 0 ? ' (up to ' + photosLeft + ' more)' : ' — limit reached'))
-    : ('Photos (optional, up to ' + MAX_PUBLIC_PHOTOS + ', 1MB each)');
+    : ('Photos & videos (optional, up to ' + MAX_PUBLIC_PHOTOS + ' files \u2014 photos 1MB, videos 8MB)');
   var photoInputDisabled = (editing && photosLeft <= 0);
   return ''
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Subject *</label>'
@@ -17435,7 +17440,7 @@ function buildPublicFormFields(editing, existing){
     + '<input id="pub-phone" type="tel" placeholder="e.g. 082 123 4567" maxlength="30" value="' + escHtml(ex.reporterPhone || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:14px;font-family:var(--sans)" inputmode="tel">'
     + photosHtml
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + photoLabel + '</label>'
-    + '<input id="pub-photos" type="file" accept="image/*" multiple ' + (photoInputDisabled ? 'disabled' : '') + ' style="width:100%;padding:9px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box;margin-bottom:16px;font-family:var(--sans)' + (photoInputDisabled ? ';opacity:0.5;cursor:not-allowed' : '') + '">';
+    + '<input id="pub-photos" type="file" accept="image/*,video/*" multiple ' + (photoInputDisabled ? 'disabled' : '') + ' style="width:100%;padding:9px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box;margin-bottom:16px;font-family:var(--sans)' + (photoInputDisabled ? ';opacity:0.5;cursor:not-allowed' : '') + '">';
 }
 
 // Toggle visual delete state on an existing photo. On Save we apply the
@@ -17497,6 +17502,30 @@ function publicRateLimitOk(){
 
 // Compress a File to a JPEG dataURL ≤ 1MB. Same flow used in the main app
 // for resident photos. Returns a promise resolving to {name, type, data}.
+// Read a video file for public submission: keep the original bytes (no
+// browser re-encode) and grab a poster frame for previews. 8 MB cap matches
+// the server upload limit.
+function publicReadVideo(file){
+  return new Promise(function(resolve, reject){
+    if(file.size > 8 * 1024 * 1024){
+      reject(new Error('VIDEO_TOO_LARGE:' + file.name));
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var vUrl = ev.target.result;
+      var done = function(poster){
+        resolve({ name: file.name, type: file.type || 'video/mp4', data: vUrl, thumb: poster || '' });
+      };
+      if(typeof captureVideoPoster === 'function'){
+        try { captureVideoPoster(vUrl, done); } catch(e){ done(''); }
+      } else { done(''); }
+    };
+    reader.onerror = function(){ reject(new Error('READ_FAILED:' + file.name)); };
+    reader.readAsDataURL(file);
+  });
+}
+
 function publicCompressPhoto(file){
   return new Promise(function(resolve, reject){
     var reader = new FileReader();
@@ -17580,14 +17609,38 @@ async function submitPublicReport(){
   if(btn){ btn.disabled = true; btn.textContent = 'Submitting…'; btn.style.opacity = '0.7'; }
   try {
     var photoIds = [];
+    var notifyAtt = [];   // media for the managing-agent email
+    // Serverless requests cap at ~6 MB, so budget the attachment payload and
+    // list anything that doesn't fit in the email body instead (with enough
+    // info for the agent to find it in the tracker). Note: zipping video
+    // doesn't help — camera video is already compressed.
+    var NOTIFY_BUDGET = 4200000;  // ~4.2 MB of base64 across all attachments
+    var notifyUsed = 0;
     for(var i = 0; i < files.length; i++){
-      var compressed = await publicCompressPhoto(files[i]);
+      var f = files[i];
+      var isVid = (f.type||'').indexOf('video/') === 0 || /\.(mp4|webm|ogg|mov|m4v|3gp)$/i.test(f.name||'');
+      var compressed;
+      if(isVid){
+        try { compressed = await publicReadVideo(f); }
+        catch(err){
+          if(String(err && err.message).indexOf('VIDEO_TOO_LARGE') === 0){
+            showPublicErr('"' + f.name + '" is too large \u2014 videos must be under 8 MB. Record a shorter clip or lower the camera quality.');
+          } else {
+            showPublicErr('Could not read "' + f.name + '". Please try a different file.');
+          }
+          if(btn){ btn.disabled = false; btn.textContent = 'Submit'; btn.style.opacity = '1'; }
+          return;
+        }
+      } else {
+        compressed = await publicCompressPhoto(f);
+      }
       var photoId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + i;
       var photoRec = {
         id: photoId,
         name: compressed.name,
         type: compressed.type,
         data: compressed.data,
+        thumb: compressed.thumb || '',
         docType: 'Supporting Evidence',
         invCompany: '(public submission)',
         added: Date.now()
@@ -17596,6 +17649,15 @@ async function submitPublicReport(){
       try { await sbUpsert('invoices', photoId, photoRec); }
       catch(e){ console.warn('public submit: photo save failed', e); }
       photoIds.push(photoId);
+      // Attach to the agent email if it fits the request budget.
+      var attSize = (compressed.data || '').length;
+      if(notifyUsed + attSize <= NOTIFY_BUDGET){
+        notifyAtt.push({ name: compressed.name, type: compressed.type, dataUrl: compressed.data });
+        notifyUsed += attSize;
+      } else {
+        notifyAtt.push({ name: compressed.name, type: compressed.type, skipped: true,
+                         sizeMB: (attSize * 0.75 / 1048576).toFixed(1) });
+      }
     }
     var ticketId = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     var editToken = generateShareToken();
@@ -17648,7 +17710,12 @@ async function submitPublicReport(){
               editUrl: editUrl,
               editToken: editToken,
               title: title,
-              ticketNumber: ticket.ticketNumber
+              ticketNumber: ticket.ticketNumber,
+              desc: desc,
+              unit: unit,
+              reporter: name,
+              phone: phone,
+              attachments: notifyAtt
             })
           });
           var statusEl = document.getElementById('pub-email-status');
@@ -17672,6 +17739,25 @@ async function submitPublicReport(){
           }
         }
       })();
+    } else {
+      // No edit-link email requested — still notify the managing agent that a
+      // report arrived. Fire-and-forget; the agent address lives server-side
+      // (AGENT_NOTIFY_EMAIL) so nothing sensitive is exposed here.
+      fetch('/api/send-edit-link', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          notifyOnly: true,
+          title: title,
+          ticketNumber: ticket.ticketNumber,
+          desc: desc,
+          unit: unit,
+          reporter: name,
+          phone: phone,
+          email: email,
+          attachments: notifyAtt
+        })
+      }).catch(function(e){ console.warn('agent notify failed', e); });
     }
 
     document.getElementById('public-view-content').innerHTML = ''
