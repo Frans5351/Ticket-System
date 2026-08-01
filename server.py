@@ -17,6 +17,11 @@ PUBLIC_DIR = Path(__file__).parent / 'public'
 ATTACHMENTS_DIR = PUBLIC_DIR / 'park_manor_attachments'
 ATTACHMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
+# Netlify functions (email, passkeys, uploads) only run on the deployed site.
+# Unknown /api/* requests are forwarded there so local testing exercises the
+# real thing (with the real env vars). Set to '' to disable forwarding.
+NETLIFY_SITE = 'https://park-manor-bc.netlify.app'
+
 SUPA_URL = 'https://spagcmzhlngtqvrydzvi.supabase.co'
 SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwYWdjbXpobG5ndHF2cnlkenZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MTA1OTgsImV4cCI6MjA5NDA4NjU5OH0.TfRrz2iUPFm7AUL55BRNJtyhNl--s8yBbtejcD9yjPU'
 
@@ -48,6 +53,8 @@ class ParkManorHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_list_files()
         elif path == '/api/ping':
             self.send_json({'ok': True})
+        elif path.startswith('/api/'):
+            self.proxy_netlify('GET')
         else:
             super().do_GET()
 
@@ -59,6 +66,8 @@ class ParkManorHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_save_file()
         elif path == '/api/delete-file':
             self.handle_delete_file()
+        elif path.startswith('/api/'):
+            self.proxy_netlify('POST')
         else:
             self.send_error(404)
 
@@ -68,6 +77,44 @@ class ParkManorHandler(http.server.SimpleHTTPRequestHandler):
             self.proxy_supabase('DELETE')
         else:
             self.send_error(404)
+
+    def proxy_netlify(self, method):
+        """Forward /api/* to the deployed Netlify site so serverless functions
+        (email sending, passkeys, attachment uploads) work during local dev."""
+        if not NETLIFY_SITE:
+            self.send_json({'error': 'API forwarding disabled (NETLIFY_SITE unset in server.py)'}, 404)
+            return
+        try:
+            target = NETLIFY_SITE + self.path
+            headers = {'Content-Type': self.headers.get('Content-Type', 'application/json'),
+                       'Accept': 'application/json'}
+            auth = self.headers.get('Authorization')
+            if auth:
+                headers['Authorization'] = auth
+            body = None
+            if method == 'POST':
+                length = int(self.headers.get('Content-Length', 0))
+                if length:
+                    body = self.rfile.read(length)
+            req = urllib.request.Request(target, data=body, headers=headers, method=method)
+            with urllib.request.urlopen(req, timeout=110) as resp:
+                data = resp.read()
+                self.send_response(resp.status)
+                self.send_cors_headers()
+                self.send_header('Content-Type', resp.headers.get('Content-Type', 'application/json'))
+                self.send_header('Content-Length', len(data))
+                self.end_headers()
+                self.wfile.write(data)
+        except urllib.error.HTTPError as e:
+            data = e.read()
+            self.send_response(e.code)
+            self.send_cors_headers()
+            self.send_header('Content-Type', e.headers.get('Content-Type', 'application/json') if e.headers else 'application/json')
+            self.send_header('Content-Length', len(data))
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            self.send_json({'error': 'Netlify forward failed: ' + str(e)}, 502)
 
     def proxy_supabase(self, method):
         """Proxy requests to Supabase to avoid CORS issues"""
@@ -177,6 +224,7 @@ if __name__ == '__main__':
     print(f'  URL:      http://localhost:{PORT}')
     print(f'  Serving:  {PUBLIC_DIR}')
     print(f'  Supabase: proxied via /supabase/')
+    print(f'  /api/*:   forwarded to {NETLIFY_SITE or "(disabled)"}')
     print(f'  Press Ctrl+C to stop')
     print('=' * 44)
     server = http.server.HTTPServer(('', PORT), ParkManorHandler)

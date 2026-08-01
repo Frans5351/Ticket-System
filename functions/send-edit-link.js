@@ -11,15 +11,14 @@
 // When notifyOnly is true (resident did not request an emailed link), only
 // the agent notification is sent.
 //
-// SETUP (same one-time setup as send-email.js):
-//   - RESEND_API_KEY        Netlify env var (required for any sending)
-//   - EMAIL_FALLBACK_FROM   optional verified from-address
-//   - AGENT_NOTIFY_EMAIL    the managing agent's address(es) to notify on new
+// SETUP: Brevo credentials — see functions/_email-shared.js. Plus:
+//   - AGENT_NOTIFY_EMAIL    extra agent address(es) to notify on new
 //                           public reports. Comma-separate multiple addresses.
 //                           Kept server-side so the public form cannot be
 //                           abused to email arbitrary recipients.
 
 import { jsonResponse, errorResponse, getConfig, supaFetch } from "./_passkey-shared.js";
+import { sendEmail, emailConfigError } from "./_email-shared.js";
 
 export const config = { path: "/api/send-edit-link" };
 
@@ -32,40 +31,11 @@ function bareAddress(from) {
   return (m ? m[1] : String(from || "")).trim();
 }
 
-async function sendViaResend(apiKey, payload) {
-  let res, json;
-  try {
-    res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    json = await res.json().catch(() => ({}));
-  } catch (e) {
-    return { ok: false, status: 502, msg: "Could not reach the email service." };
-  }
-  if (!res.ok) {
-    const msg =
-      (json && (json.message || json.error)) ||
-      `Email service returned status ${res.status}.`;
-    return { ok: false, status: res.status, msg: String(msg) };
-  }
-  return { ok: true, id: json && json.id };
-}
-
 export default async function handler(req) {
   if (req.method !== "POST") return errorResponse(405, "Method not allowed");
 
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return errorResponse(
-      500,
-      "Email sending isn't configured yet. Add RESEND_API_KEY in Netlify environment variables."
-    );
-  }
+  const cfgErr = emailConfigError();
+  if (cfgErr) return errorResponse(500, cfgErr);
 
   let body;
   try {
@@ -114,13 +84,6 @@ export default async function handler(req) {
     if (!editUrl) return errorResponse(400, "An edit link is required.");
   }
 
-  // Resolve the from-address the same way send-email.js does.
-  const fallbackFrom = (process.env.EMAIL_FALLBACK_FROM || "").trim();
-  let from = fallbackFrom;
-  if (!looksLikeEmail(bareAddress(from))) {
-    from = "onboarding@resend.dev";
-  }
-  const fromHeader = from.includes("<") ? from : `Park Manor <${from}>`;
   const ref = ticketNumber ? `#${ticketNumber}` : "";
 
   // ── 1) Resident edit-link email (only when requested) ────────────────────
@@ -139,12 +102,14 @@ export default async function handler(req) {
       "",
       "Park Manor Body Corporate",
     ];
-    residentResult = await sendViaResend(apiKey, {
-      from: fromHeader,
+    residentResult = await sendEmail({
       to: [to],
       subject: subject,
       text: lines.join("\n"),
     });
+    if (!residentResult.ok) {
+      console.error("send-edit-link: RESIDENT email failed:", residentResult.status, residentResult.msg, "| to:", to);
+    }
     if (!residentResult.ok) {
       // The resident email is the primary purpose of a non-notifyOnly call —
       // surface the failure. Still attempt the agent notification below.
@@ -209,16 +174,22 @@ export default async function handler(req) {
       "",
       "— Park Manor Body Corporate (automated notification)",
     ].filter((l) => l !== null);
-    const aPayload = {
-      from: fromHeader,
+    agentResult = await sendEmail({
       to: agentList,
       subject: aSubject,
       text: aLines.join("\n"),
-    };
-    // Let the agent reply straight to the resident when we have their address.
-    if (looksLikeEmail(to)) aPayload.reply_to = to;
-    if (emailAttachments.length) aPayload.attachments = emailAttachments;
-    agentResult = await sendViaResend(apiKey, aPayload);
+      // Let the agent reply straight to the resident when we have their address.
+      replyTo: looksLikeEmail(to) ? to : undefined,
+      attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),
+    });
+    if (!agentResult.ok) {
+      console.error("send-edit-link: AGENT notification failed:", agentResult.status, agentResult.msg,
+        "| recipients:", agentList.join(","), "| attachments:", emailAttachments.length);
+    } else {
+      console.log("send-edit-link: agent notified:", agentList.join(","), "id:", agentResult.id);
+    }
+  } else {
+    console.warn("send-edit-link: no agent recipients (no management users with email; AGENT_NOTIFY_EMAIL unset)");
   }
 
   // ── Response ─────────────────────────────────────────────────────────────
