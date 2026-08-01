@@ -128,16 +128,28 @@ export default async function handler(req) {
   //      fallback / extra so the feature works before any user has an email.
   const agentSet = new Set();
   try {
+    // Prefer the service-role key when configured; otherwise fall back to the
+    // public anon key (the same one the client uses to read users — its RLS
+    // already permits this read, and the key is public by design).
     const cfg = getConfig();
-    if (cfg.supaServiceKey) {
-      const rows = await supaFetch(cfg, "/rest/v1/users?select=id,data");
-      (Array.isArray(rows) ? rows : []).forEach((r) => {
-        const u = r && r.data ? r.data : r;
-        if (u && u.role === "management" && looksLikeEmail(u.email)) {
-          agentSet.add(u.email.trim().toLowerCase());
-        }
-      });
-    }
+    const supaUrl = cfg.supaUrl || "https://spagcmzhlngtqvrydzvi.supabase.co";
+    const supaKey = cfg.supaServiceKey ||
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwYWdjbXpobG5ndHF2cnlkenZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MTA1OTgsImV4cCI6MjA5NDA4NjU5OH0.TfRrz2iUPFm7AUL55BRNJtyhNl--s8yBbtejcD9yjPU";
+    const res = await fetch(supaUrl + "/rest/v1/users?select=id,data", {
+      headers: { apikey: supaKey, Authorization: "Bearer " + supaKey, Accept: "application/json" },
+    });
+    const rows = res.ok ? await res.json() : [];
+    if (!res.ok) console.warn("send-edit-link: users query returned", res.status);
+    let mgmtSeen = 0;
+    (Array.isArray(rows) ? rows : []).forEach((r) => {
+      const u = r && r.data ? r.data : r;
+      if (u && u.role === "management") {
+        mgmtSeen++;
+        if (looksLikeEmail(u.email)) agentSet.add(u.email.trim().toLowerCase());
+      }
+    });
+    console.log("send-edit-link: management users found:", mgmtSeen, "| with email:", agentSet.size,
+      "| via", cfg.supaServiceKey ? "service key" : "anon key");
   } catch (e) {
     console.warn("send-edit-link: could not read management users:", e.message);
   }
