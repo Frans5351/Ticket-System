@@ -17484,7 +17484,7 @@ function openPublicPhotoFullscreen(photoId){
   document.body.appendChild(overlay);
 }
 
-// Rate-limit submissions per browser (3 per hour) so spam is throttled
+// Rate-limit submissions per browser (10 per hour) so spam is throttled
 // without the friction of CAPTCHA.
 function publicRateLimitOk(){
   try {
@@ -17493,7 +17493,7 @@ function publicRateLimitOk(){
     var arr = raw ? JSON.parse(raw) : [];
     var oneHourAgo = Date.now() - 3600 * 1000;
     arr = arr.filter(function(ts){ return ts > oneHourAgo; });
-    if(arr.length >= 3) return false;
+    if(arr.length >= 10) return false;
     arr.push(Date.now());
     localStorage.setItem(key, JSON.stringify(arr));
     return true;
