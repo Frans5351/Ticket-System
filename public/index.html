@@ -852,7 +852,8 @@ async function checkStorageSetup(){
     }
   }
 
-  html{background:var(--bg)}
+  html{background:var(--bg);-webkit-tap-highlight-color:transparent}
+  button{touch-action:manipulation}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;font-size:14px;line-height:1.5}
   .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;gap:20px;position:sticky;top:0;z-index:200}
   .header-logo .name{font-size:16px;font-weight:600;letter-spacing:-.3px}
@@ -1058,6 +1059,10 @@ async function checkStorageSetup(){
     .tkt-stat-card{flex:0 0 auto;min-width:104px;padding:8px 11px}
     .tkt-stat-num{font-size:18px}
     #ticket-list{padding:12px !important}
+    .tkt-card{ padding:12px 13px; }
+    .tkt-card:active{ background:var(--surface2); }
+    /* Titles read better wrapped to two lines than chopped to one */
+    .tkt-card div[style*="text-overflow:ellipsis"]{ white-space:normal !important; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
     /* Transactions layout */
     .txn-layout{flex-direction:row}
@@ -1268,6 +1273,21 @@ async function checkStorageSetup(){
     #ticket-modal{ background:var(--bg) !important; }
     #ticket-modal-card{ background:var(--surface) !important; }
     #tkt-two-col, #tkt-left-col, #tkt-right-col{ background:var(--surface); }
+
+    /* ── Mobile polish pass ── */
+    /* 16px inputs stop iOS Safari's zoom-jump when a field gets focus */
+    #ticket-modal input, #ticket-modal select, #ticket-modal textarea{ font-size:16px !important; }
+    /* Tighter section padding + safe-area breathing room at the very bottom */
+    #tkt-left-col, #tkt-right-col{ padding:14px !important; }
+    #tkt-right-col{ padding-bottom:calc(24px + env(safe-area-inset-bottom,0)) !important; }
+    #tkt-approval-panel{ padding:12px 14px !important; }
+    /* Header action buttons (Timeline/Share/Resync/Delete/Close): one
+       swipeable row instead of wrapping into three lines */
+    #ticket-modal div:has(> #tkt-share-btn){ flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px; }
+    #ticket-modal div:has(> #tkt-share-btn)::-webkit-scrollbar{ display:none; }
+    #ticket-modal div:has(> #tkt-share-btn) button{ flex-shrink:0; }
+    /* Status stepper scrolls horizontally rather than squashing */
+    #tkt-status-flow{ flex-wrap:nowrap !important; overflow-x:auto; }
 
     /* ── Header ──────────────────────────────────────────────────────────
        Ticket number + title get the full width; the ✕ is pinned to the top
@@ -1537,6 +1557,15 @@ async function checkStorageSetup(){
       <button onclick="doLogin()"
         style="width:100%;padding:11px;background:#7b68ee;border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity .15s"
         onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">Sign in</button>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" onclick="event.preventDefault();var b=document.getElementById('forgot-box');b.style.display=b.style.display==='none'?'block':'none';" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;text-decoration:underline;cursor:pointer">Forgot password?</a>
+      </div>
+      <div id="forgot-box" style="display:none;margin-top:12px;padding:14px;background:var(--surface2);border:1px solid var(--border2);border-radius:9px">
+        <div style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:8px;line-height:1.5">Enter the email address on your account and we\u2019ll send you new login details.</div>
+        <input id="forgot-email" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;padding:9px 11px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:14px;outline:none;box-sizing:border-box;margin-bottom:8px" onkeydown="if(event.key==='Enter')submitForgotPw()">
+        <button onclick="submitForgotPw()" id="forgot-send-btn" style="width:100%;padding:9px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:600;cursor:pointer">Email me new login details</button>
+        <div id="forgot-msg" style="font-size:11px;font-family:'DM Mono',monospace;min-height:14px;margin-top:8px;color:var(--muted)"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1548,7 +1577,8 @@ async function checkStorageSetup(){
     <button id="settings-btn-header" onclick="showSettingsIO()" title="Settings (admin only)" style="display:none;margin-left:8px;padding:7px 14px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap" onmouseover="this.style.background='var(--accent-bg2)'" onmouseout="this.style.background='var(--accent-bg)'">⚙ Settings</button>
     <button id="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" style="margin-left:8px;padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:14px;font-family:var(--mono);cursor:pointer;transition:all .15s;white-space:nowrap;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🌙</button>
     <button id="login-btn" onclick="openLoginModal()" style="margin-left:8px;padding:7px 16px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔑 Log in</button>
-    <button id="logout-btn" onclick="doLogout()" style="display:none;margin-left:8px;padding:7px 16px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap">✓ Logged in</button>
+    <button id="pwd-btn" onclick="openPwChangeSelf()" title="Change my password" style="display:none;margin-left:8px;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer">\ud83d\udd11</button>
+      <button id="logout-btn" onclick="doLogout()" style="display:none;margin-left:8px;padding:7px 16px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap">✓ Logged in</button>
   </div>
 </header>
 <nav id="bottom-nav" aria-label="Primary">
@@ -6477,6 +6507,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
       </div>
       <!-- Save button -->
       <button onclick="saveUser()" style="width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;margin-top:4px">Save User</button>
+      <button id="usr-sendlogin-btn" onclick="sendLoginDetails()" style="display:none;width:100%;padding:9px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer;margin-top:8px">\ud83d\udce8 Send login details by email</button>
       <div id="user-save-msg" style="text-align:center;font-size:11px;font-family:var(--mono);color:var(--muted)"></div>
     </div>
   </div>
@@ -6975,6 +7006,7 @@ function doLogout(){
   document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display='none'; });
   document.getElementById('login-btn').style.display='';
   document.getElementById('logout-btn').style.display='none';
+  var __pb=document.getElementById('pwd-btn'); if(__pb) __pb.style.display='none';
   document.getElementById('logout-btn').textContent='✓ Logged in';
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
@@ -6994,6 +7026,8 @@ function postLoginUiSetup(userObj, opts){
   applyUserSession(userObj);
   document.getElementById('login-btn').style.display='none';
   document.getElementById('logout-btn').style.display='';
+  var __pb2=document.getElementById('pwd-btn');
+  if(__pb2) __pb2.style.display = (userObj && userObj.id !== '__admin__') ? '' : 'none';
   // Persist a local session record so the user stays logged in across page
   // refreshes. Skip when explicitly restoring (we just read it).
   if(!opts.skipPersist){
@@ -7052,15 +7086,25 @@ function postLoginUiSetup(userObj, opts){
 var _pwChangeTarget = null;
 
 function offerPasswordChangeAfterLogin(userObj){
-  // Skip for the hardcoded admin (no real user record to update)
-  if(!userObj || userObj.id === '__admin__') return;
-  _pwChangeTarget = userObj;
-  // Delay a moment so the login-modal close animation finishes first
-  setTimeout(function(){
-    var m = document.getElementById('pw-prompt-modal');
-    if(m) m.style.display = 'flex';
-  }, 250);
+  // Retired: the automatic “change your password?” popup after every login
+  // annoyed more than it helped. Password changes are now on demand via the
+  // \ud83d\udd11 button in the header (openPwChangeSelf), and new users receive
+  // generated credentials by email from the Users screen.
+  return;
 }
+function openPwChangeSelf(){
+  if(!_currentUserObj || _currentUserObj.id === '__admin__'){
+    alert('The built-in admin password is fixed in configuration and can\'t be changed here.');
+    return;
+  }
+  _pwChangeTarget = _currentUserObj;
+  var m = document.getElementById('pw-change-modal');
+  var e1 = document.getElementById('pw-new'); if(e1) e1.value='';
+  var e2 = document.getElementById('pw-new2'); if(e2) e2.value='';
+  var er = document.getElementById('pw-err'); if(er) er.textContent='';
+  if(m) m.style.display = 'flex';
+}
+
 function pwPromptDismiss(){
   var m = document.getElementById('pw-prompt-modal');
   if(m) m.style.display = 'none';
@@ -7111,6 +7155,28 @@ async function submitPwChange(){
   } catch(e){
     console.warn('Password update failed:', e);
     err.textContent = 'Could not save. Check your connection and try again.';
+  }
+}
+
+async function submitForgotPw(){
+  var em = (document.getElementById('forgot-email').value||'').trim();
+  var msg = document.getElementById('forgot-msg');
+  var btn = document.getElementById('forgot-send-btn');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){
+    if(msg){ msg.style.color='var(--red)'; msg.textContent='Please enter a valid email address.'; }
+    return;
+  }
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+  try {
+    await fetch('/api/send-credentials', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'reset', email: em })
+    });
+  } catch(e){ /* generic response either way */ }
+  if(btn){ btn.disabled = false; btn.textContent = 'Email me new login details'; }
+  if(msg){
+    msg.style.color = 'var(--green)';
+    msg.textContent = 'If that email is on an account, new login details are on their way \u2014 check spam too.';
   }
 }
 
@@ -11460,6 +11526,34 @@ function hexToRgb(hex){
   return map[hex] || '123,104,238';
 }
 
+// Email the reporter (if they provided an address) whenever their ticket's
+// status changes. Fire-and-forget: a mail hiccup must never block the save.
+// Reporters without an email still track everything via their personal link.
+function notifyReporterStatusChange(t, newStatusKey){
+  try {
+    if(!t) return;
+    var em = String(t.reporterEmail||'').trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return;
+    var meta = TKT_STATUS[newStatusKey] || {};
+    var editUrl = t.reporterEditToken
+      ? (location.origin + location.pathname + '?reportEdit=' + t.reporterEditToken)
+      : '';
+    fetch('/api/send-status-update', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        email: em,
+        ticketNumber: t.ticketNumber || '',
+        title: t.title || '',
+        statusKey: newStatusKey,
+        statusLabel: meta.label || newStatusKey,
+        editUrl: editUrl
+      })
+    }).then(function(r){
+      if(r && r.ok) console.log('status email queued for', em);
+    }).catch(function(e){ console.warn('status email failed', e); });
+  } catch(e){}
+}
+
 async function setTicketStatus(newStatus){
   if(!canChangeTicketStatus()){ alert('Only Trustees and Admins can change ticket status.'); return; }
   // Bail if the status isn't actually changing. The old code referenced an
@@ -11726,6 +11820,7 @@ async function startWorkOnItem(targetId){
   liveT.log = liveT.log || [];
   var byName = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
   liveT.log.push({type:'status', text:'▶ Work started by '+byName+' — chosen item: '+label, ts:Date.now()});
+  notifyReporterStatusChange(liveT, 'work_in_progress');
   // Refresh in-modal UI
   var statusSel = document.getElementById('tkt-status');
   if(statusSel) statusSel.value = 'work_in_progress';
@@ -13694,6 +13789,7 @@ function autoSaveTicket(){
       var s = TKT_STATUS[status]||TKT_STATUS.open;
       TICKETS[id].log.push({type:'status', text:'Status changed to '+s.label, ts:Date.now()});
       renderTicketLog(TICKETS[id]);
+      notifyReporterStatusChange(TICKETS[id], status);
     }
     var _delBtn = document.getElementById('tkt-delete-btn');
     if(_delBtn){
@@ -14845,6 +14941,52 @@ async function saveUsers(){
 // logins are global (cross-scheme), everyone else stays scoped. Use this
 // instead of calling sbUpsert('users', …) directly so the global flag is
 // applied consistently everywhere a user is written.
+function genTempPassword(){
+  // Readable, unambiguous, easy to type from a phone: PM- + 6 chars
+  var chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  var out = '';
+  var rnd = new Uint8Array(6);
+  (window.crypto || {}).getRandomValues ? crypto.getRandomValues(rnd) : rnd.forEach(function(_,i){ rnd[i]=Math.floor(Math.random()*256); });
+  for(var i=0;i<6;i++) out += chars[rnd[i] % chars.length];
+  return 'PM-' + out;
+}
+
+// Generate a fresh password for the user being edited, save it, and email
+// the credentials to the address on their record.
+async function sendLoginDetails(){
+  var id = _currentUserId;
+  if(!id || !USERS[id]){ alert('Save the user first, then send login details.'); return; }
+  var email = (document.getElementById('usr-email').value||'').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    alert('Enter a valid email address for this user first.');
+    return;
+  }
+  var live = USERS[id];
+  if(!confirm('Generate a NEW password for "'+live.username+'" and email the login details to '+email+'?\n\nTheir current password will stop working.')) return;
+  var btn = document.getElementById('usr-sendlogin-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending\u2026'; }
+  var tmp = genTempPassword();
+  try {
+    live.email = email;
+    live.password = await hashPassword(tmp);
+    await sbUpsertUser(id, live);
+    await saveUsers();
+    var r = await fetch('/api/send-credentials', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'invite', email: email, username: live.username, password: tmp, name: live.name||'' })
+    });
+    var data = await r.json().catch(function(){ return {}; });
+    if(r.ok && data.ok){
+      alert('\u2713 Login details sent to '+email+'.\n\nTell them to check spam the first time, and to change the password with the \ud83d\udd11 button after logging in.');
+    } else {
+      alert('\u26a0 The new password was SAVED, but the email failed: '+(data.error||r.status)+'\n\nTheir new password is: '+tmp+'\n(Share it with them another way, e.g. WhatsApp.)');
+    }
+  } catch(e){
+    alert('\u26a0 Could not send: '+e+'\nNew password (already saved): '+tmp);
+  }
+  if(btn){ btn.disabled = false; btn.textContent = '\ud83d\udce8 Send login details by email'; }
+}
+
 async function sbUpsertUser(id, rec){
   var isSupplier = rec && rec.role === 'supplier';
   await sbUpsert('users', id, rec, isSupplier ? {global:true} : undefined);
@@ -14906,6 +15048,8 @@ function openUserModal(userId){
   document.getElementById('usr-password').value = '';
   document.getElementById('usr-name').value = u.name||'';
   document.getElementById('usr-email').value = u.email||'';
+  var _slb = document.getElementById('usr-sendlogin-btn');
+  if(_slb) _slb.style.display = userId ? '' : 'none';
   document.getElementById('usr-password').placeholder = isNew ? 'Set password' : 'Leave blank to keep current';
   // Set role radio
   var radios = document.querySelectorAll('input[name="usr-role"]');
