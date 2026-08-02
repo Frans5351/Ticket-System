@@ -17516,7 +17516,7 @@ function buildPublicFormFields(editing, existing){
         // field becomes required (validation in submitPublicReport).
         '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text);cursor:pointer;padding:6px 0;margin-bottom:6px;line-height:1.5">'
         + '<input id="pub-email-link-opt" type="checkbox" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin-top:2px">'
-        + '<span>📧 Email me my edit link <span style="color:var(--muted);font-family:var(--mono);font-size:11px">(so you don\'t lose it)</span></span>'
+        + '<span>📧 Email me my edit link <span style="color:var(--muted);font-family:var(--mono);font-size:11px">(so you don\'t lose it — check spam the first time)</span></span>'
         + '</label>'
       )
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your phone (optional)</label>'
@@ -17924,7 +17924,7 @@ async function submitPublicReport(){
           if(r.ok){
             statusEl.style.background = 'var(--green-bg)';
             statusEl.style.borderLeftColor = '#4ade9e';
-            statusEl.innerHTML = '✓ Sent to <b>'+escHtml(email)+'</b> — check your inbox (and spam folder just in case).';
+            statusEl.innerHTML = '✓ Sent to <b>'+escHtml(email)+'</b>.<br><b>Can\'t see it? Check your Spam folder</b> — and tap “Not spam” / “Report not spam” so future updates land in your inbox.';
           } else {
             statusEl.style.background = 'rgba(245,158,11,.08)';
             statusEl.style.borderLeftColor = '#f59e0b';

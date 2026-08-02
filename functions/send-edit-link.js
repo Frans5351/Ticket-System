@@ -257,13 +257,17 @@ export default async function handler(req) {
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a4354;line-height:1.7;background:#f5f7fa;border:1px solid #e4e9ef;border-radius:9px;padding:14px 16px">${escH(desc || "(none provided)").replace(/\n/g, "<br>")}</div>
       ${attNote}${skipNote}
       ${emailButton(APP_URL, "Open the Park Manor Tracker")}
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">${looksLikeEmail(to) ? "Replying to this email goes directly to the resident." : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">${looksLikeEmail(to) ? "The resident is CC\u2019d on this email \u2014 replying goes directly to them." : ""}</div>
     `);
     agentResult = await sendEmail({
       to: agentList,
       subject: aSubject,
       text: aLines.join("\n"),
       html: agentHtml,
+      // The resident is CC'd so they automatically receive the same report
+      // copy the agent gets (their private edit link is NOT in this email
+      // by design — it stays theirs alone via the opt-in email / WhatsApp).
+      cc: looksLikeEmail(to) ? [to] : undefined,
       // Let the agent reply straight to the resident when we have their address.
       replyTo: looksLikeEmail(to) ? to : undefined,
       attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),
