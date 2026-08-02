@@ -11491,25 +11491,73 @@ function distillTicketJourney(t){
   var out = [];
   var createdTs = t.created || (t.dateOpened ? Date.parse(t.dateOpened) : null);
   if(createdTs && !isNaN(createdTs)) out.push({label:'Created', ts:createdTs, color:'var(--accent2)'});
+
+  // \u2500 Status milestones from the log \u2500
   (t.log||[]).forEach(function(e){
-    if(!e || e.type !== 'status' || !e.ts) return;
+    if(!e || !e.ts) return;
     var txt = String(e.text||'');
-    var m = txt.match(/^Status changed to (.+)$/);
-    if(m){
-      var key = Object.keys(TKT_STATUS).find(function(k){ return TKT_STATUS[k].label === m[1]; });
-      out.push({label:m[1], ts:e.ts, color:(key && TKT_STATUS[key].color) || 'var(--muted)'});
-      return;
-    }
-    if(txt.indexOf('▶ Work started') === 0){
-      out.push({label:'Work started', ts:e.ts, color:TKT_STATUS.work_in_progress.color});
+    if(e.type === 'status'){
+      var m = txt.match(/^Status changed to (.+)$/);
+      if(m){
+        var key = Object.keys(TKT_STATUS).find(function(k){ return TKT_STATUS[k].label === m[1]; });
+        out.push({label:m[1], ts:e.ts, color:(key && TKT_STATUS[key].color) || 'var(--muted)'});
+        return;
+      }
+      if(txt.indexOf('\u25b6 Work started') === 0){
+        out.push({label:'Work started', ts:e.ts, color:TKT_STATUS.work_in_progress.color});
+        return;
+      }
+      if(txt.indexOf('+ Proposal added') === 0){
+        out.push({label:'\ud83d\udca1 Proposal', ts:e.ts, color:'var(--accent2)'});
+        return;
+      }
     }
   });
-  out = out.filter(function(x,i){ return i === 0 || x.label !== out[i-1].label; });
+
+  // \u2500 Linked documents (clickable) \u2500
+  var evidence = [];
+  (t.linkedDocIds||[]).forEach(function(invId){
+    var d = INVOICES[invId];
+    if(!d) return;
+    var ts = d.added || createdTs || Date.now();
+    var dt = String(d.docType||'');
+    if(/quote/i.test(dt)){
+      var who = d.invCompany && d.invCompany !== '(public submission)' ? (' \u00b7 ' + String(d.invCompany).slice(0,14)) : '';
+      out.push({label:'\ud83d\udcb0 Quote' + who, ts:ts, color:'var(--st-appr)', docId:invId});
+    } else if(/invoice/i.test(dt)){
+      out.push({label:'\ud83e\uddfe Invoice', ts:ts, color:'var(--info)', docId:invId});
+    } else if(/evidence|photo/i.test(dt)){
+      evidence.push({ts:ts, docId:invId});
+    } else {
+      out.push({label:'\ud83d\udcc4 ' + String(dt||'Document').slice(0,14), ts:ts, color:'var(--muted)', docId:invId});
+    }
+  });
+  // Group evidence files that arrived together (e.g. photos on creation)
+  evidence.sort(function(a,b){ return a.ts - b.ts; });
+  var grp = null;
+  evidence.forEach(function(ev){
+    if(grp && (ev.ts - grp.lastTs) < 10*60*1000){ grp.n++; grp.lastTs = ev.ts; }
+    else { if(grp) out.push(grp.node()); grp = {n:1, ts:ev.ts, lastTs:ev.ts, docId:ev.docId,
+      node:function(){ return {label:'\ud83d\udcce ' + this.n + ' file' + (this.n===1?'':'s'), ts:this.ts, color:'var(--muted)', docId:this.docId}; }}; }
+  });
+  if(grp) out.push(grp.node());
+
+  // \u2500 Approvals + acceptance \u2500
+  (t.approvals||[]).forEach(function(a){
+    if(a && a.ts) out.push({label:'\u2713 ' + String(a.trusteeName||'Approved').split(' ')[0], ts:a.ts, color:'var(--green)'});
+  });
+  if(t.approvedAt){
+    out.push({label:'\ud83c\udfc1 Accepted', ts:t.approvedAt, color:'var(--green)'});
+  }
+
+  out.sort(function(a,b){ return a.ts - b.ts; });
+  out = out.filter(function(x,i){ return i === 0 || x.label !== out[i-1].label || x.docId; });
+
   var curLabel = (TKT_STATUS[t.status]||{}).label || t.status || 'Open';
   if(!out.length || out[out.length-1].label !== curLabel){
     out.push({label:curLabel, ts:t.updated || Date.now(), color:(TKT_STATUS[t.status]||{}).color || 'var(--muted)'});
   }
-  if(out.length > 6){ out = [out[0], {gap:true}].concat(out.slice(out.length - 5)); }
+  if(out.length > 9){ out = [out[0], {gap:true}].concat(out.slice(out.length - 7)); }
   return out;
 }
 function renderTicketJourney(t){
@@ -11517,7 +11565,7 @@ function renderTicketJourney(t){
   if(!host) return;
   if(!t){ host.style.display = 'none'; return; }
   var ms = distillTicketJourney(t);
-  if(ms.length < 2){ host.style.display = 'none'; return; }  // nothing to tell yet
+  if(ms.length < 2){ host.style.display = 'none'; return; }
   var createdTs = ms[0].ts;
   var lastAct = 0;
   (t.log||[]).forEach(function(e){ if(e && e.ts > lastAct) lastAct = e.ts; });
@@ -11530,18 +11578,21 @@ function renderTicketJourney(t){
   if(lastAct) parts.push('last activity ' + _relAgo(lastAct));
   host.innerHTML = ''
     + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px">'
-    +   '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);text-transform:uppercase;letter-spacing:.6px;font-weight:600">📍 Journey · ' + escHtml(parts.join(' · ')) + '</div>'
-    +   '<a href="#" onclick="event.preventDefault();openTicketTimeline()" style="font-size:10px;color:var(--accent2);font-family:var(--sans);white-space:nowrap;text-decoration:none;font-weight:700">Full timeline →</a>'
+    +   '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);text-transform:uppercase;letter-spacing:.6px;font-weight:600">\ud83d\udccd Journey \u00b7 ' + escHtml(parts.join(' \u00b7 ')) + '</div>'
+    +   '<a href="#" onclick="event.preventDefault();openTicketTimeline()" style="font-size:10px;color:var(--accent2);font-family:var(--sans);white-space:nowrap;text-decoration:none;font-weight:700">Full timeline \u2192</a>'
     + '</div>'
     + '<div style="display:flex;align-items:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px">'
     + ms.map(function(x, i){
-        if(x.gap) return '<div style="flex-shrink:0;color:var(--border2);padding:0 6px;font-size:13px;line-height:10px">⋯</div>';
+        if(x.gap) return '<div style="flex-shrink:0;color:var(--border2);padding:0 6px;font-size:13px;line-height:10px">\u22EF</div>';
         var connector = (i > 0 && !ms[i-1].gap)
           ? '<div style="flex:0 0 16px;height:2px;background:var(--border);margin-top:4px"></div>' : '';
+        var clickable = x.docId ? ' onclick="openInvModal(\'' + String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'') + '\')" title="Open this document"' : '';
+        var cursor = x.docId ? 'cursor:pointer;' : '';
+        var underline = x.docId ? 'text-decoration:underline;text-decoration-color:var(--border2);text-underline-offset:2px;' : '';
         return connector
-          + '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
+          + '<div' + clickable + ' style="' + cursor + 'flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
           +   '<span style="width:10px;height:10px;border-radius:50%;background:' + x.color + ';display:block"></span>'
-          +   '<span style="font-size:9.5px;color:var(--text2);font-family:var(--sans);font-weight:600;text-align:center;line-height:1.25;margin-top:4px">' + escHtml(x.label) + '</span>'
+          +   '<span style="' + underline + 'font-size:9.5px;color:var(--text2);font-family:var(--sans);font-weight:600;text-align:center;line-height:1.25;margin-top:4px">' + escHtml(x.label) + '</span>'
           +   '<span style="font-size:8.5px;color:var(--muted);font-family:var(--sans);margin-top:1px">' + _journeyDate(x.ts) + '</span>'
           + '</div>';
       }).join('')
