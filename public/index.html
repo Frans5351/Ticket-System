@@ -14466,27 +14466,34 @@ async function deleteTicket(id){
     return;
   }
   if(!confirm('Delete ticket "'+t.title+'"? This cannot be undone.')) return;
+  // Instant feedback while the server round-trip runs
+  var _delBtn2 = document.getElementById('tkt-delete-btn');
+  if(_delBtn2){ _delBtn2.disabled = true; _delBtn2.textContent = 'Deleting\u2026'; _delBtn2.style.opacity = '.6'; }
+  var _delRestoreBtn = function(){
+    if(_delBtn2){ _delBtn2.disabled = false; _delBtn2.textContent = 'Delete'; _delBtn2.style.opacity = '1'; }
+  };
   var _delBackup = TICKETS[id];
   delete TICKETS[id];
   var delRes = await sbDelete('tickets', id);
   if(delRes && delRes.ok === false){
     TICKETS[id] = _delBackup;  // restore \u2014 the server still has it
+    _delRestoreBtn();
     alert('\u26a0 Could not delete this ticket on the server.\n\n' + (delRes.msg||'') + '\n\nNothing was removed.');
     return;
   }
-  await saveTickets();
-  // Clean up any "Supporting Evidence" photos that were only attached to this
-  // ticket — they would otherwise become orphans in the documents tab.
-  try {
-    var purged = await purgeOrphanedSupportingEvidence(true);
-    if(purged > 0) console.log('deleteTicket: purged '+purged+' orphan Supporting Evidence doc(s)');
-  } catch(e){ console.warn('deleteTicket: purgeOrphanedSupportingEvidence failed', e); }
-  // Close modal directly without triggering the save-on-close logic
+  // Persist locally only \u2014 the server row is already gone; re-uploading
+  // every other ticket here was what made deletes feel slow.
+  try { localStorage.setItem('pm_tickets', JSON.stringify(TICKETS)); } catch(e){}
+  // Close immediately; the orphan-photo cleanup runs in the background.
   clearTimeout(_tktSaveTimer);
   _currentTicketId = null;
   document.getElementById('ticket-modal').style.display = 'none';
   document.body.style.overflow = '';
+  _delRestoreBtn();
   renderTickets();
+  purgeOrphanedSupportingEvidence(true).then(function(purged){
+    if(purged > 0) console.log('deleteTicket: purged '+purged+' orphan Supporting Evidence doc(s)');
+  }).catch(function(e){ console.warn('deleteTicket: purgeOrphanedSupportingEvidence failed', e); });
 }
 
 window.addEventListener('keydown', function(e){
