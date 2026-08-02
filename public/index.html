@@ -17509,16 +17509,8 @@ function buildPublicFormFields(editing, existing){
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your name (optional)</label>'
     + '<input id="pub-name" type="text" oninput="pubDraftSave()" placeholder="So we know who to follow up with" maxlength="80" value="' + escHtml(ex.reporter || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans)">'
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your email (optional)</label>'
-    + '<input id="pub-email" type="email" oninput="pubDraftSave()" placeholder="So we can send you your edit link" maxlength="120" value="' + escHtml(ex.reporterEmail || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:8px;font-family:var(--sans)" autocomplete="email" inputmode="email">'
-    + (editing ? '' :
-        // Opt-in to receive the personal link by email. Default unchecked
-        // so the user has to actively pick it. When ticked, the email
-        // field becomes required (validation in submitPublicReport).
-        '<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text);cursor:pointer;padding:6px 0;margin-bottom:6px;line-height:1.5">'
-        + '<input id="pub-email-link-opt" type="checkbox" style="width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin-top:2px">'
-        + '<span>📧 Email me my edit link <span style="color:var(--muted);font-family:var(--mono);font-size:11px">(so you don\'t lose it — check spam the first time)</span></span>'
-        + '</label>'
-      )
+    + '<div style="font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin:0 0 6px">You\'ll be copied (CC) on the report we email to the managing agent \u2014 your proof it was logged, and how we keep you updated on this ticket.</div>'
+    + '<input id="pub-email" type="email" oninput="pubDraftSave()" placeholder="e.g. yourname@gmail.com" maxlength="120" value="' + escHtml(ex.reporterEmail || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:8px;font-family:var(--sans)" autocomplete="email" inputmode="email">'
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your phone (optional)</label>'
     + '<input id="pub-phone" type="tel" oninput="pubDraftSave()" placeholder="e.g. 082 123 4567" maxlength="30" value="' + escHtml(ex.reporterPhone || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:14px;font-family:var(--sans)" inputmode="tel">'
     + photosHtml
@@ -17787,8 +17779,10 @@ async function submitPublicReport(){
   var name  = (document.getElementById('pub-name').value  || '').trim();
   var email = (document.getElementById('pub-email').value || '').trim();
   var phone = (document.getElementById('pub-phone').value || '').trim();
-  var emailLinkOpt = document.getElementById('pub-email-link-opt');
-  var wantsEmailedLink = !!(emailLinkOpt && emailLinkOpt.checked);
+  // The edit-link opt-in checkbox was removed \u2014 residents are CC'd on the
+  // managing-agent email instead, and keep their link via the success
+  // screen / WhatsApp button.
+  var wantsEmailedLink = false;
   if(!title){ showPublicErr('Please give your message a short subject.'); return; }
   if(!desc){  showPublicErr('Please add some details.'); return; }
   // If user opted into being emailed their link, email becomes required.
