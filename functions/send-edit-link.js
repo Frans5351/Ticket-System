@@ -173,7 +173,8 @@ export default async function handler(req) {
   // public form cannot direct mail to arbitrary recipients.
   let agentResult = null;
   // Recipients come from TWO sources, merged and de-duplicated:
-  //   1. Users in the app with role "management" that have an email assigned
+  //   1. Users in the app with role "management" OR "trustee" that have an
+  //      email assigned
   //      (managed in the Users tab — no Netlify access needed).
   //   2. The AGENT_NOTIFY_EMAIL env var (comma-separated), kept as a
   //      fallback / extra so the feature works before any user has an email.
@@ -191,15 +192,17 @@ export default async function handler(req) {
     });
     const rows = res.ok ? await res.json() : [];
     if (!res.ok) console.warn("send-edit-link: users query returned", res.status);
-    let mgmtSeen = 0;
+    let recipSeen = 0;
     (Array.isArray(rows) ? rows : []).forEach((r) => {
       const u = r && r.data ? r.data : r;
-      if (u && u.role === "management") {
-        mgmtSeen++;
+      // Management users AND trustees with an email assigned all receive the
+      // public-report notification.
+      if (u && (u.role === "management" || u.role === "trustee")) {
+        recipSeen++;
         if (looksLikeEmail(u.email)) agentSet.add(u.email.trim().toLowerCase());
       }
     });
-    console.log("send-edit-link: management users found:", mgmtSeen, "| with email:", agentSet.size,
+    console.log("send-edit-link: management/trustee users found:", recipSeen, "| with email:", agentSet.size,
       "| via", cfg.supaServiceKey ? "service key" : "anon key");
   } catch (e) {
     console.warn("send-edit-link: could not read management users:", e.message);
