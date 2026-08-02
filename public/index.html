@@ -1219,6 +1219,23 @@ async function checkStorageSetup(){
   body.theme-light .tkt-type-m, body.theme-green .tkt-type-m, body.theme-clean .tkt-type-m{color:#6b5fb8;background:rgba(107,95,184,.10);border-color:rgba(107,95,184,.30)}
   body.theme-light .tkt-type-a, body.theme-green .tkt-type-a, body.theme-clean .tkt-type-a{color:#3a6fb8;background:rgba(58,111,184,.10);border-color:rgba(58,111,184,.30)}
   .tkt-stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;font-family:var(--sans)}
+  .tkt-vt{padding:6px 11px;background:var(--surface);border:none;color:var(--muted);font-size:13px;cursor:pointer;line-height:1}
+  .tkt-vt.active{background:var(--accent-bg);color:var(--accent2)}
+  @media(min-width:900px){ #tkt-view-toggle{display:inline-flex !important} }
+  .tkt-att-pill{display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-family:var(--sans);font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}
+  .tkt-att-warn{color:var(--st-open);background:var(--st-open-bg);border:1px solid var(--st-open-bd)}
+  .tkt-att-go{color:var(--green);background:var(--green-bg);border:1px solid var(--green-bd)}
+  .tkt-att-me{color:#fff;background:var(--accent);border:1px solid var(--accent)}
+  .tkt-board{display:flex;gap:12px;overflow-x:auto;align-items:flex-start;padding-bottom:6px}
+  .tkt-bcol{flex:0 0 236px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:120px}
+  .tkt-bcol.dragover{outline:2px dashed var(--accent);outline-offset:-2px}
+  .tkt-bcol-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-family:var(--sans);font-weight:700;color:var(--text2);padding:2px 4px 10px}
+  .tkt-bcount{font-size:10px;color:var(--muted);font-weight:600}
+  .tkt-bcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 11px;margin-bottom:8px;cursor:pointer}
+  .tkt-bcard:hover{border-color:var(--border2)}
+  .tkt-bcard[draggable="true"]{cursor:grab}
+  .tkt-bcard-title{font-size:12px;font-weight:600;color:var(--text2);font-family:var(--sans);line-height:1.3;margin:4px 0}
+  .tkt-bcard-meta{font-size:9.5px;color:var(--muted);font-family:var(--sans);display:flex;gap:8px;flex-wrap:wrap}
   .tkt-card:hover{border-color:var(--accent)}
   .tkt-card.priority-urgent{border-left:3px solid #f06f6f}
   .tkt-card.priority-high{border-left:3px solid #f59e0b}
@@ -5861,10 +5878,19 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
       <select id="ticket-sort" onchange="renderTickets()" style="padding:6px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;font-family:var(--sans);outline:none">
         <option value="newest">Newest first</option>
+        <option value="attention">Needs attention</option>
+        <option value="active">Recently active</option>
         <option value="oldest">Oldest first</option>
         <option value="priority">Priority</option>
         <option value="updated">Recently updated</option>
       </select>
+      <select id="ticket-unit-filter" onchange="renderTickets()" style="padding:6px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:12px;font-family:var(--sans);outline:none;max-width:110px">
+        <option value="">All units</option>
+      </select>
+      <span id="tkt-view-toggle" style="display:none;gap:0;border:1px solid var(--border2);border-radius:9px;overflow:hidden">
+        <button id="tkt-view-list" class="tkt-vt active" onclick="setTktView('list')" title="List view">\u2630</button>
+        <button id="tkt-view-board" class="tkt-vt" onclick="setTktView('board')" title="Board view (drag cards between statuses)">\u25a5</button>
+      </span>
       <button id="new-tkt-btn" onclick="openTrackerTypeChooser()" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> New</button>
     </div>
   </div>
@@ -11418,12 +11444,108 @@ async function saveTickets(idsToSave){
   updateTicketBadge();
 }
 
+// ── Tracker intelligence ─────────────────────────────────────────────────
+function ticketLastActivity(t){
+  var m = t.updated || t.added || 0;
+  (t.log||[]).forEach(function(e){ if(e && e.ts > m) m = e.ts; });
+  return m;
+}
+function _leadApprovalCount(t){
+  var by = {};
+  (t.approvals||[]).forEach(function(a){
+    var k = a && (a.invId || a.quoteId || a.targetId || '?');
+    by[k] = (by[k]||0) + 1;
+  });
+  var lead = 0;
+  Object.keys(by).forEach(function(k){ if(by[k] > lead) lead = by[k]; });
+  return lead;
+}
+function _needsMyApproval(t){
+  if(_currentRole !== 'trustee' && _currentRole !== 'management' && _currentRole !== 'admin') return false;
+  if(normalizeStatus(t.status) !== 'awaiting_trustee_approval') return false;
+  if(!_currentUserObj || _currentUserObj.id === '__admin__') return false;
+  var myId = _currentUserObj.id;
+  var myName = String(_currentUserObj.name || _currentUserObj.username || '').trim().toLowerCase();
+  var mine = (t.approvals||[]).some(function(a){
+    if(!a) return false;
+    if(a.trusteeId && a.trusteeId === myId) return true;
+    var an = String(a.trusteeName||'').trim().toLowerCase();
+    return !!(an && myName && an === myName);
+  });
+  return !mine;
+}
+// Attention score: bigger = needs eyes sooner. Feeds card badges + the
+// "Needs attention" sort. Closed tickets always score 0.
+function ticketAttention(t){
+  var out = {score:0, badges:[], needsMe:false};
+  var st = normalizeStatus(t.status);
+  if(st === 'closed') return out;
+  var now = Date.now();
+  var quietMs = now - ticketLastActivity(t);
+  var quietD = Math.floor(quietMs / 86400000);
+  if(quietD >= 14){
+    out.score += Math.min(40, quietD);
+    out.badges.push({icon:'\u26a0', text:'quiet ' + quietD + 'd', warn:true});
+  }
+  if(st === 'awaiting_trustee_approval'){
+    var lead = _leadApprovalCount(t);
+    var need = Math.max(0, TRUSTEE_APPROVAL_THRESHOLD - lead);
+    if(need > 0){
+      out.score += 30;
+      if(_needsMyApproval(t)){ out.score += 50; out.needsMe = true; }
+    } else {
+      out.score += 45;
+      out.badges.push({icon:'\u25b6', text:'ready to start', go:true});
+    }
+  }
+  if(st === 'open' && (now - (t.added||now)) > 7*86400000) out.score += 10;
+  if(t.priority === 'urgent') out.score += 25;
+  else if(t.priority === 'high') out.score += 10;
+  return out;
+}
+// Board drags (admin): a proper status change through the same side-effects
+// as the modal path — log entry, save, reporter email, badge refresh.
+async function boardChangeStatus(ticketId, newStatus){
+  var t = TICKETS[ticketId];
+  if(!t || _currentRole !== 'admin') return;
+  var oldS = normalizeStatus(t.status);
+  if(oldS === newStatus) return;
+  t.status = newStatus;
+  t.updated = Date.now();
+  t.log = t.log || [];
+  var sMeta = TKT_STATUS[newStatus] || TKT_STATUS.open;
+  t.log.push({type:'status', text:'Status changed to ' + sMeta.label, ts:Date.now()});
+  try { await saveTickets([ticketId]); } catch(e){ console.warn('board save failed', e); }
+  notifyReporterStatusChange(t, newStatus);
+  updateTicketBadge();
+  renderTickets();
+}
+var _tktView = 'list';
+var _showArchivedClosed = false;
+function setTktView(v){
+  _tktView = v === 'board' ? 'board' : 'list';
+  var lb = document.getElementById('tkt-view-list'), bb = document.getElementById('tkt-view-board');
+  if(lb) lb.classList.toggle('active', _tktView === 'list');
+  if(bb) bb.classList.toggle('active', _tktView === 'board');
+  renderTickets();
+}
+
 function updateTicketBadge(){
-  var open = Object.values(TICKETS).filter(function(t){
-    return t.status==='open'||t.status==='awaiting_quote'||t.status==='awaiting_parts';
-  }).length;
   var badge = document.getElementById('tickets-badge');
-  if(badge){ badge.style.display=open?'inline':'none'; badge.textContent=open; }
+  if(!badge) return;
+  var n;
+  if((_currentRole === 'trustee' || _currentRole === 'management') && _currentUserObj){
+    // Personal: how many tickets are waiting on YOUR approval
+    n = Object.values(TICKETS).filter(function(t){ return _needsMyApproval(t); }).length;
+    badge.title = n ? (n + ' ticket' + (n===1?'':'s') + ' waiting on your approval') : '';
+  } else {
+    n = Object.values(TICKETS).filter(function(t){
+      return t.status==='open'||t.status==='awaiting_quote'||t.status==='awaiting_parts';
+    }).length;
+    badge.title = '';
+  }
+  badge.style.display = n ? 'inline' : 'none';
+  badge.textContent = n;
 }
 
 // ── Status / priority helpers ─────────────────────────────────────────────
@@ -11490,9 +11612,8 @@ function _relAgo(ts){
 function distillTicketJourney(t){
   var out = [];
   var createdTs = t.created || (t.dateOpened ? Date.parse(t.dateOpened) : null);
-  if(createdTs && !isNaN(createdTs)) out.push({label:'Created', ts:createdTs, color:'var(--accent2)'});
+  if(createdTs && !isNaN(createdTs)) out.push({label:'Created', ts:createdTs, color:'var(--accent2)', kind:'created'});
 
-  // \u2500 Status milestones from the log \u2500
   (t.log||[]).forEach(function(e){
     if(!e || !e.ts) return;
     var txt = String(e.text||'');
@@ -11500,21 +11621,20 @@ function distillTicketJourney(t){
       var m = txt.match(/^Status changed to (.+)$/);
       if(m){
         var key = Object.keys(TKT_STATUS).find(function(k){ return TKT_STATUS[k].label === m[1]; });
-        out.push({label:m[1], ts:e.ts, color:(key && TKT_STATUS[key].color) || 'var(--muted)'});
+        out.push({label:m[1], ts:e.ts, color:(key && TKT_STATUS[key].color) || 'var(--muted)', kind:'status'});
         return;
       }
       if(txt.indexOf('\u25b6 Work started') === 0){
-        out.push({label:'Work started', ts:e.ts, color:TKT_STATUS.work_in_progress.color});
+        out.push({label:'Work started', ts:e.ts, color:TKT_STATUS.work_in_progress.color, kind:'status'});
         return;
       }
       if(txt.indexOf('+ Proposal added') === 0){
-        out.push({label:'\ud83d\udca1 Proposal', ts:e.ts, color:'var(--accent2)'});
+        out.push({label:'\ud83d\udca1 Proposal', ts:e.ts, color:'var(--accent2)', kind:'proposal'});
         return;
       }
     }
   });
 
-  // \u2500 Linked documents (clickable) \u2500
   var evidence = [];
   (t.linkedDocIds||[]).forEach(function(invId){
     var d = INVOICES[invId];
@@ -11523,31 +11643,29 @@ function distillTicketJourney(t){
     var dt = String(d.docType||'');
     if(/quote/i.test(dt)){
       var who = d.invCompany && d.invCompany !== '(public submission)' ? (' \u00b7 ' + String(d.invCompany).slice(0,14)) : '';
-      out.push({label:'\ud83d\udcb0 Quote' + who, ts:ts, color:'var(--st-appr)', docId:invId});
+      out.push({label:'\ud83d\udcb0 Quote' + who, ts:ts, color:'var(--st-appr)', docId:invId, kind:'doc'});
     } else if(/invoice/i.test(dt)){
-      out.push({label:'\ud83e\uddfe Invoice', ts:ts, color:'var(--info)', docId:invId});
+      out.push({label:'\ud83e\uddfe Invoice', ts:ts, color:'var(--info)', docId:invId, kind:'doc'});
     } else if(/evidence|photo/i.test(dt)){
       evidence.push({ts:ts, docId:invId});
     } else {
-      out.push({label:'\ud83d\udcc4 ' + String(dt||'Document').slice(0,14), ts:ts, color:'var(--muted)', docId:invId});
+      out.push({label:'\ud83d\udcc4 ' + String(dt||'Document').slice(0,14), ts:ts, color:'var(--muted)', docId:invId, kind:'doc', viewer:true});
     }
   });
-  // Group evidence files that arrived together (e.g. photos on creation)
   evidence.sort(function(a,b){ return a.ts - b.ts; });
   var grp = null;
   evidence.forEach(function(ev){
     if(grp && (ev.ts - grp.lastTs) < 10*60*1000){ grp.n++; grp.lastTs = ev.ts; }
     else { if(grp) out.push(grp.node()); grp = {n:1, ts:ev.ts, lastTs:ev.ts, docId:ev.docId,
-      node:function(){ return {label:'\ud83d\udcce ' + this.n + ' file' + (this.n===1?'':'s'), ts:this.ts, color:'var(--muted)', docId:this.docId}; }}; }
+      node:function(){ return {label:'\ud83d\udcce ' + this.n + ' file' + (this.n===1?'':'s'), ts:this.ts, color:'var(--muted)', docId:this.docId, kind:'doc', viewer:true}; }}; }
   });
   if(grp) out.push(grp.node());
 
-  // \u2500 Approvals + acceptance \u2500
   (t.approvals||[]).forEach(function(a){
-    if(a && a.ts) out.push({label:'\u2713 ' + String(a.trusteeName||'Approved').split(' ')[0], ts:a.ts, color:'var(--green)'});
+    if(a && a.ts) out.push({label:'\u2713 ' + String(a.trusteeName||'Approved').split(' ')[0], ts:a.ts, color:'var(--green)', kind:'approval'});
   });
   if(t.approvedAt){
-    out.push({label:'\ud83c\udfc1 Accepted', ts:t.approvedAt, color:'var(--green)'});
+    out.push({label:'\ud83c\udfc1 Accepted', ts:t.approvedAt, color:'var(--green)', kind:'accepted'});
   }
 
   out.sort(function(a,b){ return a.ts - b.ts; });
@@ -11555,11 +11673,83 @@ function distillTicketJourney(t){
 
   var curLabel = (TKT_STATUS[t.status]||{}).label || t.status || 'Open';
   if(!out.length || out[out.length-1].label !== curLabel){
-    out.push({label:curLabel, ts:t.updated || Date.now(), color:(TKT_STATUS[t.status]||{}).color || 'var(--muted)'});
+    out.push({label:curLabel, ts:t.updated || Date.now(), color:(TKT_STATUS[t.status]||{}).color || 'var(--muted)', kind:'status'});
   }
   if(out.length > 9){ out = [out[0], {gap:true}].concat(out.slice(out.length - 7)); }
   return out;
 }
+
+function _journeyFullDate(ts){
+  try {
+    var d = new Date(ts);
+    return d.toLocaleDateString('en-ZA', {day:'2-digit', month:'short', year:'numeric'}) + ', ' +
+           d.toLocaleTimeString('en-ZA', {hour:'2-digit', minute:'2-digit'});
+  } catch(e){ return ''; }
+}
+function _fmtDur(ms){
+  var d = ms / 86400000;
+  if(d >= 1) return Math.round(d) + 'd';
+  var h = Math.round(ms / 3600000);
+  return h >= 1 ? h + 'h' : '<1h';
+}
+function _journeyAmount(t){
+  try {
+    var qid = t.approvedQuoteId;
+    if(!qid) return null;
+    var d = INVOICES[qid];
+    var amt = d && (d.amount != null ? d.amount : d.invAmount);
+    if(amt == null || isNaN(parseFloat(amt))) return null;
+    return 'R ' + Number(parseFloat(amt)).toLocaleString('en-ZA', {minimumFractionDigits:0, maximumFractionDigits:0});
+  } catch(e){ return null; }
+}
+function _journeyInsights(t, ms){
+  var chips = [];
+  var now = Date.now();
+  try {
+    // Stage durations from the status backbone (Created counts as the start)
+    var stages = ms.filter(function(x){ return x.kind === 'status' || x.kind === 'created'; });
+    var longest = null;
+    for(var i = 0; i < stages.length; i++){
+      var end = (i + 1 < stages.length) ? stages[i+1].ts : (t.status === 'closed' ? stages[i].ts : now);
+      var dur = end - stages[i].ts;
+      var name = stages[i].kind === 'created' ? 'Open' : stages[i].label;
+      if(dur > 0 && (!longest || dur > longest.dur)) longest = {name:name, dur:dur};
+    }
+    if(longest && longest.dur > 2*86400000 && stages.length > 1){
+      chips.push({icon:'\u23f1', text:'Longest stage: ' + longest.name + ' \u00b7 ' + _fmtDur(longest.dur)});
+    }
+    // Quiet-ticket warning
+    var lastAct = 0;
+    (t.log||[]).forEach(function(e){ if(e && e.ts > lastAct) lastAct = e.ts; });
+    if(t.status !== 'closed' && lastAct && (now - lastAct) > 14*86400000){
+      chips.push({icon:'\u26a0', text:'Quiet for ' + _fmtDur(now - lastAct), warn:true});
+    }
+    // Approvals progress while waiting on trustees
+    if(t.status === 'awaiting_trustee_approval'){
+      var byTarget = {};
+      (t.approvals||[]).forEach(function(a){
+        var k = a && (a.invId || a.quoteId || a.targetId || '?');
+        byTarget[k] = (byTarget[k]||0) + 1;
+      });
+      var lead = 0;
+      Object.keys(byTarget).forEach(function(k){ if(byTarget[k] > lead) lead = byTarget[k]; });
+      var need = Math.max(0, (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined' ? TRUSTEE_APPROVAL_THRESHOLD : 3) - lead);
+      chips.push({icon:'\ud83d\uddf3', text: need === 0 ? 'Threshold met \u2014 ready to start work' : (lead + '/' + TRUSTEE_APPROVAL_THRESHOLD + ' approvals \u00b7 ' + need + ' more needed')});
+    }
+    // Accepted amount when resolvable
+    var amt = _journeyAmount(t);
+    if(amt) chips.push({icon:'\ud83d\udcb0', text:amt + ' accepted'});
+    // Next step per status
+    var nextMap = {
+      open: 'Next: obtain quotes',
+      awaiting_quote: 'Next: upload supplier quotes',
+      work_in_progress: 'Next: close when the work is done',
+    };
+    if(nextMap[t.status]) chips.push({icon:'\u27a1', text:nextMap[t.status]});
+  } catch(e){}
+  return chips;
+}
+
 function renderTicketJourney(t){
   var host = document.getElementById('tkt-journey');
   if(!host) return;
@@ -11576,27 +11766,82 @@ function renderTicketJourney(t){
   if(days !== null) parts.push(t.status === 'closed' ? 'Resolved' : ('Open ' + days + ' day' + (days === 1 ? '' : 's')));
   parts.push(evN + ' event' + (evN === 1 ? '' : 's'));
   if(lastAct) parts.push('last activity ' + _relAgo(lastAct));
+
+  // Stage-duration tooltips for status nodes
+  var statusIdxs = [];
+  ms.forEach(function(x,i){ if(x.kind === 'status' || x.kind === 'created') statusIdxs.push(i); });
+  ms.forEach(function(x,i){
+    var tip = x.label.replace(/^[^A-Za-z0-9]+\s*/, '') + ' \u00b7 ' + _journeyFullDate(x.ts);
+    if(x.kind === 'status' || x.kind === 'created'){
+      var pos = statusIdxs.indexOf(i);
+      var end = (pos + 1 < statusIdxs.length) ? ms[statusIdxs[pos+1]].ts : (t.status === 'closed' ? x.ts : Date.now());
+      if(end > x.ts) tip += ' \u00b7 in this stage ' + _fmtDur(end - x.ts);
+    }
+    x.tip = tip;
+  });
+
+  var isOpen = t.status !== 'closed';
+  var lastRealIdx = ms.length - 1;
+
+  var strip = ms.map(function(x, i){
+    if(x.gap) return '<div style="flex-shrink:0;color:var(--border2);padding:0 6px;font-size:13px;line-height:10px">\u22EF</div>';
+    var connector = '';
+    if(i > 0 && !ms[i-1].gap){
+      var gapMs = Math.max(0, x.ts - ms[i-1].ts);
+      var gapD = gapMs / 86400000;
+      var w = Math.min(46, 14 + Math.round(Math.log2(gapD + 1) * 8));
+      var gapTip = gapD >= 1 ? Math.round(gapD) + 'd later' : 'same day';
+      connector = '<div title="' + gapTip + '" style="flex:0 0 ' + w + 'px;height:2px;background:var(--border);margin-top:4px"></div>';
+    }
+    var ring = (i === lastRealIdx && x.kind === 'status')
+      ? 'outline:2px solid ' + x.color + ';outline-offset:2px;' : '';
+    var clickable = '';
+    if(x.docId){
+      var safeId = String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'');
+      var vIdx = (t.linkedDocIds||[]).indexOf(x.docId);
+      // Files open the attachment carousel at that file, so \u2039 \u203a flips
+      // through everything on the ticket; quotes/invoices keep their richer
+      // document modal (approve buttons, amounts, etc).
+      clickable = (x.viewer && vIdx !== -1)
+        ? ' onclick="openTktViewer(' + vIdx + ')"'
+        : ' onclick="openInvModal(\'' + safeId + '\')"';
+    }
+    var cursor = x.docId ? 'cursor:pointer;' : '';
+    var underline = x.docId ? 'text-decoration:underline;text-decoration-color:var(--border2);text-underline-offset:2px;' : '';
+    return connector
+      + '<div' + clickable + ' title="' + escHtml(x.tip || '') + '" style="' + cursor + 'flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
+      +   '<span style="' + ring + 'width:10px;height:10px;border-radius:50%;background:' + x.color + ';display:block"></span>'
+      +   '<span style="' + underline + 'font-size:9.5px;color:var(--text2);font-family:var(--sans);font-weight:600;text-align:center;line-height:1.25;margin-top:4px">' + escHtml(x.label) + '</span>'
+      +   '<span style="font-size:8.5px;color:var(--muted);font-family:var(--sans);margin-top:1px">' + _journeyDate(x.ts) + '</span>'
+      + '</div>';
+  }).join('');
+
+  // Open tickets march toward a hollow "Now" marker on a dashed line
+  if(isOpen){
+    strip += '<div style="flex:0 0 22px;border-top:2px dashed var(--border2);margin-top:5px"></div>'
+      + '<div title="Today \u00b7 ' + _journeyFullDate(Date.now()) + '" style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;min-width:40px">'
+      +   '<span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--muted);background:transparent;display:block;box-sizing:border-box"></span>'
+      +   '<span style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;margin-top:4px">Now</span>'
+      + '</div>';
+  }
+
+  var chips = _journeyInsights(t, ms);
+  var chipsHtml = chips.length
+    ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'
+      + chips.map(function(c){
+          var warn = c.warn;
+          return '<span style="font-size:9.5px;font-family:var(--sans);font-weight:600;padding:3px 10px;border-radius:99px;border:1px solid ' + (warn ? 'var(--st-open-bd)' : 'var(--border2)') + ';background:' + (warn ? 'var(--st-open-bg)' : 'var(--surface)') + ';color:' + (warn ? 'var(--st-open)' : 'var(--muted)') + ';white-space:nowrap">' + c.icon + ' ' + escHtml(c.text) + '</span>';
+        }).join('')
+      + '</div>'
+    : '';
+
   host.innerHTML = ''
     + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px">'
     +   '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);text-transform:uppercase;letter-spacing:.6px;font-weight:600">\ud83d\udccd Journey \u00b7 ' + escHtml(parts.join(' \u00b7 ')) + '</div>'
     +   '<a href="#" onclick="event.preventDefault();openTicketTimeline()" style="font-size:10px;color:var(--accent2);font-family:var(--sans);white-space:nowrap;text-decoration:none;font-weight:700">Full timeline \u2192</a>'
     + '</div>'
-    + '<div style="display:flex;align-items:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px">'
-    + ms.map(function(x, i){
-        if(x.gap) return '<div style="flex-shrink:0;color:var(--border2);padding:0 6px;font-size:13px;line-height:10px">\u22EF</div>';
-        var connector = (i > 0 && !ms[i-1].gap)
-          ? '<div style="flex:0 0 16px;height:2px;background:var(--border);margin-top:4px"></div>' : '';
-        var clickable = x.docId ? ' onclick="openInvModal(\'' + String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'') + '\')" title="Open this document"' : '';
-        var cursor = x.docId ? 'cursor:pointer;' : '';
-        var underline = x.docId ? 'text-decoration:underline;text-decoration-color:var(--border2);text-underline-offset:2px;' : '';
-        return connector
-          + '<div' + clickable + ' style="' + cursor + 'flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
-          +   '<span style="width:10px;height:10px;border-radius:50%;background:' + x.color + ';display:block"></span>'
-          +   '<span style="' + underline + 'font-size:9.5px;color:var(--text2);font-family:var(--sans);font-weight:600;text-align:center;line-height:1.25;margin-top:4px">' + escHtml(x.label) + '</span>'
-          +   '<span style="font-size:8.5px;color:var(--muted);font-family:var(--sans);margin-top:1px">' + _journeyDate(x.ts) + '</span>'
-          + '</div>';
-      }).join('')
-    + '</div>';
+    + '<div style="display:flex;align-items:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px">' + strip + '</div>'
+    + chipsHtml;
   host.style.display = '';
 }
 
@@ -12857,12 +13102,9 @@ function renderTickets(){
     }).join('');
   }
 
-  // Filter by status (multi-select). A ticket is shown if its (normalised)
-  // status is in the active set — so a legacy 'resolved' ticket is matched
-  // by clicking the 'Closed' filter chip.
-  var filtered = all.filter(function(t){
-    return !!_ticketStatusFilter[normalizeStatus(t.status)];
-  });
+  // Scope first (role, search, unit, archive) — the status filter applies
+  // later so the Board view can show ALL statuses of the scoped set.
+  var filtered = all;
 
   // Role-based scope: residents and viewers only see tickets they created
   // or tickets on a unit number associated with their user. Admin/trustee/
@@ -12890,8 +13132,90 @@ function renderTickets(){
 
   // Search
   if(q) filtered = filtered.filter(function(t){
-    return (t.title+' '+(t.desc||'')+' '+(t.category||'')+' '+(t.unit||'')+' '+(t.reporter||'')).toLowerCase().includes(q);
+    var hay = t.title+' '+(t.desc||'')+' '+(t.category||'')+' '+(t.unit||'')+' '+(t.reporter||'')
+      + ' ' + (t.log||[]).map(function(e){ return (e && e.text) || ''; }).join(' ')
+      + ' ' + (t.linkedDocIds||[]).map(function(id){
+          var d = INVOICES[id];
+          return d ? ((d.name||'')+' '+(d.invCompany||'')) : '';
+        }).join(' ');
+    return hay.toLowerCase().includes(q);
   });
+
+  // Unit filter (options rebuilt from the scoped data, selection preserved)
+  var unitSel = document.getElementById('ticket-unit-filter');
+  if(unitSel){
+    var unitSet = {};
+    all.forEach(function(t){ var u = String(t.unit||'').trim(); if(u) unitSet[u] = true; });
+    var unitList = Object.keys(unitSet).sort(function(a,b){
+      var na = parseFloat(a), nb = parseFloat(b);
+      if(!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
+    var sig = unitList.join('|');
+    if(unitSel.dataset.sig !== sig){
+      var keep = unitSel.value;
+      unitSel.innerHTML = '<option value="">All units</option>' + unitList.map(function(u){
+        return '<option value="' + escHtml(u) + '">' + escHtml(/^\d+$/.test(u) ? 'Unit ' + u : u) + '</option>';
+      }).join('');
+      unitSel.dataset.sig = sig;
+      unitSel.value = keep || '';
+    }
+    var uv = unitSel.value;
+    if(uv) filtered = filtered.filter(function(t){ return String(t.unit||'').trim() === uv; });
+  }
+
+  // Archive: closed tickets older than 90 days stay out of the way
+  var _archHidden = 0;
+  if(!_showArchivedClosed){
+    var cutoff = Date.now() - 90*86400000;
+    var before = filtered.length;
+    filtered = filtered.filter(function(t){
+      if(normalizeStatus(t.status) !== 'closed') return true;
+      var closedTs = (t.dateClosed ? Date.parse(t.dateClosed) : 0) || t.updated || t.added || 0;
+      return closedTs >= cutoff;
+    });
+    _archHidden = before - filtered.length;
+  }
+
+  // ── Board view (desktop): columns per status, admin drags to move ──
+  if(_tktView === 'board'){
+    empty.style.display = 'none';
+    var cols = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
+    var canDrag = _currentRole === 'admin';
+    list.innerHTML = '<div class="tkt-board">' + cols.map(function(k){
+      var meta = TKT_STATUS[k];
+      var colTs = filtered.filter(function(t){ return normalizeStatus(t.status) === k; });
+      return '<div class="tkt-bcol" data-status="' + k + '"'
+        + ' ondragover="if(\'' + (canDrag?'1':'') + '\'){event.preventDefault();this.classList.add(\'dragover\')}"'
+        + ' ondragleave="this.classList.remove(\'dragover\')"'
+        + ' ondrop="this.classList.remove(\'dragover\');var id=event.dataTransfer.getData(\'text/plain\');if(id)boardChangeStatus(id,this.dataset.status)">'
+        + '<div class="tkt-bcol-head"><span style="color:' + meta.color + '">' + escHtml(meta.label) + '</span><span class="tkt-bcount">' + colTs.length + '</span></div>'
+        + colTs.map(function(t){
+            var p2 = TKT_PRIORITY[t.priority] || TKT_PRIORITY.medium;
+            var att2 = ticketAttention(t);
+            var pills2 = (att2.needsMe ? '<span class="tkt-att-pill tkt-att-me">\ud83d\uddf3 you</span> ' : '')
+              + att2.badges.slice(0,1).map(function(b){ return '<span class="tkt-att-pill ' + (b.warn?'tkt-att-warn':'tkt-att-go') + '">' + b.icon + ' ' + escHtml(b.text) + '</span>'; }).join('');
+            return '<div class="tkt-bcard" ' + (canDrag ? 'draggable="true" ondragstart="event.dataTransfer.setData(\'text/plain\',\'' + String(t.id).replace(/[^A-Za-z0-9_\-]/g,'') + '\')"' : '')
+              + ' onclick="openTicketModal(\'' + String(t.id).replace(/[^A-Za-z0-9_\-]/g,'') + '\')">'
+              + '<div style="display:flex;align-items:center;gap:6px"><span style="font-size:9px;color:var(--accent2);font-family:var(--mono);font-weight:600">#' + (t.ticketNumber||'') + '</span><span style="width:7px;height:7px;border-radius:50%;background:' + p2.color + ';margin-left:auto" title="' + escHtml(p2.label) + '"></span></div>'
+              + '<div class="tkt-bcard-title">' + escHtml(t.title||'') + '</div>'
+              + '<div class="tkt-bcard-meta">' + (t.unit ? '<span>Unit ' + escHtml(t.unit) + '</span>' : '') + '<span>\ud83d\udcac ' + ((t.log||[]).length) + '</span>' + (pills2 ? '<span style="flex-basis:100%;margin-top:2px">' + pills2 + '</span>' : '') + '</div>'
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }).join('') + '</div>'
+    + (_archHidden ? '<div style="text-align:center;padding:10px;font-size:11px;color:var(--muted);font-family:var(--sans);cursor:pointer;text-decoration:underline" onclick="_showArchivedClosed=true;renderTickets()">Show ' + _archHidden + ' archived (closed over 90 days ago)</div>' : '');
+    return;
+  }
+
+  // ── List view: now apply the status filter ──
+  filtered = filtered.filter(function(t){
+    return !!_ticketStatusFilter[normalizeStatus(t.status)];
+  });
+
+  // Attention scores, computed once per render (used by sort + card pills)
+  var _attCache = {};
+  filtered.forEach(function(t){ _attCache[t.id] = ticketAttention(t); });
 
   // Sort
   filtered.sort(function(a,b){
@@ -12901,6 +13225,11 @@ function renderTickets(){
       return (po[a.priority]||2)-(po[b.priority]||2);
     }
     if(sortVal==='updated') return (b.updated||b.added)-(a.updated||a.added);
+    if(sortVal==='active') return ticketLastActivity(b)-ticketLastActivity(a);
+    if(sortVal==='attention'){
+      var sa=(_attCache[a.id]||{score:0}).score, sb=(_attCache[b.id]||{score:0}).score;
+      return (sb-sa) || (ticketLastActivity(b)-ticketLastActivity(a));
+    }
     return b.added-a.added; // newest
   });
 
@@ -12920,10 +13249,21 @@ function renderTickets(){
     filtered.sort(function(a,b){ return _rank(a) - _rank(b); });
   }
 
-  if(!filtered.length){ list.innerHTML=''; empty.style.display='block'; return; }
+  if(!filtered.length){
+    list.innerHTML = _archHidden
+      ? '<div style="text-align:center;padding:14px;font-size:11px;color:var(--muted);font-family:var(--sans);cursor:pointer;text-decoration:underline" onclick="_showArchivedClosed=true;renderTickets()">Show ' + _archHidden + ' archived (closed over 90 days ago)</div>'
+      : '';
+    empty.style.display = _archHidden ? 'none' : 'block';
+    return;
+  }
   empty.style.display='none';
 
   list.innerHTML = filtered.map(function(t){
+    var _att = _attCache[t.id] || {badges:[], needsMe:false};
+    var attHtml = (_att.needsMe ? '<span class="tkt-att-pill tkt-att-me">\ud83d\uddf3 Your approval needed</span>' : '')
+      + _att.badges.slice(0, 2).map(function(b){
+          return '<span class="tkt-att-pill ' + (b.warn ? 'tkt-att-warn' : 'tkt-att-go') + '">' + b.icon + ' ' + escHtml(b.text) + '</span>';
+        }).join('');
     var s = TKT_STATUS[t.status]||TKT_STATUS.open;
     var p = TKT_PRIORITY[t.priority]||TKT_PRIORITY.medium;
     var d = t.dateOpen ? new Date(t.dateOpen).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}) : new Date(t.added).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'});
@@ -12996,12 +13336,14 @@ function renderTickets(){
           +(docCount?'<span style="color:var(--accent2)">📎 '+docCount+' doc'+(docCount!==1?'s':'')+'</span>':'')
           +(logCount?'<span>💬 '+logCount+' note'+(logCount!==1?'s':'')+'</span>':'')
         +'</div>'
+        +(attHtml?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">'+attHtml+'</div>':'')
       +'</div>'
       +'<div style="text-align:right;flex-shrink:0">'
         +rightPill
       +'</div>'
     +'</div>';
-  }).join('');
+  }).join('')
+  + (_archHidden ? '<div style="text-align:center;padding:10px;font-size:11px;color:var(--muted);font-family:var(--sans);cursor:pointer;text-decoration:underline" onclick="_showArchivedClosed=true;renderTickets()">Show ' + _archHidden + ' archived (closed over 90 days ago)</div>' : '');
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────

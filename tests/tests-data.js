@@ -343,5 +343,21 @@ window.PARK_MANOR_TESTS = [
       {id:'rd-009', title:'Sidebar respects roles', pre:'Logged in as owner or tenant on desktop', steps:['Look at the sidebar'], expect:'Only Tracker is listed — admin-only sections do not appear.', roles:['owner','tenant'], priority:'critical'},
       {id:'rd-010', title:'Supplier portal job cards match the new style', pre:'Logged in as a supplier with assigned jobs', steps:['View My Jobs'], expect:'Category and unit render as outlined chips, consistent with the Tracker cards.', roles:['all'], priority:'medium'},
     ]
+  },
+
+  {
+    id: 'smart',
+    name: 'Tracker intelligence',
+    icon: '🧠',
+    tests: [
+      {id:'sm-001', title:'Attention pills appear on cards', pre:'A ticket untouched for 14+ days, or awaiting approval', steps:['Open the Tracker'], expect:'Cards show pills like ⚠ quiet 18d, ▶ ready to start, or 🗳 Your approval needed.', roles:['admin','trustee'], priority:'high'},
+      {id:'sm-002', title:'Needs attention sort floats stuck tickets', pre:'Mixed ticket ages/statuses', steps:['Sort by Needs attention'], expect:'Tickets needing your approval come first, then stale and ready-to-start tickets; fresh quiet tickets sink.', roles:['admin','trustee'], priority:'high'},
+      {id:'sm-003', title:'Trustee badge counts YOUR approvals', pre:'Logged in as a trustee with pending approvals', steps:['Look at the Tracker tab badge'], expect:'Badge shows the number of tickets waiting on this trustee\'s approval (tooltip confirms), not total open tickets.', roles:['trustee'], priority:'critical'},
+      {id:'sm-004', title:'Search reaches notes and documents', pre:'A ticket with a note or doc containing a unique word', steps:['Search that word'], expect:'The ticket is found even though the word is not in its title or description.', roles:['admin'], priority:'medium'},
+      {id:'sm-005', title:'Unit filter', pre:'Tickets across several units', steps:['Pick a unit in the All units dropdown'], expect:'Only that unit\'s tickets remain; options are sorted numerically.', roles:['admin'], priority:'medium'},
+      {id:'sm-006', title:'Old closed tickets archived', pre:'A ticket closed more than 90 days ago; Closed filter active', steps:['Scroll the list'], expect:'It is hidden; a “Show N archived” link at the bottom reveals it.', roles:['admin'], priority:'medium'},
+      {id:'sm-007', title:'Board view renders on desktop', pre:'Window wider than 900px', steps:['Click the board icon next to sort'], expect:'Five status columns with compact cards; counts per column; clicking a card opens the ticket.', roles:['admin','trustee'], priority:'high'},
+      {id:'sm-008', title:'Admin can drag cards between columns', pre:'Board view, admin', steps:['Drag a card from Open to Obtaining Quotes'], expect:'Card moves; ticket status updates; activity log gains a status entry; reporter email fires if set. Non-admins cannot drag.', roles:['admin'], priority:'critical'},
+    ]
   }
 ];
