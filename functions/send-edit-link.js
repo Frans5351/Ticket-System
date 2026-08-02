@@ -31,6 +31,49 @@ function bareAddress(from) {
   return (m ? m[1] : String(from || "")).trim();
 }
 
+
+// ── Branded HTML email scaffolding ──────────────────────────────────────
+const APP_URL = (process.env.APP_BASE_URL || "https://park-manor-bc.netlify.app").replace(/\/$/, "");
+
+function escH(v) {
+  return String(v == null ? "" : v)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function emailShell(bodyHtml) {
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#eef1f5">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:14px;border:1px solid #e4e9ef;overflow:hidden">
+        <tr><td style="padding:22px 28px;border-bottom:3px solid #1fa898">
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#3a4354;letter-spacing:2px">PARK MANOR</div>
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1fa898;font-weight:bold">Body Corporate</div>
+        </td></tr>
+        <tr><td style="padding:26px 28px">${bodyHtml}</td></tr>
+        <tr><td style="padding:16px 28px;background:#f5f7fa;border-top:1px solid #e4e9ef">
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;line-height:1.5">Automated notification from the Park Manor reporting system \u00b7 17 Echium Road, Table View</div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table></body></html>`;
+}
+
+function emailButton(href, label, color) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 6px"><tr>
+    <td style="border-radius:9px;background:${color || "#1fa898"}">
+      <a href="${escH(href)}" target="_blank" style="display:inline-block;padding:13px 26px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none">${label}</a>
+    </td></tr></table>`;
+}
+
+function detailRow(label, value) {
+  if (!value) return "";
+  return `<tr>
+    <td style="padding:7px 12px 7px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8b96a5;white-space:nowrap;vertical-align:top">${label}</td>
+    <td style="padding:7px 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a4354;font-weight:bold">${escH(value)}</td>
+  </tr>`;
+}
+
 export default async function handler(req) {
   if (req.method !== "POST") return errorResponse(405, "Method not allowed");
 
@@ -102,10 +145,18 @@ export default async function handler(req) {
       "",
       "Park Manor Body Corporate",
     ];
+    const residentHtml = emailShell(`
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#3a4354;margin-bottom:6px">Thanks \u2014 we\u2019ve received your report${ref ? " " + escH(ref) : ""}</div>
+      ${title ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1fa898;font-weight:bold;margin-bottom:14px">${escH(title)}</div>` : ""}
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#5c6675;line-height:1.6;margin-bottom:4px">The trustees will review it as soon as possible. Use your personal button below at any time to view what you sent, add details, or check progress.</div>
+      ${emailButton(editUrl, "View or update my report")}
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;line-height:1.6;margin-top:14px;padding:10px 12px;background:#fdf6ea;border-left:3px solid #9a6200;border-radius:4px"><b>Keep this email.</b> Anyone with this link can view and edit your report, so please don\u2019t share it.</div>
+    `);
     residentResult = await sendEmail({
       to: [to],
       subject: subject,
       text: lines.join("\n"),
+      html: residentHtml,
     });
     if (!residentResult.ok) {
       console.error("send-edit-link: RESIDENT email failed:", residentResult.status, residentResult.msg, "| to:", to);
@@ -186,10 +237,33 @@ export default async function handler(req) {
       "",
       "— Park Manor Body Corporate (automated notification)",
     ].filter((l) => l !== null);
+    const attNote = emailAttachments.length
+      ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#177a4c;margin-top:12px">\ud83d\udcce ${emailAttachments.length} file${emailAttachments.length === 1 ? "" : "s"} attached to this email.</div>`
+      : "";
+    const skipNote = skippedFiles.length
+      ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#9a6200;margin-top:6px">\u26a0 Too large to attach (view in the tracker): ${skippedFiles.map((x) => escH(x.name) + " (" + escH(x.sizeMB) + " MB)").join(", ")}</div>`
+      : "";
+    const agentHtml = emailShell(`
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8b96a5;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">New public report${ref ? " \u00b7 " + escH(ref) : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:#3a4354;margin-bottom:16px">${escH(title || "(no subject)")}</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:14px">
+        ${detailRow("Reference", ref)}
+        ${detailRow("Unit", unit)}
+        ${detailRow("Name", reporter)}
+        ${detailRow("Phone", phone)}
+        ${detailRow("Email", looksLikeEmail(to) ? to : "")}
+      </table>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8b96a5;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Details</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a4354;line-height:1.7;background:#f5f7fa;border:1px solid #e4e9ef;border-radius:9px;padding:14px 16px">${escH(desc || "(none provided)").replace(/\n/g, "<br>")}</div>
+      ${attNote}${skipNote}
+      ${emailButton(APP_URL, "Open the Park Manor Tracker")}
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">${looksLikeEmail(to) ? "Replying to this email goes directly to the resident." : ""}</div>
+    `);
     agentResult = await sendEmail({
       to: agentList,
       subject: aSubject,
       text: aLines.join("\n"),
+      html: agentHtml,
       // Let the agent reply straight to the resident when we have their address.
       replyTo: looksLikeEmail(to) ? to : undefined,
       attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),

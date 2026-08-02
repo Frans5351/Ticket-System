@@ -1353,6 +1353,24 @@ async function checkStorageSetup(){
   body.theme-clean select[style*="background:var(--surface2)"]{
     background:var(--surface) !important;
   }
+  /* \u2500\u2500 Public form: hero, cards, sticky submit, celebration \u2500\u2500 */
+  .pub-hero{position:relative;margin:-24px -18px 20px;height:200px;overflow:hidden;border-radius:0 0 18px 18px}
+  .pub-hero img{width:100%;height:100%;object-fit:cover;display:block}
+  .pub-hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,20,30,.15) 0%,rgba(10,20,30,.72) 100%)}
+  .pub-hero-text{position:absolute;left:18px;right:18px;bottom:16px;color:#fff}
+  .pub-hero-brand{font-size:26px;font-weight:800;letter-spacing:3px;font-family:var(--sans);text-shadow:0 1px 8px rgba(0,0,0,.4)}
+  .pub-hero-sub{font-size:14px;font-weight:600;margin-top:2px;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+  .pub-hero-trust{font-size:10.5px;margin-top:7px;opacity:.94;font-family:var(--sans);text-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .pub-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 16px 12px;margin-bottom:14px}
+  .pub-card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;font-family:var(--sans)}
+  .pub-card-head b{font-size:14px;color:var(--text2)}
+  .pub-card-head i{font-style:normal;font-size:11px;color:var(--muted);margin-left:6px}
+  .pub-step{width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;font-family:var(--sans)}
+  #pub-submit-bar{position:sticky;bottom:0;background:linear-gradient(180deg,transparent,var(--bg) 26%);padding:12px 0 calc(10px + env(safe-area-inset-bottom,0));margin:0 -4px;z-index:5}
+  .pub-check{width:76px;height:76px;margin:0 auto 14px;display:block}
+  .pub-check circle{fill:none;stroke:var(--green);stroke-width:2.4;stroke-dasharray:166;stroke-dashoffset:166;animation:pubDraw .55s ease forwards}
+  .pub-check path{fill:none;stroke:var(--green);stroke-width:3;stroke-linecap:round;stroke-dasharray:48;stroke-dashoffset:48;animation:pubDraw .35s .45s ease forwards}
+  @keyframes pubDraw{to{stroke-dashoffset:0}}
   body.theme-portal .header{ box-shadow:0 1px 4px rgba(25,39,60,.07); }
   body.theme-portal .tab.active{ color:#1fa898; }
   /* Soft shadow on card-like surfaces (subtle; matches the portal look) */
@@ -17392,19 +17410,24 @@ function renderPublicReportForm(){
       return;
     }
     host.innerHTML = ''
-      + '<div style="margin-bottom:18px;display:flex;gap:16px;align-items:flex-start">'
-      +   '<div style="flex:1;min-width:0">'
-      +     '<div style="font-size:22px;font-weight:800;color:var(--text2);font-family:var(--sans);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Park Manor</div>'
-      +     '<div style="font-size:16px;font-weight:600;color:var(--accent2);margin-bottom:6px">Submit a report or enquiry</div>'
-      +     '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.5">Goes straight to the trustees and the managing agent. You\'ll get a personal link to track or update what you sent.</div>'
+      + '<div class="pub-hero">'
+      +   '<img src="park-manor-entrance.jpg" alt="">'
+      +   '<div class="pub-hero-shade"></div>'
+      +   '<div class="pub-hero-text">'
+      +     '<div class="pub-hero-brand">PARK MANOR</div>'
+      +     '<div class="pub-hero-sub">Report a problem or send an enquiry</div>'
+      +     '<div class="pub-hero-trust">\u2713 Goes straight to the trustees &amp; managing agent &nbsp;\u00b7&nbsp; \u2713 Track it with a personal link</div>'
       +   '</div>'
-      +   '<img src="park-manor-entrance.jpg" alt="Park Manor entrance" style="width:96px;height:96px;object-fit:cover;border-radius:14px;border:1px solid var(--border2);flex-shrink:0">'
       + '</div>'
       // Honeypot — bots fill this in, humans don\'t see it. Submission is rejected if non-empty.
       + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
       + buildPublicFormFields(/*editing*/ false, /*existing*/ null)
       + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
-      + '<button id="pub-submit-btn" onclick="submitPublicReport()" style="width:100%;padding:14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:600;font-family:var(--mono);cursor:pointer;letter-spacing:.3px">Submit</button>';
+      + '<div id="pub-submit-bar">'
+      +   '<button id="pub-submit-btn" onclick="submitPublicReport()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer;letter-spacing:.3px;box-shadow:0 2px 10px rgba(25,39,60,.14)">Send my report</button>'
+      + '</div>'
+      + '<div style="text-align:center;font-size:10.5px;color:var(--muted);font-family:var(--sans);margin-top:2px">Prefer talking to a person? Any trustee can log this for you.</div>';
+    if(typeof pubDraftRestore === 'function') setTimeout(pubDraftRestore, 30);
   }
   // If the setting hasn't loaded yet, wait a beat
   if(typeof PUBLIC_REPORTS_ENABLED === 'undefined' && Date.now() - startedAt < 2000){
@@ -17462,20 +17485,31 @@ function buildPublicFormFields(editing, existing){
       }).join('')
     + '</div>';
   return ''
-    + tilesHtml
-    + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Subject *</label>'
-    + '<input id="pub-title" type="text" placeholder="e.g. Leaking tap in kitchen, or Question about parking" maxlength="120" value="' + escHtml(ex.title || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans)">'
+    + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>What\'s the issue?</b></span></div>'
+    + tilesHtml+ '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Subject *</label>'
+    + '<input id="pub-title" type="text" oninput="pubDraftSave()" placeholder="e.g. Leaking tap in kitchen, or Question about parking" maxlength="120" value="' + escHtml(ex.title || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans)">'
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Details *</label>'
-    + '<textarea id="pub-desc" rows="4" placeholder="Tell us what\'s going on or what you\'d like to know — as much detail as helps." maxlength="2000" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans);resize:vertical;min-height:90px">' + escHtml(ex.desc || '') + '</textarea>'
-    + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Unit number (optional)</label>'
+    + '<textarea id="pub-desc" rows="4" oninput="pubDraftSave();pubGrow(this)" placeholder="Tell us what\'s going on or what you\'d like to know — as much detail as helps." maxlength="2000" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans);resize:vertical;min-height:90px">' + escHtml(ex.desc || '') + '</textarea>'
+    
+    + '</div>'
+    + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Show us</b><i>photos help a lot \u2014 optional</i></span></div>'+ '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + photoLabel + '</label>'
+    + '<div style="display:flex;gap:8px;margin-bottom:8px">'
+    +   '<button type="button" ' + (photoInputDisabled ? 'disabled' : '') + ' onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:12px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:700;cursor:pointer' + (photoInputDisabled ? ';opacity:.5;cursor:not-allowed' : '') + '">\ud83d\udcf7 Take a photo</button>'
+    +   '<button type="button" ' + (photoInputDisabled ? 'disabled' : '') + ' onclick="document.getElementById(\'pub-photos\').click()" style="flex:1;padding:12px 8px;border-radius:9px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer' + (photoInputDisabled ? ';opacity:.5;cursor:not-allowed' : '') + '">\ud83d\uddbc Photo / video</button>'
+    + '</div>'
+    + '<div id="pub-file-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>'
+    + '<input id="pub-photos-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
+    + '<input id="pub-photos" type="file" accept="image/*,video/*" multiple style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
+    + '</div>'
+    + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>Where &amp; who</b><i>so we can follow up</i></span></div>'+ '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Unit number (optional)</label>'
     + '<div style="display:flex;gap:8px;margin-bottom:12px">'
-    +   '<input id="pub-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" value="' + escHtml(ex.unit || '') + '" style="flex:1;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;font-family:var(--sans)">'
+    +   '<input id="pub-unit" type="text" inputmode="numeric" oninput="pubDraftSave()" placeholder="e.g. 12" maxlength="20" value="' + escHtml(ex.unit || '') + '" style="flex:1;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;font-family:var(--sans)">'
     +   '<button type="button" onclick="var u=document.getElementById(\'pub-unit\');u.value=(u.value===\'Common area\'?\'\':\'Common area\');" style="padding:0 14px;border-radius:7px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">\ud83c\udfde Common area</button>'
     + '</div>'
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your name (optional)</label>'
-    + '<input id="pub-name" type="text" placeholder="So we know who to follow up with" maxlength="80" value="' + escHtml(ex.reporter || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans)">'
+    + '<input id="pub-name" type="text" oninput="pubDraftSave()" placeholder="So we know who to follow up with" maxlength="80" value="' + escHtml(ex.reporter || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:12px;font-family:var(--sans)">'
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your email (optional)</label>'
-    + '<input id="pub-email" type="email" placeholder="So we can send you your edit link" maxlength="120" value="' + escHtml(ex.reporterEmail || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:8px;font-family:var(--sans)" autocomplete="email" inputmode="email">'
+    + '<input id="pub-email" type="email" oninput="pubDraftSave()" placeholder="So we can send you your edit link" maxlength="120" value="' + escHtml(ex.reporterEmail || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:8px;font-family:var(--sans)" autocomplete="email" inputmode="email">'
     + (editing ? '' :
         // Opt-in to receive the personal link by email. Default unchecked
         // so the user has to actively pick it. When ticked, the email
@@ -17486,16 +17520,10 @@ function buildPublicFormFields(editing, existing){
         + '</label>'
       )
     + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Your phone (optional)</label>'
-    + '<input id="pub-phone" type="tel" placeholder="e.g. 082 123 4567" maxlength="30" value="' + escHtml(ex.reporterPhone || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:14px;font-family:var(--sans)" inputmode="tel">'
+    + '<input id="pub-phone" type="tel" oninput="pubDraftSave()" placeholder="e.g. 082 123 4567" maxlength="30" value="' + escHtml(ex.reporterPhone || '') + '" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;margin-bottom:14px;font-family:var(--sans)" inputmode="tel">'
     + photosHtml
-    + '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + photoLabel + '</label>'
-    + '<div style="display:flex;gap:8px;margin-bottom:8px">'
-    +   '<button type="button" ' + (photoInputDisabled ? 'disabled' : '') + ' onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:12px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:700;cursor:pointer' + (photoInputDisabled ? ';opacity:.5;cursor:not-allowed' : '') + '">\ud83d\udcf7 Take a photo</button>'
-    +   '<button type="button" ' + (photoInputDisabled ? 'disabled' : '') + ' onclick="document.getElementById(\'pub-photos\').click()" style="flex:1;padding:12px 8px;border-radius:9px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer' + (photoInputDisabled ? ';opacity:.5;cursor:not-allowed' : '') + '">\ud83d\uddbc Photo / video</button>'
-    + '</div>'
-    + '<div id="pub-file-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>'
-    + '<input id="pub-photos-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
-    + '<input id="pub-photos" type="file" accept="image/*,video/*" multiple style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">';
+    
+    + '</div>';
 }
 
 // Toggle visual delete state on an existing photo. On Save we apply the
@@ -17537,6 +17565,60 @@ function openPublicPhotoFullscreen(photoId){
   overlay.onclick = function(){ overlay.remove(); };
   overlay.innerHTML = '<img src="' + src + '" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px"><button style="position:absolute;top:18px;right:18px;background:rgba(255,255,255,.15);border:none;color:#fff;font-size:24px;width:44px;height:44px;border-radius:50%;cursor:pointer;line-height:1">×</button>';
   document.body.appendChild(overlay);
+}
+
+// Draft autosave: nothing typed into the public form is ever lost to an
+// accidental refresh. Cleared on successful submit.
+function pubDraftSave(){
+  try {
+    var g = function(id){ var el=document.getElementById(id); return el?el.value:''; };
+    localStorage.setItem('pm_pub_draft', JSON.stringify({
+      t:g('pub-title'), d:g('pub-desc'), u:g('pub-unit'),
+      n:g('pub-name'), e:g('pub-email'), p:g('pub-phone'),
+      c: window._pubCategory || ''
+    }));
+  } catch(e){}
+}
+function pubDraftRestore(){
+  try {
+    var raw = localStorage.getItem('pm_pub_draft');
+    if(!raw) return;
+    var d = JSON.parse(raw);
+    var set = function(id,v){ var el=document.getElementById(id); if(el && v) el.value=v; };
+    set('pub-title',d.t); set('pub-desc',d.d); set('pub-unit',d.u);
+    set('pub-name',d.n); set('pub-email',d.e); set('pub-phone',d.p);
+    if(d.c){
+      var btn = document.querySelector('#pub-cat-tiles button[data-cat="'+d.c+'"]');
+      if(btn) pubSelectCategory(btn);
+    }
+    var ta = document.getElementById('pub-desc');
+    if(ta) pubGrow(ta);
+  } catch(e){}
+}
+function pubGrow(el){
+  el.style.height='auto';
+  el.style.height=Math.min(el.scrollHeight, 340)+'px';
+}
+// Confetti burst on successful submit
+function pubCelebrate(){
+  try {
+    var c = document.createElement('canvas');
+    c.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:3000';
+    c.width=innerWidth; c.height=innerHeight;
+    document.body.appendChild(c);
+    var ctx=c.getContext('2d');
+    var cols=['#1fa898','#2ec4b6','#f0b429','#7b68ee','#2eb87e'];
+    var P=[]; for(var i=0;i<48;i++){ P.push({x:c.width/2,y:c.height*0.28,vx:(Math.random()-0.5)*9,vy:-(Math.random()*7+3),r:Math.random()*5+3,cl:cols[i%cols.length],a:1,rot:Math.random()*6}); }
+    var t0=Date.now();
+    (function tick(){
+      var dt=(Date.now()-t0)/1000;
+      ctx.clearRect(0,0,c.width,c.height);
+      P.forEach(function(p){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.28; p.a=Math.max(0,1-dt/1.4); p.rot+=0.1;
+        ctx.save(); ctx.globalAlpha=p.a; ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillStyle=p.cl; ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*0.62); ctx.restore(); });
+      if(dt<1.5) requestAnimationFrame(tick); else c.remove();
+    })();
+  } catch(e){}
 }
 
 // ── Public form interactivity ──────────────────────────────────────────
@@ -17881,7 +17963,7 @@ async function submitPublicReport(){
 
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:40px 16px 24px">'
-      +   '<div style="font-size:54px;margin-bottom:14px">✓</div>'
+      +   '<svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin-bottom:8px">Submitted</div>'
       +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:440px;margin:0 auto">Your message has been logged. The trustees will review it as soon as possible.</div>'
       + '</div>'
@@ -17900,6 +17982,8 @@ async function submitPublicReport(){
       +   '<a href="https://wa.me/?text=' + encodeURIComponent('Park Manor report' + (ticket.ticketNumber ? ' #'+ticket.ticketNumber : '') + ' \u2014 my personal link to track or update it: ' + editUrl) + '" target="_blank" rel="noopener" style="display:block;text-align:center;width:100%;padding:11px;background:#25D366;border-radius:7px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer;text-decoration:none;box-sizing:border-box;margin-top:8px">\ud83d\udcac Save my link to WhatsApp</a>'
       + '</div>'
       + '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.6;padding:12px;background:rgba(245,158,11,.05);border-left:2px solid #f59e0b;border-radius:4px"><b>Save this link.</b> It\'s the only way to come back and update what you sent. You\'ll be able to edit it until a trustee starts working on it.</div>';
+    try { localStorage.removeItem('pm_pub_draft'); } catch(e){}
+    if(typeof pubCelebrate === 'function') pubCelebrate();
   } catch(e){
     console.warn('submitPublicReport: failed', e);
     showPublicErr('Could not submit. Please check your connection and try again.');
@@ -18081,7 +18165,7 @@ async function savePublicEdit(ticketId){
     // Re-render with success indicator
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:40px 16px 24px">'
-      +   '<div style="font-size:54px;margin-bottom:14px">✓</div>'
+      +   '<svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin-bottom:8px">Saved</div>'
       +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:440px;margin:0 auto">Your changes have been saved.</div>'
       + '</div>'

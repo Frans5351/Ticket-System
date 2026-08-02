@@ -62,6 +62,7 @@ export async function sendEmail(opts) {
     subject: String(opts.subject || ""),
     textContent: String(opts.text || ""),
   };
+  if (opts.html) payload.htmlContent = String(opts.html);
   if (!payload.to.length) return { ok: false, status: 400, msg: "No valid recipients." };
   if (opts.replyTo && looksLikeEmail(bareAddress(opts.replyTo))) {
     payload.replyTo = { email: bareAddress(opts.replyTo) };
