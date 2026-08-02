@@ -1577,7 +1577,7 @@ async function checkStorageSetup(){
     <button id="settings-btn-header" onclick="showSettingsIO()" title="Settings (admin only)" style="display:none;margin-left:8px;padding:7px 14px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap" onmouseover="this.style.background='var(--accent-bg2)'" onmouseout="this.style.background='var(--accent-bg)'">⚙ Settings</button>
     <button id="theme-toggle-btn" onclick="toggleTheme()" title="Switch theme" style="margin-left:8px;padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:14px;font-family:var(--mono);cursor:pointer;transition:all .15s;white-space:nowrap;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🌙</button>
     <button id="login-btn" onclick="openLoginModal()" style="margin-left:8px;padding:7px 16px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted)'">🔑 Log in</button>
-    <button id="pwd-btn" onclick="openPwChangeSelf()" title="Change my password" style="display:none;margin-left:8px;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer">\ud83d\udd11</button>
+    <button id="pwd-btn" onclick="openPwChangeSelf()" title="Change my password" style="display:none;margin-left:8px;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer">🔑</button>
       <button id="logout-btn" onclick="doLogout()" style="display:none;margin-left:8px;padding:7px 16px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap">✓ Logged in</button>
   </div>
 </header>
@@ -6211,6 +6211,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <!-- Status flow bar (kept up top; the trustee-approval panel now lives
          BELOW description so users see the issue first, then act on it) -->
     <div id="tkt-status-flow" style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;overflow-x:auto"></div>
+    <div id="tkt-journey" style="display:none;padding:10px 20px 8px;border-bottom:1px solid var(--border)"></div>
 
     <!-- Description (full-width row; reads naturally before approvals) -->
     <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
@@ -6507,7 +6508,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
       </div>
       <!-- Save button -->
       <button onclick="saveUser()" style="width:100%;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:500;cursor:pointer;margin-top:4px">Save User</button>
-      <button id="usr-sendlogin-btn" onclick="sendLoginDetails()" style="display:none;width:100%;padding:9px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer;margin-top:8px">\ud83d\udce8 Send login details by email</button>
+      <button id="usr-sendlogin-btn" onclick="sendLoginDetails()" style="display:none;width:100%;padding:9px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer;margin-top:8px">📨 Send login details by email</button>
       <div id="user-save-msg" style="text-align:center;font-size:11px;font-family:var(--mono);color:var(--muted)"></div>
     </div>
   </div>
@@ -11468,6 +11469,86 @@ var TKT_FLOW = [
   {value:'closed',        label:'Closed',         color:'#4ade9e'}
 ];
 
+// ── Journey strip ─────────────────────────────────────────────────────
+// A distilled read of the ticket's life: created → key status milestones →
+// current status, with dates. Long histories collapse to first + last five
+// with a ⋯ gap. Links into the full Timeline view for the whole story.
+function _journeyDate(ts){
+  try {
+    var d = new Date(ts);
+    return String(d.getDate()).padStart(2,'0') + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  } catch(e){ return ''; }
+}
+function _relAgo(ts){
+  var mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if(mins < 60) return mins <= 1 ? 'just now' : mins + 'm ago';
+  var hrs = Math.round(mins / 60);
+  if(hrs < 24) return hrs + 'h ago';
+  var days = Math.round(hrs / 24);
+  return days === 1 ? 'yesterday' : days + 'd ago';
+}
+function distillTicketJourney(t){
+  var out = [];
+  var createdTs = t.created || (t.dateOpened ? Date.parse(t.dateOpened) : null);
+  if(createdTs && !isNaN(createdTs)) out.push({label:'Created', ts:createdTs, color:'var(--accent2)'});
+  (t.log||[]).forEach(function(e){
+    if(!e || e.type !== 'status' || !e.ts) return;
+    var txt = String(e.text||'');
+    var m = txt.match(/^Status changed to (.+)$/);
+    if(m){
+      var key = Object.keys(TKT_STATUS).find(function(k){ return TKT_STATUS[k].label === m[1]; });
+      out.push({label:m[1], ts:e.ts, color:(key && TKT_STATUS[key].color) || 'var(--muted)'});
+      return;
+    }
+    if(txt.indexOf('▶ Work started') === 0){
+      out.push({label:'Work started', ts:e.ts, color:TKT_STATUS.work_in_progress.color});
+    }
+  });
+  out = out.filter(function(x,i){ return i === 0 || x.label !== out[i-1].label; });
+  var curLabel = (TKT_STATUS[t.status]||{}).label || t.status || 'Open';
+  if(!out.length || out[out.length-1].label !== curLabel){
+    out.push({label:curLabel, ts:t.updated || Date.now(), color:(TKT_STATUS[t.status]||{}).color || 'var(--muted)'});
+  }
+  if(out.length > 6){ out = [out[0], {gap:true}].concat(out.slice(out.length - 5)); }
+  return out;
+}
+function renderTicketJourney(t){
+  var host = document.getElementById('tkt-journey');
+  if(!host) return;
+  if(!t){ host.style.display = 'none'; return; }
+  var ms = distillTicketJourney(t);
+  if(ms.length < 2){ host.style.display = 'none'; return; }  // nothing to tell yet
+  var createdTs = ms[0].ts;
+  var lastAct = 0;
+  (t.log||[]).forEach(function(e){ if(e && e.ts > lastAct) lastAct = e.ts; });
+  if(!lastAct) lastAct = t.updated || createdTs;
+  var days = createdTs ? Math.max(0, Math.round((Date.now() - createdTs) / 86400000)) : null;
+  var evN = (t.log||[]).length;
+  var parts = [];
+  if(days !== null) parts.push(t.status === 'closed' ? 'Resolved' : ('Open ' + days + ' day' + (days === 1 ? '' : 's')));
+  parts.push(evN + ' event' + (evN === 1 ? '' : 's'));
+  if(lastAct) parts.push('last activity ' + _relAgo(lastAct));
+  host.innerHTML = ''
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px">'
+    +   '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);text-transform:uppercase;letter-spacing:.6px;font-weight:600">📍 Journey · ' + escHtml(parts.join(' · ')) + '</div>'
+    +   '<a href="#" onclick="event.preventDefault();openTicketTimeline()" style="font-size:10px;color:var(--accent2);font-family:var(--sans);white-space:nowrap;text-decoration:none;font-weight:700">Full timeline →</a>'
+    + '</div>'
+    + '<div style="display:flex;align-items:flex-start;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px">'
+    + ms.map(function(x, i){
+        if(x.gap) return '<div style="flex-shrink:0;color:var(--border2);padding:0 6px;font-size:13px;line-height:10px">⋯</div>';
+        var connector = (i > 0 && !ms[i-1].gap)
+          ? '<div style="flex:0 0 16px;height:2px;background:var(--border);margin-top:4px"></div>' : '';
+        return connector
+          + '<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
+          +   '<span style="width:10px;height:10px;border-radius:50%;background:' + x.color + ';display:block"></span>'
+          +   '<span style="font-size:9.5px;color:var(--text2);font-family:var(--sans);font-weight:600;text-align:center;line-height:1.25;margin-top:4px">' + escHtml(x.label) + '</span>'
+          +   '<span style="font-size:8.5px;color:var(--muted);font-family:var(--sans);margin-top:1px">' + _journeyDate(x.ts) + '</span>'
+          + '</div>';
+      }).join('')
+    + '</div>';
+  host.style.display = '';
+}
+
 function renderStatusFlow(currentStatus){
   var el = document.getElementById('tkt-status-flow');
   if(!el) return;
@@ -11570,6 +11651,7 @@ async function setTicketStatus(newStatus){
     document.getElementById('tkt-date-close').value = new Date().toISOString().slice(0,10);
   }
   renderStatusFlow(newStatus);
+  if(_currentTicketId && TICKETS[_currentTicketId]) renderTicketJourney(TICKETS[_currentTicketId]);
   // Reflect the new status on the in-memory ticket immediately (autoSaveTicket
   // is debounced, so the object may not be updated yet) and re-render the
   // supplier section so it shows/hides based on the new status without needing
@@ -11825,6 +11907,7 @@ async function startWorkOnItem(targetId){
   var statusSel = document.getElementById('tkt-status');
   if(statusSel) statusSel.value = 'work_in_progress';
   renderStatusFlow('work_in_progress');
+  renderTicketJourney(liveT);
   refreshStatusDropdownGating(liveT);
   refreshTicketHeaderCaption(liveT);
   renderTicketApprovalPanel(liveT);
@@ -13142,6 +13225,7 @@ function openTicketModal(ticketId){
   document.getElementById('tkt-doc-search').value = '';
   document.getElementById('tkt-doc-results').innerHTML = '';
   renderStatusFlow(t.status||'open');
+  renderTicketJourney(t);
   renderTicketApprovalPanel(t);
   refreshStatusDropdownGating(t);
 
@@ -13789,6 +13873,7 @@ function autoSaveTicket(){
       var s = TKT_STATUS[status]||TKT_STATUS.open;
       TICKETS[id].log.push({type:'status', text:'Status changed to '+s.label, ts:Date.now()});
       renderTicketLog(TICKETS[id]);
+      renderTicketJourney(TICKETS[id]);
       notifyReporterStatusChange(TICKETS[id], status);
     }
     var _delBtn = document.getElementById('tkt-delete-btn');
