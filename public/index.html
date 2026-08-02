@@ -259,7 +259,8 @@ var _SHARE_MODE = (function(){
 var _PUBLIC_MODE = (function(){
   try {
     var qs = new URLSearchParams(location.search);
-    if(qs.has('contact-public') || qs.get('report') === '1') return {kind: 'submit'};
+    // Canonical: ?report — legacy ?contact-public and ?report=1 keep working
+    if(qs.has('report') || qs.has('contact-public')) return {kind: 'submit'};
     var editTok = qs.get('reportEdit');
     if(editTok) return {kind: 'edit', token: editTok};
     // Per-supplier quote link: ?supplierQuote=<ticketId>&t=<token>&s=<supplierId>
@@ -15189,26 +15190,25 @@ function applyUserSession(userObj){
   if(role==='admin'){
     document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display='inline-flex'; });
   } else if(role==='trustee' || role==='management'){
-    // Trustees and management see the Tickets and Resolutions tabs. They get
-    // full ticket-level powers (approve quotes, change status, share links,
-    // manage attachments) and can vote on resolutions; the finance/admin
-    // tabs stay hidden. (Management has the same rights as a trustee — the
-    // only governance difference is that they don't count toward quorum,
-    // which is handled in checkMeetingQuorum, not here.)
-    ['transactions','expenses','income','invoices','suppliers','users','recon'].forEach(function(t){
+    // ROLLOUT LOCK: for now everyone except admin sees ONLY the Tracker.
+    // Trustees/management keep their full ticket-level powers (approve
+    // quotes, change status, share links, attachments); the other tabs
+    // (incl. Resolutions) stay hidden until they're opened up later.
+    ['dashboard','transactions','expenses','income','invoices','suppliers','resolutions','users','recon'].forEach(function(t){
       var tab = document.querySelector('[data-tab="'+t+'"]');
       if(tab) tab.style.display = 'none';
     });
-    ['tickets','resolutions'].forEach(function(t){
-      var tab = document.querySelector('[data-tab="'+t+'"]');
-      if(tab) tab.style.display = 'inline-flex';
-    });
+    var tmTab = document.querySelector('[data-tab="tickets"]');
+    if(tmTab) tmTab.style.display = 'inline-flex';
   } else if(role==='viewer'){
-    // Show only allowed tabs
-    ['transactions','expenses','income','invoices','suppliers','tickets','users'].forEach(function(t){
+    // ROLLOUT LOCK: viewers are also limited to the Tracker for now,
+    // regardless of their configured tab list.
+    ['dashboard','transactions','expenses','income','invoices','suppliers','resolutions','users','recon'].forEach(function(t){
       var tab = document.querySelector('[data-tab="'+t+'"]');
-      if(tab) tab.style.display = tabs.includes(t) ? 'inline-flex' : 'none';
+      if(tab) tab.style.display = 'none';
     });
+    var vTab = document.querySelector('[data-tab="tickets"]');
+    if(vTab) vTab.style.display = 'inline-flex';
   } else if(isResRole(role)){
     // Residents only see Tickets tab — hide everything else
     ['transactions','expenses','income','invoices','suppliers','resolutions','users','recon'].forEach(function(t){
@@ -15294,7 +15294,7 @@ function showSettingsModal(){
       var urlRow = document.getElementById('public-reports-url-row');
       var urlInput = document.getElementById('public-reports-url');
       if(urlRow) urlRow.style.display = PUBLIC_REPORTS_ENABLED ? '' : 'none';
-      if(urlInput) urlInput.value = location.origin + location.pathname + '?contact-public';
+      if(urlInput) urlInput.value = location.origin + location.pathname + '?report';
     }
   }
   // Refresh devices section visibility + content based on session state
@@ -15309,7 +15309,7 @@ async function onPublicReportsToggle(enabled){
   var urlRow = document.getElementById('public-reports-url-row');
   if(urlRow) urlRow.style.display = enabled ? '' : 'none';
   var urlInput = document.getElementById('public-reports-url');
-  if(urlInput) urlInput.value = location.origin + location.pathname + '?contact-public';
+  if(urlInput) urlInput.value = location.origin + location.pathname + '?report';
 }
 // Robust clipboard copy used by the various "Copy link" buttons. Three
 // layers of fallback because clipboard support varies a lot in the wild:
@@ -18014,6 +18014,29 @@ async function renderPublicEditView(token){
   if(!ticket){
     console.warn('public edit: no ticket matched token "'+wanted+'". Tickets loaded: '+Object.keys(TICKETS).length
       +'. Tokens present: '+Object.values(TICKETS).map(function(t){return t&&t.reporterEditToken;}).filter(Boolean).length);
+  }
+  if(!ticket){
+    // Cross-scheme rescue: the link is often opened in a fresh browser (e.g.
+    // WhatsApp's in-app browser) whose default scheme can differ from the one
+    // the report was filed under — the scoped load above then sees nothing.
+    // Search ALL rows for the token and adopt that scheme so every subsequent
+    // load/save scopes correctly.
+    try {
+      const { data: allRows } = await supa.from('tickets').select('id, data');
+      var hit = (allRows||[]).find(function(r){ return r && r.data && String(r.data.reporterEditToken||'').trim() === wanted; });
+      if(hit){
+        var m = String(hit.id).match(/^([a-z0-9]{2,12}):/i);
+        var hitScheme = m ? m[1] : SCHEME_DEFAULT_ID;
+        if(hitScheme !== CURRENT_SCHEME){
+          CURRENT_SCHEME = hitScheme;
+          try { localStorage.setItem('pm_active_scheme', hitScheme); } catch(e){}
+          console.log('public edit: adopted scheme "'+hitScheme+'" from token match');
+        }
+        var uid = m ? hit.id.slice(m[0].length) : hit.id;
+        TICKETS[uid] = hit.data;
+        ticket = hit.data;
+      }
+    } catch(e){ console.warn('public edit: cross-scheme lookup failed', e); }
   }
   if(ticket){
     try {
