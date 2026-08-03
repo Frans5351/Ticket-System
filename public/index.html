@@ -902,7 +902,7 @@ async function checkStorageSetup(){
   .sidebar-section label{display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
   input[type="text"],input[type="date"],select{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:6px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s}
   input:focus,select:focus{border-color:var(--accent)}
-  select option{background:#1e1e24}
+  select option{background:var(--surface);color:var(--text)}
   .date-range,.amount-filter{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .chips{display:flex;flex-wrap:wrap;gap:5px}
   .chip{padding:3px 9px;border-radius:20px;font-size:11px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted);transition:all .15s}
@@ -3569,6 +3569,167 @@ function renderInvoices(){
   }).join('');
 }
 
+// \u2500 In-app spreadsheet preview (xls/xlsx/csv) via SheetJS \u2500
+function _isSpreadsheet(inv, nm){
+  var mt = String((inv && inv.type) || '');
+  return mt === 'application/vnd.ms-excel'
+    || mt === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    || mt === 'text/csv'
+    || /\.(xlsx|xls|csv)(\s|$)/i.test(String(nm||''));
+}
+var _sheetJsPromise = null;
+function _loadSheetJs(){
+  if(window.XLSX) return Promise.resolve();
+  if(_sheetJsPromise) return _sheetJsPromise;
+  _sheetJsPromise = new Promise(function(resolve, reject){
+    var sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js';
+    sc.onload = function(){ resolve(); };
+    sc.onerror = function(){ _sheetJsPromise = null; reject(new Error('SheetJS failed to load')); };
+    document.head.appendChild(sc);
+  });
+  return _sheetJsPromise;
+}
+async function renderSpreadsheetPreview(prev, src, name){
+  prev.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:var(--mono);padding:30px">\ud83d\udcca Opening spreadsheet\u2026</div>';
+  try {
+    await _loadSheetJs();
+    var buf = await fetch(src).then(function(r){ return r.arrayBuffer(); });
+    var wb = XLSX.read(buf, {type:'array', cellStyles:true});
+    window._sheetWb = wb;
+    window._sheetName = name;
+    _renderSheetTab(prev, 0);
+  } catch(e){
+    console.warn('spreadsheet preview failed', e);
+    prev.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:var(--mono)">\ud83d\udcc4 '+escHtml(name)+'<br><br>Could not preview this spreadsheet.<br><br><a href="'+src+'" download="'+escHtml(name)+'" style="color:var(--accent)">Download</a></div>';
+  }
+}
+function _renderSheetTab(prev, idx){
+  var wb = window._sheetWb;
+  if(!wb) return;
+  var names = wb.SheetNames || [];
+  var sheet = wb.Sheets[names[idx]];
+  if(!sheet || !sheet['!ref']){ prev.innerHTML = '<div style="color:var(--muted);font-family:var(--sans);font-size:12px;padding:20px">This sheet is empty.</div>'; return; }
+  var range = XLSX.utils.decode_range(sheet['!ref']);
+
+  // Trim to the actually-used rectangle
+  var minR = range.e.r, maxR = range.s.r, minC = range.e.c, maxC = range.s.c, any = false;
+  for(var R = range.s.r; R <= range.e.r; R++){
+    for(var C = range.s.c; C <= range.e.c; C++){
+      var cell = sheet[XLSX.utils.encode_cell({r:R, c:C})];
+      var val = cell && (cell.w != null ? cell.w : cell.v);
+      if(val != null && String(val).trim() !== ''){
+        any = true;
+        if(R < minR) minR = R; if(R > maxR) maxR = R;
+        if(C < minC) minC = C; if(C > maxC) maxC = C;
+      }
+    }
+  }
+  if(!any){ prev.innerHTML = '<div style="color:var(--muted);font-family:var(--sans);font-size:12px;padding:20px">This sheet is empty.</div>'; return; }
+  var MAXR = 400;
+  var over = (maxR - minR + 1) > MAXR;
+  if(over) maxR = minR + MAXR - 1;
+
+  var merges = sheet['!merges'] || [];
+  var anchor = {}, covered = {};
+  merges.forEach(function(m){
+    anchor[m.s.r + '_' + m.s.c] = {cs: m.e.c - m.s.c + 1, rs: m.e.r - m.s.r + 1};
+    for(var r2 = m.s.r; r2 <= m.e.r; r2++){
+      for(var c2 = m.s.c; c2 <= m.e.c; c2++){
+        if(r2 !== m.s.r || c2 !== m.s.c) covered[r2 + '_' + c2] = true;
+      }
+    }
+  });
+
+  var colsMeta = sheet['!cols'] || [];
+  function colPx(C){
+    var w = colsMeta[C] && (colsMeta[C].wch || colsMeta[C].width);
+    if(!w) return 64;
+    return Math.max(26, Math.min(440, Math.round(w * 7)));
+  }
+  var colgroup = '<colgroup>';
+  for(var C3 = minC; C3 <= maxC; C3++) colgroup += '<col style="width:' + colPx(C3) + 'px">';
+  colgroup += '</colgroup>';
+
+  function hex6(o){
+    var rgb = o && o.rgb;
+    if(!rgb || typeof rgb !== 'string') return null;
+    var h = rgb.slice(-6);
+    return /^[0-9a-fA-F]{6}$/.test(h) ? h : null;
+  }
+  function cellCss(cell2, isNum){
+    var st = (cell2 && cell2.s) || {};
+    var css = '';
+    var f = st.font || {};
+    css += 'font-size:' + (f.sz ? Math.round(f.sz * 1.3) : 13) + 'px;';
+    if(f.bold) css += 'font-weight:700;';
+    if(f.italic) css += 'font-style:italic;';
+    if(f.underline) css += 'text-decoration:underline;';
+    var fc = hex6(f.color);
+    css += 'color:#' + (fc && fc.toLowerCase() !== 'ffffff' ? fc : '1c2733') + ';';
+    var fill = st.fill || {};
+    var bg = hex6(fill.fgColor);
+    if(fill.patternType === 'solid' && bg && bg.toLowerCase() !== '000000'){
+      css += 'background:#' + bg + ';';
+      // white text on genuinely dark fills stays visible
+      var lum = parseInt(bg.slice(0,2),16)*0.3 + parseInt(bg.slice(2,4),16)*0.59 + parseInt(bg.slice(4,6),16)*0.11;
+      if(lum < 110 && !fc) css += 'color:#ffffff;';
+    }
+    var al = (st.alignment || {}).horizontal;
+    css += 'text-align:' + (al || (isNum ? 'right' : 'left')) + ';';
+    var b = st.border || {};
+    // Excel documents show only their own borders \u2014 no synthetic grid.
+    function bs(side){
+      if(!side || !side.style) return 'none';
+      var w = (side.style === 'medium' || side.style === 'thick') ? '2px' : '1px';
+      var bc = hex6(side.color);
+      return w + ' solid #' + (bc || '9aa1ad');
+    }
+    css += 'border-top:' + bs(b.top) + ';border-bottom:' + bs(b.bottom) + ';border-left:' + bs(b.left) + ';border-right:' + bs(b.right) + ';';
+    return css;
+  }
+
+  var rowsMeta = sheet['!rows'] || [];
+  var rowsHtml = '';
+  for(var R2 = minR; R2 <= maxR; R2++){
+    var tr = '';
+    var rowEmpty = true;
+    var rH = rowsMeta[R2] && (rowsMeta[R2].hpx || (rowsMeta[R2].hpt ? Math.round(rowsMeta[R2].hpt * 1.33) : 0));
+    for(var C2 = minC; C2 <= maxC; C2++){
+      if(covered[R2 + '_' + C2]) continue;
+      var cell2 = sheet[XLSX.utils.encode_cell({r:R2, c:C2})];
+      var raw = cell2 ? (cell2.w != null ? cell2.w : cell2.v) : '';
+      var text = raw == null ? '' : String(raw);
+      if(text.trim() !== '') rowEmpty = false;
+      var isNum = cell2 && cell2.t === 'n';
+      var mg = anchor[R2 + '_' + C2];
+      var span = mg ? (' colspan="' + mg.cs + '" rowspan="' + mg.rs + '"') : '';
+      tr += '<td' + span + ' style="padding:3px 7px;font-family:Calibri,Arial,sans-serif;vertical-align:top;white-space:pre-wrap;word-break:break-word;line-height:1.35;' + cellCss(cell2, isNum) + (isNum ? 'font-variant-numeric:tabular-nums;' : '') + '">' + escHtml(text) + '</td>';
+    }
+    if(rowEmpty){
+      if(rowsHtml.slice(-11) === '<!--spcr-->') continue;
+      rowsHtml += '<tr style="height:8px"><td colspan="' + (maxC - minC + 1) + '" style="border:none;padding:0"></td></tr><!--spcr-->';
+    } else {
+      rowsHtml += '<tr' + (rH ? ' style="height:' + rH + 'px"' : '') + '>' + tr + '</tr>';
+    }
+  }
+  rowsHtml = rowsHtml.split('<!--spcr-->').join('');
+
+  if(!prev.id) prev.id = 'sheet-host-' + Date.now();
+  var hostId = prev.id;
+  var tabs = names.length > 1
+    ? '<div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">' + names.map(function(n, i2){
+        return '<button onclick="_renderSheetTab(document.getElementById(\'' + hostId + '\'),' + i2 + ')" style="padding:4px 12px;border-radius:7px;border:1px solid ' + (i2 === idx ? 'var(--accent)' : 'var(--border2)') + ';background:' + (i2 === idx ? 'var(--accent-bg)' : 'var(--surface)') + ';color:' + (i2 === idx ? 'var(--accent2)' : 'var(--muted)') + ';font-size:11px;font-family:var(--sans);font-weight:600;cursor:pointer">' + escHtml(n) + '</button>';
+      }).join('') + '</div>'
+    : '';
+  // White paper regardless of app theme \u2014 the document's own colours assume it
+  prev.innerHTML = tabs
+    + '<div style="max-height:480px;overflow:auto;border:1px solid var(--border);border-radius:8px;background:#ffffff;padding:14px">'
+    +   '<table style="border-collapse:collapse;table-layout:fixed;background:#ffffff">' + colgroup + rowsHtml + '</table>'
+    + '</div>'
+    + (over ? '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);margin-top:6px">Showing the first ' + MAXR + ' rows \u2014 download for the full sheet.</div>' : '');
+}
+
 function openInvModalById(safeId){
   var id = safeId.replace(/__/g,'|');
   if(id.startsWith('att|')){
@@ -3706,6 +3867,8 @@ function openInvModal(invId){
     +'</div>';
   } else if(isPdf && src){
     prev.innerHTML = '<iframe src="'+src+'" style="width:100%;height:500px;border:none;border-radius:6px"></iframe>';
+  } else if(_isSpreadsheet(inv, nm) && src){
+    renderSpreadsheetPreview(prev, src, inv.name || 'spreadsheet');
   } else if(src){
     prev.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:var(--mono)">📄 '+escHtml(inv.name)+'<br><br><a href="'+src+'" download="'+escHtml(inv.name)+'" style="color:var(--accent)">Download</a></div>';
   } else {
@@ -3844,7 +4007,7 @@ function _invShowReuploadUI(invId, message){
     +   '<div style="font-size:11px;color:var(--muted);line-height:1.6">'+escHtml(message || 'This file could not be loaded.')+'</div>'
     +   '<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-top:-4px"><b style="color:var(--text2)">'+safeName+'</b></div>'
     +   '<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:280px;margin-top:6px">'
-    +     '<input type="file" id="inv-reupload-file" accept="image/*,application/pdf,audio/*,video/*" onchange="_invDoReupload(\''+safeId+'\')" style="display:none">'
+    +     '<input type="file" id="inv-reupload-file" accept="image/*,application/pdf,audio/*,video/*,.xls,.xlsx,.csv" onchange="_invDoReupload(\''+safeId+'\')" style="display:none">'
     +     '<button type="button" onclick="document.getElementById(\'inv-reupload-file\').click()" style="padding:10px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">↑ Re-upload the file</button>'
     +     '<div id="inv-reupload-status" style="font-size:10px;color:var(--muted);font-family:var(--mono);min-height:14px"></div>'
     +   '</div>'
@@ -5775,7 +5938,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">
       <label id="inv-upload-btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--accent);border-radius:7px;font-size:12px;color:#fff;font-family:var(--mono);font-weight:500;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
         ➕ Add Document
-        <input type="file" id="inv-file-input" multiple accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.gif,.webp" style="display:none" onchange="handleInvoiceUpload(this)">
+        <input type="file" id="inv-file-input" multiple accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.gif,.webp,.xls,.xlsx,.csv" style="display:none" onchange="handleInvoiceUpload(this)">
       </label>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <button onclick="toggleInvFilter('assigned')" id="inv-filter-assigned" class="inv-filter-btn">Assigned</button>
@@ -5820,14 +5983,14 @@ document.getElementById('tbody').addEventListener('click', function(e){
       <!-- Preview -->
       <div id="inv-modal-preview" style="flex:1;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;min-height:300px;border-right:1px solid var(--border)"></div>
       <!-- Right panel: notes + linked transactions -->
-      <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column">
+      <div style="width:300px;flex-shrink:0;display:flex;flex-direction:column">
         <!-- Invoice details: 4 separate fields -->
-        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px">
-          <div style="font-size:11px;color:#7a9cc0;font-family:var(--mono);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Document Details</div>
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:10px">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--sans);font-weight:700;text-transform:uppercase;letter-spacing:.7px;display:flex;justify-content:space-between;align-items:baseline">Document Details<span style="font-weight:500;letter-spacing:0;text-transform:none;opacity:.65">saves automatically</span></div>
           <div style="display:flex;gap:8px">
             <div style="flex:1">
-              <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Document Type</div>
-              <select id="inv-doctype-input" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box" onchange="saveInvoiceDetails()">
+              <div style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Document Type</div>
+              <select id="inv-doctype-input" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;box-sizing:border-box" onchange="saveInvoiceDetails()">
                 <option value="">— Type —</option>
                 <option value="Invoice">Invoice</option>
                 <option value="Quote">Quote</option>
@@ -5841,35 +6004,35 @@ document.getElementById('tbody').addEventListener('click', function(e){
               </select>
             </div>
             <div style="flex:1">
-              <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Company / Supplier</div>
-              <input id="inv-company-input" type="text" list="supplier-datalist" placeholder="Supplier name" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()">
+              <div style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Company / Supplier</div>
+              <input id="inv-company-input" type="text" list="supplier-datalist" placeholder="Supplier name" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()">
             </div>
           </div>
           <div>
-            <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Reference Number</div>
-            <input id="inv-number-input" type="text" placeholder="e.g. INV-2024-001" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()">
+            <div style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Reference Number</div>
+            <input id="inv-number-input" type="text" placeholder="e.g. INV-2024-001" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()">
           </div>
           <div style="display:flex;gap:8px">
             <div style="flex:1">
-              <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Amount (R)</div>
-              <input id="inv-amount-input" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()">
+              <div style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Amount (R)</div>
+              <input id="inv-amount-input" type="number" min="0" step="0.01" placeholder="0.00" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()">
             </div>
             <div style="flex:1">
-              <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Date</div>
-              <input id="inv-date-input" type="date" style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()" onchange="if(_currentInvId){clearTimeout(_invDetailTimer);flushInvoiceDetails(_currentInvId);}">
+              <div style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Date</div>
+              <input id="inv-date-input" type="date" style="width:100%;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()" onchange="if(_currentInvId){clearTimeout(_invDetailTimer);flushInvoiceDetails(_currentInvId);}">
             </div>
           </div>
           <div>
-            <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Notes</div>
-            <textarea id="inv-notes-input" placeholder="Supplier, reference, description..." style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--mono);padding:7px 8px;resize:none;outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()"></textarea>
+            <div style="font-size:9.5px;color:var(--muted);font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Notes</div>
+            <textarea id="inv-notes-input" placeholder="Supplier, reference, description..." style="width:100%;height:58px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--sans);padding:8px 10px;resize:none;outline:none;box-sizing:border-box" oninput="saveInvoiceDetails()"></textarea>
           </div>
         </div>
         <!-- Linked transactions -->
-        <div style="flex:1;overflow-y:auto;padding:14px 16px">
-          <div style="font-size:11px;color:#7a9cc0;font-family:var(--mono);font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Linked Transactions</div>
+        <div style="flex:1;overflow-y:auto;padding:14px 18px">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--sans);font-weight:700;margin-bottom:9px;text-transform:uppercase;letter-spacing:.7px">Linked Transactions</div>
           <div id="inv-linked-list" style="display:flex;flex-direction:column;gap:6px"></div>
           <div id="inv-link-search-wrap" style="margin-top:10px">
-            <input id="inv-link-search" type="text" placeholder="Search transactions to link…" style="width:100%;padding:6px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--mono);outline:none;box-sizing:border-box" oninput="renderLinkSearch()">
+            <input id="inv-link-search" type="text" placeholder="Search transactions to link…" style="width:100%;padding:8px 11px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--sans);outline:none;box-sizing:border-box" oninput="renderLinkSearch()">
             <div id="inv-link-results" style="margin-top:6px;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>
           </div>
         </div>
@@ -5970,7 +6133,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
             <div id="sp-quote-doc-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <button type="button" id="sp-quote-attach-btn" onclick="document.getElementById('sp-quote-file').click()" style="padding:8px 14px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;color:var(--accent2);font-size:12px;font-family:var(--mono);cursor:pointer">📎 Choose file</button>
               <span id="sp-quote-doc-name" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
-              <input id="sp-quote-file" type="file" accept="application/pdf,image/*" style="display:none" onchange="spQuoteFilePicked(this)">
+              <input id="sp-quote-file" type="file" accept="application/pdf,image/*,.xls,.xlsx,.csv" style="display:none" onchange="spQuoteFilePicked(this)">
             </div>
           </div>
           <div id="sp-quote-err" style="color:#f06f6f;font-size:11px;font-family:var(--mono);margin-top:10px;min-height:14px"></div>
@@ -7878,7 +8041,7 @@ function deleteDuplicates(){
     <div style="padding:10px 18px;border-top:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:10px">
       <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;font-size:12px;color:var(--muted);font-family:var(--mono);transition:color .15s" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">
         ➕ Add more files
-        <input type="file" multiple accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.gif,.webp" style="display:none" onchange="handleAttachFiles(_carouselKey,this)">
+        <input type="file" multiple accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.gif,.webp,.xls,.xlsx,.csv" style="display:none" onchange="handleAttachFiles(_carouselKey,this)">
       </label>
       <span style="font-size:11px;color:#5a7fa8;font-family:var(--mono)">Images, PDFs accepted</span>
     </div>
@@ -7886,7 +8049,7 @@ function deleteDuplicates(){
 </div>
 
 <!-- Hidden file input for initial attach -->
-<input type="file" id="attach-file-input" multiple accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.gif,.webp" style="display:none">
+<input type="file" id="attach-file-input" multiple accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.gif,.webp,.xls,.xlsx,.csv" style="display:none">
 
 <style>
   .th-attach{width:36px;text-align:center;color:var(--muted);font-size:13px}
@@ -11846,7 +12009,10 @@ function renderTicketJourney(t){
     if(x.docId){
       var safeId = String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'');
       var vIdx = (t.linkedDocIds||[]).indexOf(x.docId);
-      clickable = (x.viewer && vIdx !== -1)
+      // Clicking any document milestone just VIEWS it (carousel \u2014 clean,
+      // flippable). Editing its details is the explicit \u270f button on the
+      // hover card.
+      clickable = (vIdx !== -1)
         ? ' onclick="openTktViewer(' + vIdx + ')"'
         : ' onclick="openInvModal(\'' + safeId + '\')"';
     }
@@ -12031,7 +12197,7 @@ function journeyHover(el, idx){
       var d0 = INVOICES[x.docId];
       if(d0 && d0.invCompany && d0.invCompany !== '(public submission)') body += _jnRow('From', escHtml(d0.invCompany));
       if(d0 && (d0.amount != null) && !isNaN(parseFloat(d0.amount))) body += _jnRow('Amount', 'R ' + Number(parseFloat(d0.amount)).toLocaleString('en-ZA', {maximumFractionDigits:0}));
-      body += '<div style="font-size:9px;color:var(--muted);margin-top:6px">Click the milestone to open</div>';
+      body += '<div style="font-size:9px;color:var(--muted);margin-top:6px">Click the milestone to view' + (_currentRole === 'admin' ? ' \u00b7 \u270f below to edit' : '') + '</div>';
     } else if(x.kind === 'note'){
       var en = parts[0] === 'log' ? (t.log||[])[parseInt(parts[1],10)] : null;
       body += _jnRow('Note', escHtml(String((en && en.text) || x.fullText || '')));
@@ -12060,8 +12226,10 @@ function journeyHover(el, idx){
     var oBtn = '';
     if(x.docId){
       var oIdx2 = (t.linkedDocIds||[]).indexOf(x.docId);
-      var oCall = (x.viewer && oIdx2 !== -1) ? ('openTktViewer(' + oIdx2 + ')') : ('openInvModal(\'' + String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'') + '\')');
-      oBtn = '<button onclick="journeyHoverHide();' + oCall + '" title="Open">\ud83d\udc41</button>';
+      var dSafe = String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'');
+      var vCall = (oIdx2 !== -1) ? ('openTktViewer(' + oIdx2 + ')') : ('openInvModal(\'' + dSafe + '\')');
+      oBtn = '<button onclick="journeyHoverHide();' + vCall + '" title="View">\ud83d\udc41</button>'
+        + '<button onclick="journeyHoverHide();openInvModal(\'' + dSafe + '\')" title="Edit details (type, amount, supplier)">\u270f</button>';
     }
     actions = '<div id="jn-card-actions">'
       + '<button onclick="journeyHoverHide();journeyEditTime(' + idx + ')" title="Edit date/time">\ud83d\udd52</button>'
@@ -15307,6 +15475,15 @@ function renderTktViewer(){
       +'</div>'
       +'<iframe src="'+safePdfSrc+'" style="width:min(860px,100%);height:100%;border:none;border-radius:8px" '
         +'onload="var s=document.getElementById(\'tkt-viewer-spinner\');if(s)s.remove();"></iframe>';
+  } else if(_isSpreadsheet(inv, inv.name||'') && src){
+    // Spreadsheets render in-place inside the carousel too \u2014 same engine
+    // as the document modal, wrapped in a white sheet for readability.
+    content.innerHTML = '<div id="tkt-viewer-sheet" style="width:min(880px,96%);max-height:82vh;overflow:auto;background:var(--surface);border-radius:10px;padding:14px">'
+      + '<div style="text-align:center;color:var(--muted);font-family:var(--mono);padding:24px">📊 Opening spreadsheet\u2026</div></div>';
+    (function(){
+      var box = document.getElementById('tkt-viewer-sheet');
+      renderSpreadsheetPreview(box, src, inv.name || 'spreadsheet');
+    })();
   } else if(src){
     content.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:var(--mono)"><div style="font-size:48px;margin-bottom:16px">📄</div><div>'+escHtml(inv.name)+'</div><br><a href="'+src+'" download="'+escHtml(inv.name)+'" style="color:var(--accent)">Download</a></div>';
   } else {
