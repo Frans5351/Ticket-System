@@ -1223,6 +1223,12 @@ async function checkStorageSetup(){
   .jn-node:hover .jn-menu{display:flex}
   .jn-menu button{border:none;background:none;font-size:11px;padding:3px 6px;cursor:pointer;border-radius:5px;line-height:1}
   .jn-menu button:hover{background:var(--surface2)}
+  .jn-conn .jn-add{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:12px;line-height:1;cursor:pointer;padding:0;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(15,25,40,.25)}
+  .jn-conn:hover .jn-add{display:flex}
+  #jn-card{position:fixed;z-index:5000;width:232px;background:var(--surface);border:1px solid var(--border2);border-radius:11px;box-shadow:0 8px 24px rgba(15,25,40,.2);padding:11px 13px;font-family:var(--sans);box-sizing:border-box}
+  #jn-card-actions{display:flex;gap:2px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border)}
+  #jn-card-actions button{border:1px solid var(--border);background:var(--surface2);font-size:11px;padding:4px 7px;cursor:pointer;border-radius:6px;line-height:1}
+  #jn-card-actions button:hover{background:var(--accent-bg);border-color:var(--accent-bd)}
   .tkt-vt{padding:6px 11px;background:var(--surface);border:none;color:var(--muted);font-size:13px;cursor:pointer;line-height:1}
   .tkt-vt.active{background:var(--accent-bg);color:var(--accent2)}
   @media(min-width:900px){ #tkt-view-toggle{display:inline-flex !important} }
@@ -11623,6 +11629,10 @@ function distillTicketJourney(t){
   (t.log||[]).forEach(function(e, _li){
     if(!e || !e.ts || _hid('log:'+_li)) return;
     var txt = String(e.text||'');
+    if(e.type === 'note' && e.journey){
+      out.push({label:'\ud83d\udcdd ' + (txt.length > 16 ? txt.slice(0,15) + '\u2026' : txt), ts:e.ts, color:'var(--muted)', kind:'note', ref:'log:'+_li, fullText:txt});
+      return;
+    }
     if(e.type === 'status'){
       var m = txt.match(/^Status changed to (.+)$/);
       if(m){
@@ -11635,7 +11645,9 @@ function distillTicketJourney(t){
         return;
       }
       if(txt.indexOf('+ Proposal added') === 0){
-        out.push({label:'\ud83d\udca1 Proposal', ts:e.ts, color:'var(--accent2)', kind:'proposal', ref:'log:'+_li});
+        var _pAmt = (e.amount != null && !isNaN(parseFloat(e.amount)))
+          ? ' \u00b7 R ' + Number(parseFloat(e.amount)).toLocaleString('en-ZA', {maximumFractionDigits:0}) : '';
+        out.push({label:'\ud83d\udca1 Proposal' + _pAmt, ts:e.ts, color:'var(--accent2)', kind:'proposal', ref:'log:'+_li, fullText:txt, amount:e.amount});
         return;
       }
     }
@@ -11667,9 +11679,33 @@ function distillTicketJourney(t){
   });
   if(grp) out.push(grp.node());
 
+  // Approvals FOLD INTO the node they approved (quote/doc/proposal) instead
+  // of floating as separate name-dots \u2014 the node gets a \u2713n badge and the
+  // hover card lists who approved and when. Approvals whose target has no
+  // node fall back to the latest proposal, then to standalone dots.
+  var _pendApprs = [];
   (t.approvals||[]).forEach(function(a, _ai){
-    if(a && a.ts && !_hid('appr:'+_ai)) out.push({label:'\u2713 ' + String(a.trusteeName||'Approved').split(' ')[0], ts:a.ts, color:'var(--green)', kind:'approval', ref:'appr:'+_ai});
+    if(!a || !a.ts || _hid('appr:'+_ai)) return;
+    var nm = String(a.trusteeName||'Trustee').split(' ')[0];
+    var target = a.invId || a.quoteId || a.targetId || null;
+    var hostNode = target ? out.find(function(x){ return x.docId && x.docId === target; }) : null;
+    if(hostNode){
+      (hostNode.approvers = hostNode.approvers || []).push({name:nm, ts:a.ts, ai:_ai, target:target});
+    } else {
+      _pendApprs.push({name:nm, ts:a.ts, ai:_ai, target:target});
+    }
   });
+  if(_pendApprs.length){
+    var propNodes = out.filter(function(x){ return x.kind === 'proposal'; });
+    if(propNodes.length){
+      var pn = propNodes[propNodes.length - 1];
+      pn.approvers = (pn.approvers || []).concat(_pendApprs);
+    } else {
+      _pendApprs.forEach(function(p){
+        out.push({label:'\u2713 ' + p.name, ts:p.ts, color:'var(--green)', kind:'approval', ref:'appr:'+p.ai, approver:p});
+      });
+    }
+  }
   if(t.approvedAt && !_hid('accepted')){
     out.push({label:'\ud83c\udfc1 Accepted', ts:t.approvedAt, color:'var(--green)', kind:'accepted', ref:'accepted'});
   }
@@ -11800,7 +11836,9 @@ function renderTicketJourney(t){
       var gapD = gapMs / 86400000;
       var w = Math.min(46, 14 + Math.round(Math.log2(gapD + 1) * 8));
       var gapTip = gapD >= 1 ? Math.round(gapD) + 'd later' : 'same day';
-      connector = '<div title="' + gapTip + '" style="flex:0 0 ' + w + 'px;height:2px;background:var(--border);margin-top:4px"></div>';
+      connector = '<div class="jn-conn" title="' + gapTip + '" style="flex:0 0 ' + w + 'px;height:2px;background:var(--border);margin-top:4px;position:relative">'
+        + (isAdminJ ? '<button class="jn-add" onclick="journeyInsertBetween(' + i + ')" title="Insert a note or file here">+</button>' : '')
+        + '</div>';
     }
     var ring = (i === lastRealIdx && x.kind === 'status')
       ? 'outline:2px solid ' + x.color + ';outline-offset:2px;' : '';
@@ -11815,28 +11853,22 @@ function renderTicketJourney(t){
     var cursor = x.docId ? 'cursor:pointer;' : '';
     var underline = x.docId ? 'text-decoration:underline;text-decoration-color:var(--border2);text-underline-offset:2px;' : '';
     var adminAttrs = '';
-    var menu = '';
     if(isAdminJ && x.ref){
       adminAttrs = ' draggable="true"'
         + ' ondragstart="event.dataTransfer.setData(\'text/plain\',String(' + i + '))"'
         + ' ondragover="event.preventDefault();this.style.opacity=.55"'
         + ' ondragleave="this.style.opacity=1"'
         + ' ondrop="this.style.opacity=1;journeyDropAt(' + i + ', event)"';
-      var openBtn = '';
-      if(x.docId){
-        var oIdx = (t.linkedDocIds||[]).indexOf(x.docId);
-        openBtn = '<button title="Open" onclick="event.stopPropagation();' + ((x.viewer && oIdx !== -1) ? ('openTktViewer(' + oIdx + ')') : ('openInvModal(\'' + String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'') + '\')')) + '">\ud83d\udc41</button>';
-      }
-      menu = '<span class="jn-menu">'
-        + '<button title="Edit date/time" onclick="event.stopPropagation();journeyEditTime(' + i + ')">\ud83d\udd52</button>'
-        + openBtn
-        + '<button title="Hide from journey" onclick="event.stopPropagation();journeyHideNode(' + i + ')">\u2715</button>'
-        + '</span>';
     }
+    var apprBadge = (x.approvers && x.approvers.length)
+      ? '<span style="position:absolute;top:-7px;right:-11px;font-size:7.5px;background:var(--green);color:#fff;border-radius:99px;padding:1px 4px;font-weight:700;line-height:1.4">\u2713' + x.approvers.length + '</span>'
+      : '';
     return connector
-      + '<div class="jn-node"' + adminAttrs + clickable + ' title="' + escHtml(x.tip || '') + '" style="' + cursor + 'position:relative;flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
-      +   menu
-      +   '<span style="' + ring + 'width:10px;height:10px;border-radius:50%;background:' + x.color + ';display:block"></span>'
+      + '<div class="jn-node"' + adminAttrs + clickable + ' onmouseenter="journeyHover(this,' + i + ')" onmouseleave="journeyHoverSoon()" style="' + cursor + 'position:relative;flex-shrink:0;display:flex;flex-direction:column;align-items:center;max-width:94px;min-width:52px">'
+      +   '<span style="position:relative;display:block">'
+      +     '<span style="' + ring + 'width:10px;height:10px;border-radius:50%;background:' + x.color + ';display:block"></span>'
+      +     apprBadge
+      +   '</span>'
       +   '<span style="' + underline + 'font-size:9.5px;color:var(--text2);font-family:var(--sans);font-weight:600;text-align:center;line-height:1.25;margin-top:4px">' + escHtml(x.label) + '</span>'
       +   '<span style="font-size:8.5px;color:var(--muted);font-family:var(--sans);margin-top:1px">' + _journeyDate(x.ts) + '</span>'
       + '</div>';
@@ -11951,6 +11983,222 @@ function journeyHideNode(idx){
   t.updated = Date.now();
   saveTickets([t.id]).catch(function(e){ console.warn('journey hide save', e); });
   renderTicketJourney(t);
+}
+// \u2500 Rich hover card: info per item type + admin actions \u2500
+var _jnHideTimer = null;
+function journeyHoverSoon(){
+  clearTimeout(_jnHideTimer);
+  _jnHideTimer = setTimeout(journeyHoverHide, 180);
+}
+function journeyHoverKeep(){ clearTimeout(_jnHideTimer); }
+function journeyHoverHide(){
+  var c = document.getElementById('jn-card');
+  if(c) c.remove();
+}
+function _jnRow(label, value){
+  if(!value) return '';
+  return '<div style="margin-top:6px"><div style="font-size:8.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700">' + label + '</div>'
+    + '<div style="font-size:11px;color:var(--text2);line-height:1.45;margin-top:1px">' + value + '</div></div>';
+}
+function journeyHover(el, idx){
+  clearTimeout(_jnHideTimer);
+  journeyHoverHide();
+  var t = TICKETS[_journeyTid];
+  var x = _journeyMs && _journeyMs[idx];
+  if(!t || !x) return;
+  var head = escHtml(x.label.replace(/^[^A-Za-z0-9]+\s*/, '')) || 'Event';
+  var body = '';
+  body += _jnRow('When', escHtml(_journeyFullDate(x.ts)));
+  try {
+    var parts = (x.ref||'').split(':');
+    if(x.kind === 'proposal'){
+      var e = parts[0] === 'log' ? (t.log||[])[parseInt(parts[1],10)] : null;
+      var raw = String((e && e.text) || x.fullText || '');
+      var pm = raw.match(/^\+ Proposal added by ([^:]+):\s*(.*)$/);
+      if(pm){
+        body += _jnRow('Proposed by', escHtml(pm[1].trim()));
+        body += _jnRow('Proposal', escHtml(pm[2].trim() || raw));
+      } else {
+        body += _jnRow('Proposal', escHtml(raw));
+      }
+      if(e && e.amount != null && !isNaN(parseFloat(e.amount))){
+        body += _jnRow('Amount', 'R ' + Number(parseFloat(e.amount)).toLocaleString('en-ZA', {maximumFractionDigits:0}));
+      }
+    } else if(x.kind === 'doc'){
+      var ids = x.groupIds && x.groupIds.length ? x.groupIds : (x.docId ? [x.docId] : []);
+      var names = ids.map(function(id){ var d = INVOICES[id]; return d ? escHtml(d.name || d.filename || 'file') : ''; }).filter(Boolean);
+      body += _jnRow(ids.length > 1 ? 'Files' : 'Document', names.join('<br>'));
+      var d0 = INVOICES[x.docId];
+      if(d0 && d0.invCompany && d0.invCompany !== '(public submission)') body += _jnRow('From', escHtml(d0.invCompany));
+      if(d0 && (d0.amount != null) && !isNaN(parseFloat(d0.amount))) body += _jnRow('Amount', 'R ' + Number(parseFloat(d0.amount)).toLocaleString('en-ZA', {maximumFractionDigits:0}));
+      body += '<div style="font-size:9px;color:var(--muted);margin-top:6px">Click the milestone to open</div>';
+    } else if(x.kind === 'note'){
+      var en = parts[0] === 'log' ? (t.log||[])[parseInt(parts[1],10)] : null;
+      body += _jnRow('Note', escHtml(String((en && en.text) || x.fullText || '')));
+    } else if(x.kind === 'accepted'){
+      if(t.approvedQuoteId){
+        try { body += _jnRow('Accepted item', escHtml(approvalTargetLabel(t, t.approvedQuoteId))); } catch(e2){}
+      }
+    } else if(x.kind === 'approval' && x.approver){
+      body += _jnRow('Approved by', escHtml(x.approver.name));
+      if(x.approver.target){
+        try { body += _jnRow('Approved', escHtml(approvalTargetLabel(t, x.approver.target))); } catch(e3){}
+      }
+    } else if(x.tip){
+      var stage = x.tip.match(/in this stage (.+)$/);
+      if(stage) body += _jnRow('Time in this stage', escHtml(stage[1]));
+    }
+    if(x.approvers && x.approvers.length){
+      var thr = (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined' ? TRUSTEE_APPROVAL_THRESHOLD : 3);
+      body += _jnRow('\u2713 Approved by (' + x.approvers.length + '/' + thr + ')',
+        x.approvers.map(function(a){ return escHtml(a.name) + ' <span style="color:var(--muted);font-size:9px">' + escHtml(_journeyDate(a.ts)) + '</span>'; }).join('<br>'));
+    }
+  } catch(e){ console.warn('journey hover', e); }
+
+  var actions = '';
+  if(_currentRole === 'admin' && x.ref){
+    var oBtn = '';
+    if(x.docId){
+      var oIdx2 = (t.linkedDocIds||[]).indexOf(x.docId);
+      var oCall = (x.viewer && oIdx2 !== -1) ? ('openTktViewer(' + oIdx2 + ')') : ('openInvModal(\'' + String(x.docId).replace(/[^A-Za-z0-9_\-]/g,'') + '\')');
+      oBtn = '<button onclick="journeyHoverHide();' + oCall + '" title="Open">\ud83d\udc41</button>';
+    }
+    actions = '<div id="jn-card-actions">'
+      + '<button onclick="journeyHoverHide();journeyEditTime(' + idx + ')" title="Edit date/time">\ud83d\udd52</button>'
+      + oBtn
+      + (x.kind === 'proposal' ? '<button onclick="journeyHoverHide();journeySetAmount(' + idx + ')" title="Set Rand amount">\ud83d\udcb0</button>' : '')
+      + '<button onclick="journeyHoverHide();journeyHideNode(' + idx + ')" title="Hide from journey">\u2715</button>'
+      + '<button onclick="journeyHoverHide();journeyDeleteNode(' + idx + ')" title="Delete permanently">\ud83d\uddd1</button>'
+      + '</div>';
+  }
+
+  var card = document.createElement('div');
+  card.id = 'jn-card';
+  card.onmouseenter = journeyHoverKeep;
+  card.onmouseleave = journeyHoverSoon;
+  card.innerHTML = '<div style="font-size:12px;font-weight:700;color:var(--text2)">' + head + '</div>' + body + actions;
+  document.body.appendChild(card);
+  var r = el.getBoundingClientRect();
+  var w = 232;
+  var left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width/2 - w/2));
+  card.style.left = left + 'px';
+  var top = r.bottom + 8;
+  if(top + card.offsetHeight > window.innerHeight - 8) top = Math.max(8, r.top - card.offsetHeight - 8);
+  card.style.top = top + 'px';
+}
+
+function _journeyMidTsBefore(rightIdx){
+  var real = _journeyMs.filter(function(x){ return !x.gap; });
+  var node = _journeyMs[rightIdx];
+  var rIdx = real.indexOf(node);
+  if(rIdx === -1) return Date.now();
+  var afterTs = real[rIdx].ts;
+  var beforeTs = rIdx > 0 ? real[rIdx-1].ts : (afterTs - 3600000);
+  return Math.round((beforeTs + afterTs) / 2);
+}
+function journeyInsertBetween(rightIdx){
+  var t = TICKETS[_journeyTid];
+  if(!t || _currentRole !== 'admin') return;
+  var midTs = _journeyMidTsBefore(rightIdx);
+  var pop = document.createElement('div');
+  pop.id = 'jn-insert-pop';
+  pop.style.cssText = 'position:fixed;inset:0;z-index:4000;display:flex;align-items:center;justify-content:center;background:rgba(15,22,32,.45)';
+  pop.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:20px;width:280px">'
+    + '<div style="font-size:13px;font-weight:700;color:var(--text2);font-family:var(--sans);margin-bottom:4px">Insert into journey</div>'
+    + '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);margin-bottom:14px">Will be dated ' + _journeyFullDate(midTs) + '</div>'
+    + '<button onclick="journeyInsertNote(' + midTs + ')" style="width:100%;padding:10px;margin-bottom:8px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:9px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer">\ud83d\udcdd Add a note</button>'
+    + '<button onclick="document.getElementById(\'jn-insert-file\').click()" style="width:100%;padding:10px;margin-bottom:8px;background:var(--accent-bg);border:1px solid var(--accent-bd);border-radius:9px;color:var(--accent2);font-size:12px;font-weight:600;cursor:pointer">\ud83d\uddbc Add a photo / file</button>'
+    + '<input type="file" id="jn-insert-file" accept="image/*,video/*,application/pdf" style="display:none" onchange="journeyInsertFile(this.files[0], ' + midTs + ')">'
+    + '<button onclick="document.getElementById(\'jn-insert-pop\').remove()" style="width:100%;padding:8px;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer">Cancel</button>'
+    + '</div>';
+  pop.onclick = function(ev){ if(ev.target === pop) pop.remove(); };
+  document.body.appendChild(pop);
+}
+function _journeyAfterMutate(t){
+  t.updated = Date.now();
+  t.log = (t.log||[]).sort(function(a,b){ return (a.ts||0) - (b.ts||0); });
+  saveTickets([t.id]).catch(function(e){ console.warn('journey save', e); });
+  renderTicketJourney(t);
+  if(typeof renderTicketLog === 'function') renderTicketLog(t);
+  if(typeof refreshTimelineForTicket === 'function'){ try { refreshTimelineForTicket(t.id); } catch(e){} }
+}
+function journeyInsertNote(midTs){
+  var t = TICKETS[_journeyTid];
+  if(!t) return;
+  var txt = prompt('Note to insert into the journey:');
+  if(!txt || !txt.trim()) return;
+  var pop = document.getElementById('jn-insert-pop'); if(pop) pop.remove();
+  t.log = t.log || [];
+  t.log.push({type:'note', text:txt.trim(), ts:midTs, journey:true, by:'admin'});
+  _journeyAfterMutate(t);
+}
+async function journeyInsertFile(file, midTs){
+  var t = TICKETS[_journeyTid];
+  if(!t || !file) return;
+  var pop = document.getElementById('jn-insert-pop'); if(pop) pop.remove();
+  if(file.size > 8*1024*1024){ alert('That file is over 8 MB \u2014 please use a smaller one.'); return; }
+  var dataUrl = await new Promise(function(resolve, reject){
+    var fr = new FileReader();
+    fr.onload = function(){ resolve(fr.result); };
+    fr.onerror = function(){ reject(new Error('read failed')); };
+    fr.readAsDataURL(file);
+  }).catch(function(){ return null; });
+  if(!dataUrl){ alert('Could not read that file.'); return; }
+  var docId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  var invObj = {
+    id: docId,
+    name: file.name || 'attachment',
+    filename: file.name || 'attachment',
+    docType: 'Supporting Evidence',
+    data: dataUrl,
+    fileType: file.type || '',
+    size: file.size,
+    added: midTs,
+    linkedTxKeys: []
+  };
+  INVOICES[docId] = invObj;
+  try { await sbUpsert('invoices', docId, invObj); }
+  catch(e){ console.warn('journey file save', e); }
+  if(!Array.isArray(t.linkedDocIds)) t.linkedDocIds = [];
+  t.linkedDocIds.push(docId);
+  _journeyAfterMutate(t);
+}
+function journeyDeleteNode(idx){
+  var t = TICKETS[_journeyTid];
+  var node = _journeyMs && _journeyMs[idx];
+  if(!t || !node || !node.ref || _currentRole !== 'admin') return;
+  var parts = node.ref.split(':');
+  var nn = node.label.replace(/^[^A-Za-z0-9]+\s*/,'');
+  if(parts[0] === 'created'){ alert('The Created milestone can\'t be deleted \u2014 use \ud83d\udd52 to correct its time instead.'); return; }
+  if(!confirm('Permanently delete "' + nn + '" from this ticket?\n\nThis removes the underlying record (not just from the journey) and cannot be undone.')) return;
+  if(parts[0] === 'accepted'){ t.approvedAt = null; }
+  else if(parts[0] === 'log'){ (t.log||[]).splice(parseInt(parts[1],10), 1); }
+  else if(parts[0] === 'appr'){ (t.approvals||[]).splice(parseInt(parts[1],10), 1); }
+  else if(parts[0] === 'doc'){
+    var ids = node.groupIds && node.groupIds.length ? node.groupIds : [parts[1]];
+    ids.forEach(function(id){
+      t.linkedDocIds = (t.linkedDocIds||[]).filter(function(d){ return d !== id; });
+      delete INVOICES[id];
+      sbDelete('invoices', id).catch ? sbDelete('invoices', id).catch(function(e){ console.warn('journey doc delete', e); }) : sbDelete('invoices', id);
+    });
+  }
+  _journeyAfterMutate(t);
+}
+function journeySetAmount(idx){
+  var t = TICKETS[_journeyTid];
+  var node = _journeyMs && _journeyMs[idx];
+  if(!t || !node || !node.ref) return;
+  var parts = node.ref.split(':');
+  if(parts[0] !== 'log') return;
+  var e = (t.log||[])[parseInt(parts[1],10)];
+  if(!e) return;
+  var cur = e.amount != null ? String(e.amount) : '';
+  var inp = prompt('Rand amount for this proposal (numbers only, e.g. 2500):', cur);
+  if(inp == null) return;
+  var num = parseFloat(String(inp).replace(/[Rr\s,]/g,''));
+  if(isNaN(num)){ alert('Could not read that amount \u2014 numbers only, e.g. 2500'); return; }
+  e.amount = num;
+  _journeyAfterMutate(t);
 }
 function journeyRestoreHidden(){
   var t = TICKETS[_journeyTid];
