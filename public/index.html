@@ -3966,6 +3966,16 @@ async function flushInvoiceDetails(invId){
   // meant the note never persisted. Detail edits don't touch the file.
   try { await saveInvoiceMeta(invId); } catch(e){ console.warn('flushInvoiceDetails', e); }
   renderInvoices();
+  // If this doc belongs to the open ticket, its approval row + journey node
+  // must reflect the new amount/type right away (not on next modal open)
+  var _ft = _currentTicketId && TICKETS[_currentTicketId];
+  if(_ft && (_ft.linkedDocIds||[]).indexOf(invId) !== -1){
+    try {
+      renderTicketApprovalPanel(_ft);
+      renderTicketJourney(_ft);
+      reconcileQuoteStatus(_ft); // docType may have just become/stopped being Quote
+    } catch(e){ console.warn('flush ticket refresh', e); }
+  }
   // If the ticket timeline is open and this document belongs to that ticket,
   // re-render it so a changed date re-orders the flow on the fly (and changed
   // notes show next to the document immediately).
@@ -11695,6 +11705,7 @@ async function boardChangeStatus(ticketId, newStatus){
   t.updated = Date.now();
   t.log = t.log || [];
   var sMeta = TKT_STATUS[newStatus] || TKT_STATUS.open;
+  if(newStatus === 'closed') _ensureClosedDate(t);
   t.log.push({type:'status', text:'Status changed to ' + sMeta.label, ts:Date.now()});
   try { await saveTickets([ticketId]); } catch(e){ console.warn('board save failed', e); }
   notifyReporterStatusChange(t, newStatus);
@@ -12543,8 +12554,24 @@ function renderTicketApprovalPanel(t){
   var approvals = getTicketApprovals(t);
   var hasAnyApproval = approvals.length > 0;
 
+  // Work In Progress: the finish line — one tap to close when done
+  if(status === 'work_in_progress' && userCan('canChangeStatus', t)){
+    panel.style.display = '';
+    var slimAudit = hasAnyApproval
+      ? '<div style="font-size:10px;color:var(--green);font-family:var(--sans);margin-top:6px">\u2713 ' + approvals.length + ' trustee approval' + (approvals.length===1?'':'s') + ' recorded before work began</div>'
+      : '';
+    panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      + '<div style="flex:1;min-width:180px"><div style="font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">Work is under way. When it\u2019s finished, close the ticket \u2014 the reporter gets notified and the close date is recorded automatically.</div>' + slimAudit + '</div>'
+      + '<button onclick="markTicketClosedSimple()" style="padding:10px 18px;background:var(--green);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2713 Mark as Closed</button>'
+      + '</div>';
+    return;
+  }
+
   // Open tickets: the fork in the road — start the work, or bring in a quote
-  var addQuoteBtn = '<button onclick="document.getElementById(\'tkt-addquote-file\').click()" style="padding:10px 16px;background:var(--surface);border:1.5px solid var(--accent-bd);border-radius:9px;color:var(--accent2);font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2795 Add a quote</button>'
+  var reqQuotesBtn = _canTogglePath()
+    ? '<button onclick="requestQuotesFlow()" style="padding:10px 14px;background:none;border:1px solid var(--border2);border-radius:9px;color:var(--muted);font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer" title="Move to Obtaining Quotes and open the supplier tools">\ud83d\udce8 Request quotes</button>'
+    : '';
+  var addQuoteBtn = reqQuotesBtn + '<button onclick="document.getElementById(\'tkt-addquote-file\').click()" style="padding:10px 16px;background:var(--surface);border:1.5px solid var(--accent-bd);border-radius:9px;color:var(--accent2);font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2795 Add a quote</button>'
     + '<input type="file" id="tkt-addquote-file" accept="application/pdf,image/*,.xls,.xlsx,.csv" style="display:none" onchange="addQuoteToTicket(this)">';
   if(!ticketRequiresApproval(t) && !hasAnyApproval){
     if(status === 'open' && userCan('canChangeStatus', t)){
@@ -13054,7 +13081,7 @@ function renderApprovalRow_Quote(inv, approvals, myApprovedIds, isTrustee){
   if(qDate) detailParts.push('<span style="color:var(--muted)">'+escHtml(qDate)+'</span>');
   var detailsHtml = detailParts.length
     ? '<div style="font-size:11px;font-family:var(--mono);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap">'+detailParts.join('<span style="color:var(--border2)">·</span>')+'</div>'
-    : (isTrustee ? '<div style="font-size:10px;color:var(--st-open);font-family:var(--mono);margin-top:2px;font-style:italic">⚠ No amount or reference — open the document to add details</div>' : '');
+    : (isTrustee ? '<div onclick="openInvModal(\''+safeId+'\')" style="font-size:10px;color:var(--st-open);font-family:var(--mono);margin-top:2px;font-style:italic;cursor:pointer;text-decoration:underline" title="Open the document details to add the amount">⚠ No amount set — click to add it (✏)</div>' : '');
 
   var viewBtn = '<button onclick="openQuoteFromApproval(\''+safeId+'\')" style="background:none;border:none;color:var(--info);font-size:10px;font-family:var(--mono);cursor:pointer;padding:2px 4px;text-decoration:underline" title="View this quote">View →</button>';
 
@@ -13138,6 +13165,50 @@ function renderApproverChips(quoteApprovals){
 // document, a priced proposal, or a recorded approval auto-upgrades it to the
 // full quoted path with the trustee gate. Admin/trustees/management can
 // override per ticket; the explicit choice always wins over auto-detection.
+// Completing the flow: closed tickets date themselves, WIP has a finish
+// line, and "we need quotes" is a button rather than tribal knowledge.
+function _ensureClosedDate(t){
+  if(!t) return;
+  if(!t.dateClosed){
+    t.dateClosed = new Date().toISOString().slice(0,10);
+    if(_currentTicketId && TICKETS[_currentTicketId] === t){
+      var el = document.getElementById('tkt-date-closed');
+      if(el) el.value = t.dateClosed;
+    }
+  }
+}
+async function markTicketClosedSimple(){
+  var t = _currentTicketId && TICKETS[_currentTicketId];
+  if(!t || !userCan('canChangeStatus', t)) return;
+  t.status = 'closed';
+  _ensureClosedDate(t);
+  t.updated = Date.now();
+  t.log = t.log || [];
+  var by = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
+  t.log.push({type:'status', text:'\u2713 Closed by ' + by, ts:Date.now()});
+  _refreshTicketStatusUi(t);
+  try { await saveTickets([t.id]); } catch(e){ console.warn('close save', e); }
+  notifyReporterStatusChange(t, 'closed');
+  updateTicketBadge();
+  renderTickets();
+}
+async function requestQuotesFlow(){
+  var t = _currentTicketId && TICKETS[_currentTicketId];
+  if(!t || !_canTogglePath()) return;
+  t.status = 'awaiting_quote';
+  t.updated = Date.now();
+  t.log = t.log || [];
+  var by = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
+  t.log.push({type:'status', text:'Status changed to ' + TKT_STATUS.awaiting_quote.label + ' \u2014 ' + by + ' is requesting supplier quotes', ts:Date.now()});
+  _refreshTicketStatusUi(t);
+  if(typeof renderTicketSuppliers === 'function'){ try { renderTicketSuppliers(t); } catch(e){} }
+  try { await saveTickets([t.id]); } catch(e){ console.warn('request quotes save', e); }
+  notifyReporterStatusChange(t, 'awaiting_quote');
+  renderTickets();
+  var sec = document.getElementById('tkt-suppliers-section');
+  if(sec && sec.style.display !== 'none'){ try { sec.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){} }
+}
+
 // Quote-driven status: adding/removing quotes moves the ticket for you.
 function _ticketHasQuoteDoc(t){
   return (t.linkedDocIds||[]).some(function(id){
@@ -15027,6 +15098,7 @@ function autoSaveTicket(){
     // Auto-log status change
     if(prev.status && prev.status !== status){
       var s = TKT_STATUS[status]||TKT_STATUS.open;
+      if(status === 'closed') _ensureClosedDate(TICKETS[id]);
       TICKETS[id].log.push({type:'status', text:'Status changed to '+s.label, ts:Date.now()});
       renderTicketLog(TICKETS[id]);
       renderTicketJourney(TICKETS[id]);
