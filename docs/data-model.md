@@ -210,3 +210,17 @@ Supabase does automatic daily backups on paid tiers. On the free tier, backups n
 3. Same for `users`, `suppliers`, `settings`
 
 Store the CSVs somewhere durable. If Supabase disappears or the project is deleted by mistake, these are the recovery path.
+
+## August 2026 field additions
+
+- **`tickets.data`**: `reporterEmail`, `reporterEditToken` (public flow);
+  `approvals[]` entries `{invId|quoteId|targetId, trusteeId, trusteeName, ts}`;
+  `approvedAt`, `approvedQuoteId`; `journeyHidden[]` (display-only hide refs
+  like `log:3`, `doc:<id>`, `appr:1`, `accepted`); log entries may carry
+  `journey:true` (admin-inserted notes) and `amount` (Rand value on proposals).
+- **`users.data`**: `email` (drives notification recipients + credential
+  emails); `password` now `sha256$<hex>` (salt `park-manor-v1`, matching
+  `functions/_passkey-shared.js`); roles now include `owner`, `tenant`,
+  `management`.
+- **`invoices.data`**: `added` (ms timestamp — the Journey's doc time; admin
+  re-timing mutates it), spreadsheet mime types now accepted.

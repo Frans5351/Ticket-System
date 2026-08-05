@@ -42,41 +42,54 @@ Set in Netlify → Site settings → Environment variables. Redeploy after chang
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` | All backend functions |
 | `PM_JWT_SECRET` | Random 32+ char string | `passkey-password-login` (JWT signing) |
 
-### Required for email-the-link feature
+### Required for all email features (Brevo — replaced Resend, August 2026)
 
 | Variable | Set to | Notes |
 |---|---|---|
-| `RESEND_API_KEY` | From resend.com → API Keys (starts `re_`) | Missing → function returns 500 |
-| `RESEND_FROM` | e.g. `Park Manor <noreply@yourdomain.com>` | Optional, defaults to Resend sandbox sender |
-| `PARK_MANOR_NAME` | e.g. `Park Manor Body Corporate` | Optional; controls subject line + branding |
+| `BREVO_API_KEY` | Brevo → SMTP & API → **API Keys** tab (starts `xkeysib-`) | The API key, **not** the SMTP key. Missing → functions return a clear 500 |
+| `BREVO_FROM_EMAIL` | The sender address verified under Brevo → Senders | Must match the verified address exactly |
+| `BREVO_FROM_NAME` | e.g. `Park Manor` | Optional display name |
+| `AGENT_NOTIFY_EMAIL` | Extra notification recipient(s), comma-separated | Optional — management/trustee **users with emails** are the primary recipients |
+| `APP_BASE_URL` | Site URL for email buttons | Optional; defaults to production |
 
-### Resend sandbox sender caveat
-
-If `RESEND_FROM` is left unset (or is `onboarding@resend.dev`), Resend will **only deliver to email addresses you've personally verified** in your Resend account. To send to anyone, verify a domain:
-
-1. Resend → Domains → Add domain
-2. Add the DNS records Resend provides (SPF, DKIM) at your DNS provider
-3. Wait for verification
-4. Change `RESEND_FROM` to use your domain
+Notes that bite:
+- **Redeploy after changing env vars** — functions read them at deploy time.
+- Brevo **IP restriction for API keys must stay OFF** (Netlify IPs rotate).
+- Free plan: 300 emails/day, single verified sender, "Sent with Brevo" footer.
+- Sending *from a Gmail address* is DMARC-unaligned → first deliveries often
+  land in **spam**. The real fix is a cheap domain authenticated in Brevo
+  (SPF/DKIM), then set `BREVO_FROM_EMAIL` to that domain.
 
 ## Common operations
 
 ### Adding a new user
 
-Sign in as admin → Settings → Users → New. Set:
+Sign in as admin → Users → New. Set:
 - **Username** (unique login)
 - **Full name** (display)
-- **Role**: `resident` is the safest default for new residents; `trustee` grants approval powers; `admin` should stay small
-- **Password**: any length; users are prompted to change it after login
-- **Email / phone**: optional
+- **Role**: `owner` / `tenant` for residents (identical powers for now);
+  `trustee` grants approval powers; `management` is for the managing agent
+  (trustee-level ticket powers, no vote/quorum); `admin` should stay small
+- **Email**: drives everything — notification fan-out, credential emails,
+  forgot-password
+- Then click **📨 Send login details by email** — the app generates a
+  `PM-xxxxxx` password, saves it (hashed), and emails branded credentials
+  with a login button
 
-**Note on plaintext passwords:** the password field is stored in cleartext. Don't use passwords that are shared with other services.
+Passwords are stored as salted SHA-256 (`sha256$…`). Legacy plaintext values
+still verify and get upgraded the next time the password is set. Users change
+their own password anytime via the **🔑 button** in the header; the login
+screen has **Forgot password?** (emails fresh credentials, reveals nothing
+about which emails exist).
+
+**Rollout lock (temporary):** all non-admin roles currently see only the
+Tracker tab — two `ROLLOUT LOCK` branches in `postLoginUiSetup` control this.
 
 ### Toggling the public reporting form
 
 Settings → 🌐 Public reporting → checkbox.
 
-- **On:** shows the URL to share (`?contact-public`) with a Copy button
+- **On:** shows the URL to share (`?report`; legacy `?contact-public` still works) with a Copy button
 - **Off:** the link still resolves but shows a "Submissions currently disabled" message; new submissions can't be made
 - Doesn't affect existing edit links — residents can still access their `?reportEdit=<token>` submissions
 
@@ -111,12 +124,22 @@ If a ticket is stuck in `awaiting_trustee_approval` and votes aren't advancing:
 
 ### Public form submits but no email arrives
 
-**Symptom:** User ticked "Email me my edit link", saw "✓ Sent to <email>", but the email doesn't arrive.
+**Symptom:** Submission succeeded but the notification / CC email doesn't arrive.
 **Diagnosis path:**
-1. Check spam folder
-2. Netlify → Functions → `send-edit-link` → Recent invocations → click the failed one → view logs
-3. Most common: sandbox sender + unverified recipient. Fix: verify the email in Resend, or verify your domain
-4. Second most common: `RESEND_API_KEY` unset or expired. Fix: reset in Netlify env vars, redeploy
+1. **Spam folder first** — Gmail-from-via-Brevo lands there often (see env
+   notes above; the domain is the cure)
+2. Netlify → Logs → Functions → `send-edit-link` — the function logs the
+   recipient count (`management/trustee users found: N | with email: N`) and
+   every failure with Brevo's message
+3. `"Key not found"` from Brevo → the stored `BREVO_API_KEY` isn't the real
+   key (masked value pasted, SMTP key instead of API key, or key not
+   activated) → generate a fresh API key, update the env var, **redeploy**
+4. A "sender" error → `BREVO_FROM_EMAIL` doesn't exactly match a verified
+   sender in Brevo
+5. `agentNotified:false` in the response → no management/trustee users have
+   emails on their records (and `AGENT_NOTIFY_EMAIL` is unset)
+6. Address silently skipped after an earlier hard bounce → Brevo → Contacts →
+   suppression/blocked lists → remove it
 
 ### Ticket saves seem to overwrite each other
 
@@ -135,7 +158,7 @@ If a ticket is stuck in `awaiting_trustee_approval` and votes aren't advancing:
 
 Ranked roughly by severity:
 
-1. **Passwords are plaintext.** Fix requires a Netlify function for bcrypt hashing + login. Non-trivial refactor.
+1. ~~Passwords are plaintext~~ **Fixed (August 2026):** salted SHA-256 with a `sha256$` prefix, matching hashing client-side and in `functions/_passkey-shared.js` / `send-credentials`. Legacy plaintext still verifies and upgrades on next password change.
 2. **Photos stored as base64 in `invoices.data`.** Rows can be 5-10MB. Slow queries at scale. Fix requires migrating to Supabase Storage + updating the render pipeline to fetch URLs.
 3. **No RLS policies.** Supabase Row-Level Security is off. Access is enforced only by the anon key + app-level checks. If the anon key leaks, everything is readable.
 4. **Hardcoded admin path.** The legacy "admin/admin" fallback bypasses the server endpoint (no JWT, no passkey). Kept because losing access is worse than the weak auth. Retire once passkey enrolment is universal.

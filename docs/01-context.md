@@ -10,7 +10,7 @@ The Park Manor Ticket System is a body-corporate management app used by the trus
 graph TD
     Admin["👤 Admin<br/>(operational owner)"]
     Trustee["👥 Trustees<br/>(3 elected members)"]
-    Resident["👥 Residents<br/>(17 units)"]
+    Resident["👥 Owners & Tenants<br/>(17 units)"]
     Public["👤 Public submitter<br/>(no account)"]
     Supplier["👤 Supplier<br/>(reads shared link)"]
 
@@ -18,22 +18,22 @@ graph TD
 
     Supabase["🗄️ Supabase<br/>(database + auth backing)"]
     Netlify["☁️ Netlify<br/>(hosting + serverless functions)"]
-    Resend["📧 Resend<br/>(transactional email)"]
+    Brevo["📧 Brevo<br/>(transactional email)"]
 
     Admin -->|"Manages tickets, users,<br/>settings, permissions"| System
     Trustee -->|"Reviews & approves<br/>quotes/proposals"| System
     Resident -->|"Views own tickets,<br/>reports issues"| System
-    Public -->|"Submits reports via<br/>?contact-public URL"| System
+    Public -->|"Submits reports & water readings<br/>via ?report URL"| System
     Supplier -->|"Views ticket via<br/>?share=... link"| System
 
     System -->|"Reads/writes<br/>tickets, users, invoices"| Supabase
     System -->|"Hosted on"| Netlify
-    System -->|"Sends edit-link<br/>emails"| Resend
+    System -->|"Sends notification, status,<br/>credential emails"| Brevo
 
     style System fill:#5b48d8,color:#fff
     style Supabase fill:#3ecf8e,color:#fff
     style Netlify fill:#00c7b7,color:#fff
-    style Resend fill:#000,color:#fff
+    style Brevo fill:#0b996e,color:#fff
 ```
 
 ## What the system does
@@ -97,3 +97,21 @@ Used only by the `send-edit-link` function. Free tier gives ~3,000 emails/month.
 - Owner/tenant registry (residents are just app users; ownership records aren't tracked here)
 - Legal document management beyond ticket attachments
 - Meeting minutes management
+
+## August 2026 update — actors & email
+
+- The **`resident` role split into `owner` and `tenant`** (identical powers for
+  now; the split exists so they can diverge later).
+- A **`management` role** exists for the managing agent (Davies Properties):
+  trustee-level ticket powers, no vote/quorum weight.
+- **Rollout lock (temporary, in force):** every non-admin role currently sees
+  **only the Tracker tab**. The lock lives in `postLoginUiSetup` (two branches
+  marked `ROLLOUT LOCK`) and is a one-line change per role to open up.
+- **Email moved from Resend to Brevo** (Resend's free tier only delivered to
+  the account owner). Every public submission now emails all `management` and
+  `trustee` users that have an email on their user record, with the submitter
+  **CC'd** when they provided an address, and the reporter receives **status
+  change emails** as their ticket progresses.
+- The public form (`?report`, legacy `?contact-public` still works) gained
+  category tiles — including **💧 Water Reading** for meter submissions —
+  camera-first uploads, draft autosave, and a confetti success screen.

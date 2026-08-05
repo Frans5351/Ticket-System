@@ -94,6 +94,8 @@ export default async function handler(req) {
   const unit = (body.unit || "").toString().trim().slice(0, 50);
   const reporter = (body.reporter || "").toString().trim().slice(0, 200);
   const phone = (body.phone || "").toString().trim().slice(0, 50);
+  const category = (body.category || "").toString().trim().slice(0, 60);
+  const isWaterReading = category === "Water Reading";
   const ticketNumber = body.ticketNumber;
   const notifyOnly = !!body.notifyOnly;
 
@@ -214,7 +216,9 @@ export default async function handler(req) {
     .forEach((s) => agentSet.add(bareAddress(s).toLowerCase()));
   const agentList = Array.from(agentSet);
   if (agentList.length) {
-    const aSubject = `New Park Manor report ${ref}${title ? ` — ${title}` : ""}`.trim();
+    const aSubject = isWaterReading
+      ? `💧 Water meter reading ${ref}${unit ? ` — Unit ${unit}` : ""}`.trim()
+      : `New Park Manor report ${ref}${title ? ` — ${title}` : ""}`.trim();
     const aLines = [
       "A new report was submitted via the Park Manor public report form.",
       "",
@@ -247,10 +251,11 @@ export default async function handler(req) {
       ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#9a6200;margin-top:6px">\u26a0 Too large to attach (view in the tracker): ${skippedFiles.map((x) => escH(x.name) + " (" + escH(x.sizeMB) + " MB)").join(", ")}</div>`
       : "";
     const agentHtml = emailShell(`
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8b96a5;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">New public report${ref ? " \u00b7 " + escH(ref) : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${isWaterReading ? "#177a4c" : "#8b96a5"};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${isWaterReading ? "💧 Water meter reading" : "New public report"}${ref ? " \u00b7 " + escH(ref) : ""}</div>
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:#3a4354;margin-bottom:16px">${escH(title || "(no subject)")}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:14px">
         ${detailRow("Reference", ref)}
+        ${detailRow("Category", category)}
         ${detailRow("Unit", unit)}
         ${detailRow("Name", reporter)}
         ${detailRow("Phone", phone)}

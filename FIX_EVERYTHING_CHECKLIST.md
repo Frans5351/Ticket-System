@@ -1,5 +1,9 @@
 # Park Manor — "Fix Everything" action checklist
 
+> **✅ ARCHIVED — all three problems below were fixed (August 2026).**
+> Tables exist, the site deploys from Git (all `/api/*` functions live), and
+> email now runs on **Brevo** (see `docs/runbook.md`). Kept for history only.
+
 This is the short, do-this-in-order list to clear the errors showing in your
 browser console (missing Supabase tables, 406s, and the `/api/*` 404s for the
 email button and attachments). Full reference detail is in `FULL_DEPLOY_GUIDE.md`;

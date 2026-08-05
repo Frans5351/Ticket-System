@@ -14,7 +14,7 @@ graph TB
         Fn1["λ passkey-*<br/>(WebAuthn helpers)"]
         Fn2["λ passkey-password-login<br/>(JWT issuer)"]
         Fn3["λ *-attachment<br/>(file proxy)"]
-        Fn4["λ send-edit-link<br/>(Resend caller)"]
+        Fn4["λ send-edit-link<br/>send-email, send-status-update,<br/>send-credentials (Brevo callers)"]
     end
 
     subgraph Supabase["🗄️ Supabase"]
@@ -24,7 +24,7 @@ graph TB
         Rest --> DB
     end
 
-    Resend["📧 Resend API"]
+    Brevo["📧 Brevo API"]
 
     SPA <-->|"reads/writes<br/>via /rest/v1/..."| Rest
     SPA <-->|"session, cache"| LS
@@ -36,12 +36,12 @@ graph TB
     Fn2 <-->|"service-role queries"| Rest
     Fn3 <-->|"service-role queries"| Rest
     Fn3 <-->|"file bytes"| Storage
-    Fn4 -->|"HTTPS POST"| Resend
+    Fn4 -->|"HTTPS POST"| Brevo
     Fn4 -->|"validate token"| Rest
 
     style SPA fill:#5b48d8,color:#fff
     style DB fill:#3ecf8e,color:#fff
-    style Resend fill:#000,color:#fff
+    style Brevo fill:#0b996e,color:#fff
 ```
 
 ## Container-by-container
@@ -69,10 +69,19 @@ graph TB
 - **Postgres**: six main tables (`tickets`, `invoices`, `suppliers`, `users`, `settings`, `passkeys`, `passkey_challenges`). See [data-model.md](./data-model.md).
 - **Storage**: an `attachments` bucket for large files. Currently under-used — most photos are stored as base64 in `invoices.data`. This is a known limitation.
 
-### Resend
+### Brevo (replaced Resend, August 2026)
 
-- Consumed only by `send-edit-link`. The function POSTs to `https://api.resend.com/emails`.
-- Sender is configured via `RESEND_FROM` env var. Free-tier sandbox sender (`onboarding@resend.dev`) only delivers to verified addresses; production use requires a verified domain.
+- All email flows go through `functions/_email-shared.js` → `https://api.brevo.com/v3/smtp/email`.
+- Four sending functions: `send-edit-link` (resident edit link + the agent/trustee
+  notification with attachments and resident CC), `send-email` (supplier quote
+  requests), `send-status-update` (reporter status-change emails), and
+  `send-credentials` (login-details invites + forgot-password resets).
+- Env: `BREVO_API_KEY`, `BREVO_FROM_EMAIL` (verified single sender — no domain
+  needed on the free plan, 300 emails/day), optional `BREVO_FROM_NAME`.
+- Known limitation: sending *from a Gmail address* via Brevo is DMARC-unaligned,
+  so first deliveries often land in spam. The fix is a cheap domain
+  authenticated in Brevo (SPF/DKIM); until then the UI coaches recipients to
+  mark "Not spam".
 
 ## Data flow examples
 
@@ -92,7 +101,7 @@ Nothing else happens. No auth, no session, no other network calls.
 ### A public submitter creates a ticket + gets an email
 
 ```
-Browser → GET .../?contact-public
+Browser → GET .../?report        (legacy ?contact-public still routes)
 SPA → renders the public form
 User submits → SPA → POST /rest/v1/tickets with the new record (via anon key)
 Supabase → inserts
@@ -123,3 +132,20 @@ If the project ever grows beyond this scale, the SPA can talk to any backend —
 - **Production:** `park-manor-bc.netlify.app` (auto-deploys from `master` on the `Frans5351/Ticket-System` GitHub repo)
 - **Local dev:** `/build/local/` package with `server.py` for a local HTTP server that proxies Supabase (avoids CORS in dev)
 - **Standalone `index.html`:** the drop-in file that works without Netlify functions (passkey enrolment and email-the-link won't work, but everything else does)
+
+## August 2026 flow update — what a public submission triggers
+
+```
+SPA → POST /rest/v1/tickets (anon key)             — ticket created
+SPA → POST /api/send-edit-link                      — always (notifyOnly or full)
+Function → reads `users` (service key, else anon fallback)
+Function → recipients = management + trustee users with emails
+                        (+ AGENT_NOTIFY_EMAIL), deduped
+Function → Brevo: branded HTML email, images attached (≤ ~4MB budget),
+           resident CC'd when they gave an address, reply-to = resident
+Water readings (category "Water Reading") get a 💧 subject + green headline.
+Status changes later → /api/send-status-update → reporter email per milestone.
+```
+
+`server.py` (local dev) forwards unknown `/api/*` requests to the production
+site, so these flows work from `localhost:8080` too.

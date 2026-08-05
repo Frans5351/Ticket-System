@@ -4414,6 +4414,7 @@ async function deleteInvoice(invId){
       t.linkedDocIds = t.linkedDocIds.filter(function(d){ return d!==invId; });
       t.updated = Date.now();
       affectedTicketIds.push(t.id);
+      try { reconcileQuoteStatus(t); } catch(e){}
     }
   });
 
@@ -6451,6 +6452,12 @@ document.getElementById('tbody').addEventListener('click', function(e){
               <option value="work_in_progress">Work In Progress</option>
               <option value="closed">Closed</option>
             </select>
+            <div id="tkt-reqappr-wrap" style="margin-top:7px;display:none">
+              <label style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);font-family:var(--sans);cursor:pointer">
+                <input type="checkbox" id="tkt-reqappr" onchange="toggleRequiresApproval(this.checked)" style="accent-color:var(--accent);margin:0">
+                Requires quotes &amp; trustee approval <span id="tkt-reqappr-auto" style="opacity:.7"></span>
+              </label>
+            </div>
           </div>
           <div>
             <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Priority</div>
@@ -9338,6 +9345,7 @@ async function spSaveQuote(submit){
       // Persist the document AND the ticket (so the new linkedDocIds entry sticks).
       try { await saveInvoices([docId]); } catch(e){ console.warn('supplier quote doc save failed:', e); }
       try { await saveTickets([_spJobTicketId]); } catch(e){ console.warn('supplier quote ticket-link save failed:', e); }
+      try { await reconcileQuoteStatus(t); } catch(e){}
     } else if(_spQuoteFileData && docId && INVOICES[docId]){
       // Draft with a freshly-picked file but a doc already exists: just refresh
       // the file data on the existing (already-linked) doc, no new link needed.
@@ -11803,8 +11811,8 @@ function distillTicketJourney(t){
         out.push({label:m[1], ts:e.ts, color:(key && TKT_STATUS[key].color) || 'var(--muted)', kind:'status', ref:'log:'+_li});
         return;
       }
-      if(txt.indexOf('\u25b6 Work started') === 0){
-        out.push({label:'Work started', ts:e.ts, color:TKT_STATUS.work_in_progress.color, kind:'status', ref:'log:'+_li});
+      if(txt.indexOf('\u25b6 Work started') === 0 || txt.indexOf('\u25b6 Set to In Progress') === 0){
+        out.push({label:'In Progress', ts:e.ts, color:TKT_STATUS.work_in_progress.color, kind:'status', ref:'log:'+_li});
         return;
       }
       if(txt.indexOf('+ Proposal added') === 0){
@@ -12283,6 +12291,7 @@ function journeyInsertBetween(rightIdx){
   document.body.appendChild(pop);
 }
 function _journeyAfterMutate(t){
+  try { reconcileQuoteStatus(t); } catch(e){}
   t.updated = Date.now();
   t.log = (t.log||[]).sort(function(a,b){ return (a.ts||0) - (b.ts||0); });
   saveTickets([t.id]).catch(function(e){ console.warn('journey save', e); });
@@ -12380,10 +12389,17 @@ function journeyRestoreHidden(){
 function renderStatusFlow(currentStatus){
   var el = document.getElementById('tkt-status-flow');
   if(!el) return;
-  var currentIdx = TKT_FLOW.findIndex(function(s){ return s.value===currentStatus; });
+  // The ticket's own path: simple tickets show three steps, quoted show five.
+  var _flowT = _currentTicketId ? TICKETS[_currentTicketId] : null;
+  var _simple = _flowT && !ticketRequiresApproval(_flowT);
+  var FLOW = _simple
+    ? TKT_FLOW.filter(function(s){ return s.value === 'open' || s.value === 'work_in_progress' || s.value === 'closed'; })
+    : TKT_FLOW;
+  if(FLOW.findIndex(function(s){ return s.value === currentStatus; }) < 0) FLOW = TKT_FLOW;
+  var currentIdx = FLOW.findIndex(function(s){ return s.value===currentStatus; });
   if(currentIdx < 0) currentIdx = 0;
 
-  el.innerHTML = TKT_FLOW.map(function(step, i){
+  el.innerHTML = FLOW.map(function(step, i){
     var isDone = i < currentIdx;
     var isCurrent = i === currentIdx;
     var isAfter = i > currentIdx;
@@ -12395,7 +12411,7 @@ function renderStatusFlow(currentStatus){
     var cursor = canChange ? (isAfter || isDone ? 'pointer' : 'default') : 'default';
 
     // Arrow connector
-    var arrow = i < TKT_FLOW.length-1
+    var arrow = i < FLOW.length-1
       ? '<div style="flex-shrink:0;color:'+(isDone?'var(--green)':'var(--border)')+';font-size:14px;padding:0 2px;line-height:1">›</div>'
       : '';
 
@@ -12526,6 +12542,33 @@ function renderTicketApprovalPanel(t){
   var awaiting = status === 'awaiting_trustee_approval';
   var approvals = getTicketApprovals(t);
   var hasAnyApproval = approvals.length > 0;
+
+  // Open tickets: the fork in the road — start the work, or bring in a quote
+  var addQuoteBtn = '<button onclick="document.getElementById(\'tkt-addquote-file\').click()" style="padding:10px 16px;background:var(--surface);border:1.5px solid var(--accent-bd);border-radius:9px;color:var(--accent2);font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2795 Add a quote</button>'
+    + '<input type="file" id="tkt-addquote-file" accept="application/pdf,image/*,.xls,.xlsx,.csv" style="display:none" onchange="addQuoteToTicket(this)">';
+  if(!ticketRequiresApproval(t) && !hasAnyApproval){
+    if(status === 'open' && userCan('canChangeStatus', t)){
+      panel.style.display = '';
+      panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+        + '<div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">No quotes or approval needed \u2014 start the work, or add a quote to switch on the full approval flow automatically.</div>'
+        + addQuoteBtn
+        + '<button onclick="startWorkSimple()" style="padding:10px 18px;background:var(--accent);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u25b6 Set In Progress</button>'
+        + '</div>';
+    } else {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+    }
+    return;
+  }
+  // Quoted-path ticket still sitting Open (e.g. override): offer the quote button
+  if(status === 'open' && !hasAnyApproval && _canTogglePath()){
+    panel.style.display = '';
+    panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      + '<div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">This ticket needs quotes \u2014 add one and it moves to trustee approval automatically.</div>'
+      + addQuoteBtn
+      + '</div>';
+    return;
+  }
 
   if(!awaiting && !hasAnyApproval){
     panel.style.display = 'none';
@@ -12697,7 +12740,7 @@ function renderItemThresholdPill(targetId, count, t){
   if(stillAwaiting && userCan('canChangeStatus')){
     var safeId = String(targetId).replace(/'/g,"\\'");
     var btnTip = TRUSTEE_APPROVAL_THRESHOLD+' or more trustees agree — click to advance the ticket to Work In Progress.';
-    return '<button onclick="startWorkOnItem(\''+safeId+'\')" title="'+escHtml(btnTip)+'" style="margin-top:6px;width:100%;padding:5px 10px;font-size:11px;font-family:var(--mono);font-weight:700;color:#fff;background:var(--green);border:none;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.3px" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">▶ Start Work</button>';
+    return '<button onclick="startWorkOnItem(\''+safeId+'\')" title="'+escHtml(btnTip)+'" style="margin-top:6px;width:100%;padding:5px 10px;font-size:11px;font-family:var(--mono);font-weight:700;color:#fff;background:var(--green);border:none;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.3px" onmouseover="this.style.opacity=\'.85\'" onmouseout="this.style.opacity=\'1\'">▶ Set In Progress</button>';
   }
   // Threshold met but the ticket has already moved on, or this user can't
   // change status — show a static "met" pill.
@@ -12729,7 +12772,7 @@ async function startWorkOnItem(targetId){
   liveT.updated = Date.now();
   liveT.log = liveT.log || [];
   var byName = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
-  liveT.log.push({type:'status', text:'▶ Work started by '+byName+' — chosen item: '+label, ts:Date.now()});
+  liveT.log.push({type:'status', text:'▶ Set to In Progress by '+byName+' — chosen item: '+label, ts:Date.now()});
   notifyReporterStatusChange(liveT, 'work_in_progress');
   // Refresh in-modal UI
   var statusSel = document.getElementById('tkt-status');
@@ -13089,6 +13132,185 @@ function renderApproverChips(quoteApprovals){
 //   - the approval threshold has not been met, AND
 //   - the current user is NOT an admin (admins always override).
 // Also adds an explanatory hint label below the dropdown when disabled.
+// ── Dynamic ticket paths ────────────────────────────────────────────────
+// Open and Closed are universal; the middle is circumstantial. A ticket is
+// "simple" (Open → Work In Progress → Closed) until money shows up — a quote
+// document, a priced proposal, or a recorded approval auto-upgrades it to the
+// full quoted path with the trustee gate. Admin/trustees/management can
+// override per ticket; the explicit choice always wins over auto-detection.
+// Quote-driven status: adding/removing quotes moves the ticket for you.
+function _ticketHasQuoteDoc(t){
+  return (t.linkedDocIds||[]).some(function(id){
+    var d = INVOICES[id];
+    return d && /quote/i.test(String(d.docType||''));
+  });
+}
+function _refreshTicketStatusUi(t){
+  if(!_currentTicketId || !TICKETS[_currentTicketId] || TICKETS[_currentTicketId] !== t) return;
+  var sel = document.getElementById('tkt-status');
+  if(sel) sel.value = t.status;
+  renderStatusFlow(t.status||'open');
+  refreshStatusDropdownGating(t);
+  renderTicketApprovalPanel(t);
+  renderTicketLog(t);
+  renderTicketJourney(t);
+  refreshTicketHeaderCaption(t);
+}
+// Called after ANY change to a ticket's linked docs (or a doc's type).
+async function reconcileQuoteStatus(t){
+  try {
+    if(!t) return;
+    var hasQuote = _ticketHasQuoteDoc(t);
+    var now = Date.now();
+    t.log = t.log || [];
+    if(hasQuote && t.status === 'open'){
+      // Advance, recording the intermediate milestone so the story is complete
+      t.statusBeforeQuote = 'open';
+      t.log.push({type:'status', text:'Status changed to ' + TKT_STATUS.awaiting_quote.label, ts: now - 1500});
+      t.log.push({type:'status', text:'Status changed to ' + TKT_STATUS.awaiting_trustee_approval.label + ' \u2014 quote added', ts: now});
+      t.status = 'awaiting_trustee_approval';
+      t.updated = now;
+      notifyReporterStatusChange(t, 'awaiting_trustee_approval');
+    } else if(hasQuote && t.status === 'awaiting_quote'){
+      if(!t.statusBeforeQuote) t.statusBeforeQuote = 'awaiting_quote';
+      t.log.push({type:'status', text:'Status changed to ' + TKT_STATUS.awaiting_trustee_approval.label + ' \u2014 quote added', ts: now});
+      t.status = 'awaiting_trustee_approval';
+      t.updated = now;
+      notifyReporterStatusChange(t, 'awaiting_trustee_approval');
+    } else if(!hasQuote
+        && (t.status === 'awaiting_trustee_approval' || t.status === 'awaiting_quote')
+        && !(t.approvals||[]).length){
+      // Last quote gone and nothing decided yet -> step back where we were
+      var prev = t.statusBeforeQuote || 'open';
+      var prevMeta = TKT_STATUS[prev] || TKT_STATUS.open;
+      t.log.push({type:'status', text:'Status reverted to ' + prevMeta.label + ' \u2014 quote removed', ts: now});
+      t.status = prev;
+      delete t.statusBeforeQuote;
+      t.updated = now;
+      notifyReporterStatusChange(t, prev);
+    } else {
+      return; // nothing to do
+    }
+    _refreshTicketStatusUi(t);
+    updateTicketBadge();
+    renderTickets();
+    try { await saveTickets([t.id]); } catch(e){ console.warn('reconcile save', e); }
+  } catch(e){ console.warn('reconcileQuoteStatus', e); }
+}
+// [+ Add a quote] on open tickets: one tap -> file -> Quote doc -> linked
+async function addQuoteToTicket(fileInput){
+  var t = _currentTicketId && TICKETS[_currentTicketId];
+  var file = fileInput && fileInput.files && fileInput.files[0];
+  fileInput.value = '';
+  if(!t || !file) return;
+  if(file.size > 8*1024*1024){ alert('That file is over 8 MB \u2014 please use a smaller one.'); return; }
+  var dataUrl = await new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){ res(fr.result); };
+    fr.onerror = function(){ rej(new Error('read failed')); };
+    fr.readAsDataURL(file);
+  }).catch(function(){ return null; });
+  if(!dataUrl){ alert('Could not read that file.'); return; }
+  var docId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+  var invObj = {
+    id: docId,
+    name: file.name || 'quote',
+    filename: file.name || 'quote',
+    docType: 'Quote',
+    invCompany: '',
+    data: dataUrl,
+    type: file.type || '',
+    fileType: file.type || '',
+    size: file.size,
+    added: Date.now(),
+    linkedTxKeys: []
+  };
+  INVOICES[docId] = invObj;
+  try { await sbUpsert('invoices', docId, invObj); } catch(e){ console.warn('quote save', e); }
+  if(!Array.isArray(t.linkedDocIds)) t.linkedDocIds = [];
+  t.linkedDocIds.push(docId);
+  t.log = t.log || [];
+  t.log.push({type:'doc', text:'\ud83d\udcb0 Quote added: ' + (file.name || 'quote'), ts: Date.now()});
+  await reconcileQuoteStatus(t);
+  try { await saveTickets([t.id]); } catch(e){}
+  if(typeof renderTicketDocs === 'function'){ try { renderTicketDocs(t); } catch(e){} }
+  _refreshTicketStatusUi(t);
+  // Straight into the document details window \u2014 type is already Quote;
+  // supplier, amount, reference get filled right there.
+  try { openInvModal(docId); } catch(e){ console.warn('open quote details', e); }
+}
+
+function ticketRequiresApproval(t){
+  if(!t) return true;
+  if(typeof t.requiresApproval === 'boolean') return t.requiresApproval;
+  // Auto: money present?
+  var hasQuoteDoc = (t.linkedDocIds||[]).some(function(id){
+    var d = INVOICES[id];
+    return d && /quote/i.test(String(d.docType||''));
+  });
+  if(hasQuoteDoc) return true;
+  var pricedProposal = (t.log||[]).some(function(e){
+    return e && e.type === 'status' && String(e.text||'').indexOf('+ Proposal added') === 0 && e.amount != null;
+  });
+  if(pricedProposal) return true;
+  if((t.approvals||[]).length) return true;
+  // Legacy safety: already sitting in a quoted-path status
+  if(t.status === 'awaiting_quote' || t.status === 'awaiting_trustee_approval') return true;
+  return false;
+}
+function _canTogglePath(){
+  return _currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management';
+}
+function setupReqApprUI(t){
+  var wrap = document.getElementById('tkt-reqappr-wrap');
+  if(!wrap) return;
+  if(!t || !_canTogglePath()){ wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  var cb = document.getElementById('tkt-reqappr');
+  var hint = document.getElementById('tkt-reqappr-auto');
+  if(cb) cb.checked = ticketRequiresApproval(t);
+  if(hint) hint.textContent = (typeof t.requiresApproval === 'boolean') ? '' : '(auto)';
+}
+async function toggleRequiresApproval(v){
+  var t = _currentTicketId && TICKETS[_currentTicketId];
+  if(!t || !_canTogglePath()) return;
+  t.requiresApproval = !!v;
+  t.updated = Date.now();
+  t.log = t.log || [];
+  var by = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
+  t.log.push({type:'status', text:'Quotes & approval requirement turned ' + (v ? 'ON' : 'OFF') + ' by ' + by, ts:Date.now()});
+  setupReqApprUI(t);
+  renderStatusFlow(t.status||'open');
+  refreshStatusDropdownGating(t);
+  renderTicketApprovalPanel(t);
+  renderTicketLog(t);
+  renderTicketJourney(t);
+  try { await saveTickets([t.id]); } catch(e){ console.warn('path toggle save', e); }
+}
+// One-tap start for the simple path (no quote, no gate — the work just happens)
+async function startWorkSimple(){
+  var t = _currentTicketId && TICKETS[_currentTicketId];
+  if(!t || !userCan('canChangeStatus', t)) return;
+  if(ticketRequiresApproval(t)) return;
+  t.status = 'work_in_progress';
+  t.updated = Date.now();
+  t.log = t.log || [];
+  var by = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
+  t.log.push({type:'status', text:'\u25b6 Set to In Progress by ' + by + ' \u2014 no quote required', ts:Date.now()});
+  var sel = document.getElementById('tkt-status');
+  if(sel) sel.value = 'work_in_progress';
+  renderStatusFlow('work_in_progress');
+  refreshStatusDropdownGating(t);
+  renderTicketApprovalPanel(t);
+  renderTicketLog(t);
+  renderTicketJourney(t);
+  refreshTicketHeaderCaption(t);
+  try { await saveTickets([t.id]); } catch(e){ console.warn('simple start save', e); }
+  notifyReporterStatusChange(t, 'work_in_progress');
+  updateTicketBadge();
+  renderTickets();
+}
+
 function refreshStatusDropdownGating(t){
   var sel = document.getElementById('tkt-status');
   if(!sel) return;
@@ -13100,8 +13322,15 @@ function refreshStatusDropdownGating(t){
   // Reset
   wipOption.disabled = false;
   wipOption.textContent = 'Work In Progress';
+  // Simple-path tickets don't show the quoted-path steps at all (the current
+  // status stays visible if a legacy ticket is already sitting there)
+  var requires = t ? ticketRequiresApproval(t) : true;
+  ['awaiting_quote','awaiting_trustee_approval'].forEach(function(v){
+    var opt = sel.querySelector('option[value="'+v+'"]');
+    if(opt) opt.hidden = !requires && (!t || t.status !== v);
+  });
   // Gate: only block when awaiting approval AND threshold unmet AND not admin
-  if(awaiting && !thresholdMet && !isAdmin){
+  if(requires && awaiting && !thresholdMet && !isAdmin){
     wipOption.disabled = true;
     wipOption.textContent = 'Work In Progress (locked — needs '+TRUSTEE_APPROVAL_THRESHOLD+' trustee approvals)';
   }
@@ -14151,6 +14380,8 @@ function openTicketModal(ticketId){
   document.getElementById('tkt-doc-results').innerHTML = '';
   renderStatusFlow(t.status||'open');
   renderTicketJourney(t);
+  setupReqApprUI(t);
+  refreshStatusDropdownGating(t);
   renderTicketApprovalPanel(t);
   refreshStatusDropdownGating(t);
 
@@ -15348,6 +15579,7 @@ function unlinkDocFromTicketById(invId){
   }
   TICKETS[_currentTicketId].linkedDocIds = (TICKETS[_currentTicketId].linkedDocIds||[]).filter(function(id){ return id!==invId; });
   TICKETS[_currentTicketId].updated = Date.now();
+  reconcileQuoteStatus(TICKETS[_currentTicketId]);
   saveTickets([_currentTicketId]);
   renderTicketLinkedDocs(TICKETS[_currentTicketId]);
 }
@@ -15579,6 +15811,7 @@ async function linkDocToTicket(el){
   t.updated = Date.now();
   var inv = INVOICES[invId];
   t.log.push({type:'doc', text:'Linked document: '+(inv?inv.name:'document'), ts:Date.now()});
+  reconcileQuoteStatus(t);
   await saveTickets([_currentTicketId]);
   renderTicketLinkedDocs(t);
   renderTicketDocSearch();
@@ -18532,6 +18765,7 @@ async function _sqvUploadAttachment(file, ticketId, supplierId){
   if(t){
     if(!Array.isArray(t.linkedDocIds)) t.linkedDocIds = [];
     if(t.linkedDocIds.indexOf(docId) === -1) t.linkedDocIds.push(docId);
+    try { reconcileQuoteStatus(t); } catch(e){}
   }
   return docId;
 }
@@ -18636,7 +18870,8 @@ function buildPublicFormFields(editing, existing){
   var photoInputDisabled = (editing && photosLeft <= 0);
   var catTiles = [
     ['Plumbing','\ud83d\udea0'], ['Electrical','\ud83d\udca1'], ['Common Area','\ud83c\udfde'],
-    ['Security','\ud83d\udd12'], ['Structural','\ud83e\uddf1'], ['Pests','\ud83d\udc00'], ['Other','\u2753']
+    ['Security','\ud83d\udd12'], ['Structural','\ud83e\uddf1'], ['Pests','\ud83d\udc00'],
+    ['Water Reading','\ud83d\udca7'], ['Other','\u2753']
   ];
   window._pubCategory = ex.category || '';
   window._pubFiles = [];   // fresh staging area every time the form renders
@@ -18787,6 +19022,7 @@ var PUB_CAT_HINTS = {
   'Security':   ['e.g. Gate motor not closing properly', 'What happened, where, and when?'],
   'Structural': ['e.g. Crack in the bathroom wall', 'Where is it, roughly how big, and is it getting worse?'],
   'Pests':      ['e.g. Rats near the bins', 'What have you seen, where, and how often?'],
+  'Water Reading': ['Water meter reading', 'Type all the digits shown on your meter (e.g. 03457.2) and the date you took the reading. A photo of the meter helps a lot.'],
   'Other':      ['e.g. Question about parking', 'Tell us what\'s going on or what you\'d like to know \u2014 as much detail as helps.']
 };
 
@@ -18806,7 +19042,18 @@ function pubSelectCategory(btn){
   var descEl = document.getElementById('pub-desc');
   if(titleEl) titleEl.placeholder = hints[0];
   if(descEl) descEl.placeholder = hints[1];
-  if(titleEl && !titleEl.value) titleEl.focus();
+  // Water readings: pre-fill the subject so the resident only types the
+  // reading itself; clear it again if they switch away without editing.
+  if(titleEl){
+    if(window._pubCategory === 'Water Reading' && !titleEl.value){
+      titleEl.value = 'Water meter reading';
+      pubDraftSave();
+    } else if(window._pubCategory !== 'Water Reading' && titleEl.value === 'Water meter reading'){
+      titleEl.value = '';
+      pubDraftSave();
+    }
+  }
+  if(titleEl && !titleEl.value) titleEl.focus(); else if(descEl && window._pubCategory === 'Water Reading') descEl.focus();
 }
 
 function pubAddFiles(fileList){
@@ -19073,6 +19320,7 @@ async function submitPublicReport(){
               unit: unit,
               reporter: name,
               phone: phone,
+              category: window._pubCategory || 'Other',
               attachments: notifyAtt
             })
           });
@@ -19113,6 +19361,7 @@ async function submitPublicReport(){
           reporter: name,
           phone: phone,
           email: email,
+          category: window._pubCategory || 'Other',
           attachments: notifyAtt
         })
       }).catch(function(e){ console.warn('agent notify failed', e); });

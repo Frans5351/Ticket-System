@@ -178,3 +178,46 @@ If you're implementing a new feature, ask which module it belongs in:
 | New Netlify function | (new file in `functions/`) | Follow `send-edit-link.js` as template |
 
 Line numbers drift; use `grep` on the pattern names, not the numbers.
+
+## August 2026 additions
+
+### 📍 Journey strip (`renderTicketJourney`, `distillTicketJourney`)
+A distilled, time-scaled timeline at the top of every ticket: created → docs
+(💰 quotes with ✓n approval badges, 📎 grouped files) → proposals (with Rand
+amounts) → status milestones → 🏁 accepted, ending at a hollow **Now** node for
+open tickets. Insight chips (longest stage, quiet-ticket warning, approvals
+progress, next step). Rich hover cards per node type; **admin-only tools**:
+drag to re-time (adjusts the underlying timestamps), edit date/time, insert
+notes/files between events, hide, and permanent delete. Clicking a document
+node opens the viewer; ✏️ on the hover card opens the edit modal.
+
+### 🧠 Tracker intelligence (`ticketAttention`, board view)
+Attention scoring feeds card pills (⚠ quiet, ▶ ready, 🗳 your approval needed),
+a "Needs attention" sort, per-trustee tab badges (counts *their* pending
+approvals), search across notes + doc names, a unit filter, an archive fold
+for closed >90d, and a desktop **Board view** (kanban columns; admin drag =
+real status change incl. reporter email).
+
+### 📊 Spreadsheet preview (`renderSpreadsheetPreview`)
+xls/xlsx/csv render in-app (doc modal **and** carousel) via lazily-loaded
+`xlsx-js-style`: merged cells, Excel column widths & row heights, fonts,
+fills, borders, cached formula values, multi-sheet tabs — on white paper
+regardless of theme. Pixel-mirror is out of scope; PDF remains the gold
+standard for quotes (LibreOffice converts on request).
+
+### 🔑 Credential lifecycle
+Passwords are salted-sha256 (`sha256$` prefix; legacy plaintext verifies and
+should be migrated by changing the password). Admin: **📨 Send login details**
+on any user with an email (generates `PM-xxxxxx`, emails branded credentials).
+Users: 🔑 header button to change their password. Login screen: **Forgot
+password?** → `/api/send-credentials {mode:'reset'}` (anti-enumeration: always
+answers ok). The post-login "change your password?" popup is retired.
+
+### 🌐 Public form v2 (`?report`)
+Hero banner, three numbered step cards, category tiles (incl. 💧 Water
+Reading with subject pre-fill), camera-first uploads with previews, draft
+autosave (`pm_pub_draft`), sticky submit, animated check + confetti, progress
+strip, WhatsApp save button, resident-CC explanation instead of the old
+edit-link checkbox. Rate limit 10/browser/hour. Edit links opened in fresh
+browsers (e.g. WhatsApp's) survive via a cross-scheme token rescue in
+`renderPublicEditView`.

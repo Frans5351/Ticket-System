@@ -42,3 +42,26 @@ one in your local dev browser. They don't share.
 
 The `passkeys` and `passkey_challenges` tables need to exist. See `PASSKEYS_SETUP.sql`
 and `PASSKEYS_SETUP.md` in this folder.
+
+## Emails & `/api/*` in plain local dev (August 2026)
+
+`server.py` now **forwards any `/api/*` request to the production site**
+(`NETLIFY_SITE` constant at the top of `server.py`). That means the plain
+`./dev.sh` / `dev.bat` workflow exercises the real Netlify functions — emails
+genuinely send, attachments upload — using production's environment variables.
+Caveat: local email tests therefore send **real emails** through the live
+Brevo account; use your own address.
+
+## Email env vars (Brevo — replaced Resend, August 2026)
+
+Set in Netlify → Environment variables, then redeploy:
+
+| Variable | Value |
+|---|---|
+| `BREVO_API_KEY` | Brevo → SMTP & API → **API Keys** (starts `xkeysib-`) |
+| `BREVO_FROM_EMAIL` | The sender address verified in Brevo |
+| `BREVO_FROM_NAME` | Optional display name, e.g. `Park Manor` |
+| `AGENT_NOTIFY_EMAIL` | Optional extra notification recipient(s) |
+| `APP_BASE_URL` | Optional; defaults to the production URL |
+
+Brevo's **IP restriction for API keys must stay OFF** (serverless IPs rotate).
