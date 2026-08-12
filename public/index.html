@@ -11900,6 +11900,9 @@ function distillTicketJourney(t){
     out.push({label:curLabel, ts:t.updated || Date.now(), color:(TKT_STATUS[t.status]||{}).color || 'var(--muted)', kind:'status'});
   }
   if(out.length > 9){ out = [out[0], {gap:true}].concat(out.slice(out.length - 7)); }
+  // Never let one malformed node take the whole ticket modal down —
+  // require the two fields every renderer/tooltip assumes are present.
+  out = out.filter(function(x){ return x && typeof x.label === 'string' && x.label.length && typeof x.ts === 'number' && !isNaN(x.ts); });
   return out;
 }
 
@@ -11978,6 +11981,10 @@ function renderTicketJourney(t){
   var host = document.getElementById('tkt-journey');
   if(!host) return;
   if(!t){ host.style.display = 'none'; return; }
+  // The Journey is a nice-to-have view over ticket data, never a gate on
+  // opening the ticket — any unexpected shape hides the strip instead of
+  // breaking the whole modal.
+  try {
   var ms = distillTicketJourney(t);
   if(ms.length < 2){ host.style.display = 'none'; return; }
   var createdTs = ms[0].ts;
@@ -11995,7 +12002,8 @@ function renderTicketJourney(t){
   var statusIdxs = [];
   ms.forEach(function(x,i){ if(x.kind === 'status' || x.kind === 'created') statusIdxs.push(i); });
   ms.forEach(function(x,i){
-    var tip = x.label.replace(/^[^A-Za-z0-9]+\s*/, '') + ' \u00b7 ' + _journeyFullDate(x.ts);
+    var _lbl = (x && typeof x.label === 'string') ? x.label : '';
+    var tip = _lbl.replace(/^[^A-Za-z0-9]+\s*/, '') + ' \u00b7 ' + _journeyFullDate(x.ts);
     if(x.kind === 'status' || x.kind === 'created'){
       var pos = statusIdxs.indexOf(i);
       var end = (pos + 1 < statusIdxs.length) ? ms[statusIdxs[pos+1]].ts : (t.status === 'closed' ? x.ts : Date.now());
@@ -12089,6 +12097,7 @@ function renderTicketJourney(t){
         ? '<div style="font-size:9px;color:var(--muted);font-family:var(--sans);margin-top:6px;cursor:pointer;text-decoration:underline" onclick="journeyRestoreHidden()">' + (t.journeyHidden||[]).length + ' hidden \u00b7 restore all</div>'
         : '');
   host.style.display = '';
+  } catch(e){ console.warn('renderTicketJourney failed, hiding strip', e); host.style.display = 'none'; }
 }
 
 
@@ -13231,6 +13240,8 @@ function _refreshTicketStatusUi(t){
 async function reconcileQuoteStatus(t){
   try {
     if(!t) return;
+    // Respect a just-made manual status choice — don't fight the human.
+    if(t._manualStatusAt && (Date.now() - t._manualStatusAt) < 4000) return;
     var hasQuote = _ticketHasQuoteDoc(t);
     var now = Date.now();
     t.log = t.log || [];
@@ -13250,8 +13261,11 @@ async function reconcileQuoteStatus(t){
       notifyReporterStatusChange(t, 'awaiting_trustee_approval');
     } else if(!hasQuote
         && (t.status === 'awaiting_trustee_approval' || t.status === 'awaiting_quote')
-        && !(t.approvals||[]).length){
-      // Last quote gone and nothing decided yet -> step back where we were
+        && !(t.approvals||[]).length
+        && typeof t.statusBeforeQuote === 'string'){
+      // Last quote gone and nothing decided yet -> step back where we were.
+      // Requires statusBeforeQuote to exist (set only when WE advanced the
+      // ticket) so this never fires off a manual status change instead.
       var prev = t.statusBeforeQuote || 'open';
       var prevMeta = TKT_STATUS[prev] || TKT_STATUS.open;
       t.log.push({type:'status', text:'Status reverted to ' + prevMeta.label + ' \u2014 quote removed', ts: now});
@@ -14338,6 +14352,13 @@ async function unlinkTicketUser(){
 }
 
 function openTicketModal(ticketId){
+  try { return _openTicketModalInner(ticketId); }
+  catch(e){
+    console.error('openTicketModal crashed for', ticketId, e);
+    alert('This ticket could not be opened due to an unexpected error. The problem has been logged \u2014 please tell admin the ticket id: ' + ticketId);
+  }
+}
+function _openTicketModalInner(ticketId){
   // Dispatch to the action-item modal for type='action' rows. Action items
   // are a much simpler shape than maintenance tickets — they don't need the
   // supplier section, status flow pills, trustee approval panel, etc., so
@@ -15087,6 +15108,13 @@ function autoSaveTicket(){
     // closed) preserves the audit trail.
     var revokeStatuses = ['open','awaiting_quote','awaiting_trustee_approval'];
     var hadAnyApproval = (prev.approvals && prev.approvals.length) || prev.approvedQuoteId;
+    // A manual dropdown change is a deliberate human decision. Quote
+    // DOCUMENTS are never touched by a status change (only deleting/
+    // unlinking the document itself removes it) — and the automatic
+    // quote-driven reconciler must not immediately override this choice.
+    if(status !== prev.status){
+      TICKETS[id]._manualStatusAt = Date.now();
+    }
     if(hadAnyApproval && revokeStatuses.indexOf(status) !== -1 && status !== prev.status){
       TICKETS[id].approvals = [];
       TICKETS[id].approvedQuoteId = null;
