@@ -1854,15 +1854,29 @@ async function checkStorageSetup(){
 
     <!-- Income donut -->
     <div class="chart-section">
-      <div class="mini-donut-card" style="max-width:500px">
-        <div class="chart-title">Top income sources</div>
-        <div class="chart-sub" id="id-sub">—</div>
-        <div class="mini-donut-inner">
-          <div class="mini-donut-wrap">
-            <canvas id="incomeDonutChart"></canvas>
-            <div class="mini-donut-center" id="id-center"><div class="mdc-label">Total in</div><div class="mdc-val" id="id-total">—</div></div>
+      <div class="exp-split-layout">
+        <div class="mini-donut-card" style="flex:0 0 auto;width:340px">
+          <div class="chart-title">Top income sources</div>
+          <div class="chart-sub" id="id-sub">—</div>
+          <div class="mini-donut-inner">
+            <div class="mini-donut-wrap">
+              <canvas id="incomeDonutChart" style="cursor:pointer"></canvas>
+              <div class="mini-donut-center" id="id-center"><div class="mdc-label">Total in</div><div class="mdc-val" id="id-total">—</div></div>
+            </div>
+            <div class="mini-donut-legend" id="id-legend"></div>
           </div>
-          <div class="mini-donut-legend" id="id-legend"></div>
+        </div>
+        <div class="exp-txn-drawer" id="inc-donut-drawer">
+          <div class="exp-drawer-header">
+            <div>
+              <div class="exp-drawer-title" id="inc-donut-drawer-title">Select a slice</div>
+              <div class="exp-drawer-sub" id="inc-donut-drawer-sub">Click a slice or legend row</div>
+            </div>
+            <button class="exp-drawer-close" onclick="closeIncomeDonutDrawer()">✕</button>
+          </div>
+          <div class="exp-drawer-list" id="inc-donut-drawer-list">
+            <div class="exp-drawer-empty">👈 Click a slice or legend row to view transactions</div>
+          </div>
         </div>
       </div>
     </div>
@@ -5188,6 +5202,70 @@ function openDonutDrawer(partyName,txns,totalAmt,activeIdx,colors){
   });
 }
 
+function closeIncomeDonutDrawer(){
+  var d=document.getElementById('inc-donut-drawer');
+  if(d)d.style.opacity='0.5';
+  var t=document.getElementById('inc-donut-drawer-title'); if(t)t.textContent='Select a slice';
+  var s=document.getElementById('inc-donut-drawer-sub'); if(s)s.textContent='Click a slice or legend row';
+  var l=document.getElementById('inc-donut-drawer-list'); if(l)l.innerHTML='<div class="exp-drawer-empty">👈 Click a slice or legend row to view transactions</div>';
+  if(incomeDonutChart&&incomeDonutChart._origColors){
+    try{incomeDonutChart.data.datasets[0].backgroundColor=incomeDonutChart._origColors.slice();incomeDonutChart.update('none');}catch(e){}
+  }
+  document.querySelectorAll('#id-legend .legend-row').forEach(function(r){r.style.opacity='1';r.style.background='';});
+}
+
+function openIncomeDonutDrawer(sourceName,txns,totalAmt,activeIdx,colors){
+  var d=document.getElementById('inc-donut-drawer');
+  if(d)d.style.opacity='1';
+  document.getElementById('inc-donut-drawer-title').textContent=sourceName;
+  document.getElementById('inc-donut-drawer-sub').textContent=txns.length+' transaction'+(txns.length!==1?'s':'')+' · '+fmt(Math.abs(totalAmt))+' total';
+
+  var isOther = sourceName.indexOf('Other')===0 && txns.length>1 && (new Set(txns.map(function(t){return getDisplayName(t);})).size)>1;
+  var html='';
+
+  if(isOther){
+    // Group by source, sorted by total desc
+    var groups={};
+    txns.forEach(function(t){
+      var name=getDisplayName(t)||'Unknown';
+      if(!groups[name]) groups[name]={txns:[],total:0};
+      groups[name].txns.push(t);
+      groups[name].total+=Math.abs(t.amount);
+    });
+    var sortedGroups=Object.keys(groups).sort(function(a,b){return groups[b].total-groups[a].total;});
+    var gid=0;
+    sortedGroups.forEach(function(name){
+      var g=groups[name]; var id='idg'+(gid++);
+      var cnt=g.txns.length;
+      html+='<div class="exp-group-row" onclick="toggleDrawerGroup(\''+id+'\')">'
+        +'<div class="exp-gi-name">'+name+'</div>'
+        +'<div class="exp-gi-right"><span class="exp-gi-cnt">'+cnt+' txn'+(cnt!==1?'s':'')+'</span><span class="exp-gi-amt">+ '+fmtK(g.total)+'</span><span class="exp-gi-arrow" id="'+id+'-arrow">▶</span></div>'
+        +'</div>'
+        +'<div class="exp-group-body" id="'+id+'" style="display:none">';
+      var sorted2=g.txns.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+      sorted2.forEach(function(t){ html+=drawerItem(t,'exp-drawer-item-sub'); });
+      html+='</div>';
+    });
+  } else {
+    var sorted=txns.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');});
+    sorted.forEach(function(t){ html+=drawerItem(t); });
+  }
+
+  html+='<div class="exp-drawer-total"><span class="exp-drawer-total-label">'+txns.length+' transaction'+(txns.length!==1?'s':'')+'</span><span class="exp-drawer-total-val">'+fmt(Math.abs(totalAmt))+'</span></div>';
+  document.getElementById('inc-donut-drawer-list').innerHTML=html;
+  // dim non-selected slices
+  if(incomeDonutChart&&colors){
+    var dimmed=colors.map(function(c,i){return i===activeIdx?c:'rgba(255,255,255,0.12)';});
+    incomeDonutChart.data.datasets[0].backgroundColor=dimmed;
+    incomeDonutChart.update('none');
+  }
+  // highlight legend row
+  document.querySelectorAll('#id-legend .legend-row').forEach(function(r,i){
+    r.style.opacity=i===activeIdx?'1':'0.35';
+    r.style.background=i===activeIdx?'var(--surface2)':'';
+  });
+}
+
 const _expandListeners={};
 function setupExpandBtn(btnId,wrapId,otherData,accentColor,count,total,noun){
   const btn=document.getElementById(btnId);
@@ -5390,6 +5468,21 @@ function refreshIncome(){
           type:'doughnut',
           data:{labels:idLabels,datasets:[{data:idValues,backgroundColor:idColors,borderWidth:0,hoverOffset:5}]},
           options:{responsive:false,maintainAspectRatio:true,aspectRatio:1,cutout:'62%',
+            onClick:function(evt,els){
+              if(!els||!els.length){closeIncomeDonutDrawer();return;}
+              var idx=els[0].index;
+              var label=idLabels[idx];
+              var val=idValues[idx];
+              var txns;
+              if(idx>=idTop.length){
+                // "Other" slice — show all other income transactions
+                txns=_incData.filter(function(t){return t.amount>0&&idOther.some(function(o){return getDisplayName(t)===o.label;});});
+              } else {
+                txns=_incData.filter(function(t){return t.amount>0&&getDisplayName(t)===idTop[idx].label;});
+              }
+              incomeDonutChart._origColors=idColors.slice();
+              openIncomeDonutDrawer(label,txns,val,idx,idColors);
+            },
             plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ' '+fmt(ctx.raw)+'  ('+Math.round(ctx.raw/idTotal*100)+'%)';}}}},
             onHover:function(evt,els){
               var c=document.getElementById('id-center');if(!c)return;
@@ -5398,12 +5491,31 @@ function refreshIncome(){
             }
           }
         });
+        incomeDonutChart._origColors=idColors.slice();
       }
       var idLeg=document.getElementById('id-legend');
       if(idLeg){
-        var idRows=idTop.map(function(x,i){return '<div class="legend-row"><div class="legend-left"><span class="legend-swatch" style="background:'+idColors[i]+'"></span><span class="legend-name">'+x.label+'</span></div><div class="legend-right"><span class="legend-pct">'+x.pct+'%</span><span class="legend-amt">'+fmtK(x.value)+'</span></div></div>';});
-        if(idOtherTotal>0)idRows.push('<div class="legend-row"><div class="legend-left"><span class="legend-swatch" style="background:#5F5E5A"></span><span class="legend-name">Other ('+idOther.length+')</span></div><div class="legend-right"><span class="legend-pct">'+Math.round(idOtherTotal/idTotal*100)+'%</span><span class="legend-amt">'+fmtK(idOtherTotal)+'</span></div></div>');
+        var idRows=idTop.map(function(x,i){return '<div class="legend-row" data-id-idx="'+i+'" style="cursor:pointer;border-radius:5px;padding:6px 4px;transition:opacity .15s,background .15s"><div class="legend-left"><span class="legend-swatch" style="background:'+idColors[i]+'"></span><span class="legend-name">'+x.label+'</span></div><div class="legend-right"><span class="legend-pct">'+x.pct+'%</span><span class="legend-amt">'+fmtK(x.value)+'</span></div></div>';});
+        if(idOtherTotal>0)idRows.push('<div class="legend-row" data-id-idx="'+idTop.length+'" style="cursor:pointer;border-radius:5px;padding:6px 4px;transition:opacity .15s,background .15s"><div class="legend-left"><span class="legend-swatch" style="background:#5F5E5A"></span><span class="legend-name">Other ('+idOther.length+')</span></div><div class="legend-right"><span class="legend-pct">'+Math.round(idOtherTotal/idTotal*100)+'%</span><span class="legend-amt">'+fmtK(idOtherTotal)+'</span></div></div>');
         idLeg.innerHTML=idRows.join('');
+        idLeg.onclick=function(e){
+          var row=e.target.closest('[data-id-idx]');
+          if(!row)return;
+          var idx=parseInt(row.getAttribute('data-id-idx'),10);
+          var label,txns,val;
+          if(idx<idTop.length){
+            label=idTop[idx].label;
+            val=idTop[idx].value;
+            txns=_incData.filter(function(t){return t.amount>0&&getDisplayName(t)===label;});
+          } else {
+            label='Other ('+idOther.length+' sources)';
+            val=idOtherTotal;
+            var otherSources=idOther.map(function(o){return o.label;});
+            txns=_incData.filter(function(t){return t.amount>0&&otherSources.indexOf(getDisplayName(t))>=0;});
+          }
+          incomeDonutChart._origColors=idColors.slice();
+          openIncomeDonutDrawer(label,txns,val,idx,idColors);
+        };
       }
     }catch(e){console.error('income donut error',e);}
 
@@ -12555,6 +12667,15 @@ function getTicketApprovals(t){
   return [];
 }
 
+// The "+ Add proposal" affordance (button + inline input container). Extracted
+// so it can appear on Open-status tickets too, not only while awaiting
+// approval. Gated by canManageCriteria (admin/trustee/management).
+function _addProposalBtnHtml(){
+  if(!userCan('canManageCriteria')) return '';
+  return '<div style="margin-top:8px"><button onclick="openAddCriterionInput()" id="add-crit-btn" style="width:100%;padding:8px 10px;background:var(--accent-bg);border:1px dashed var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:11px;font-family:var(--mono);cursor:pointer;transition:background .15s" onmouseover="this.style.background=\'var(--accent-bg2)\'" onmouseout="this.style.background=\'var(--accent-bg)\'">+ Add proposal</button>'
+    +'<div id="add-crit-inline" style="display:none;margin-top:8px"></div></div>';
+}
+
 function renderTicketApprovalPanel(t){
   var panel = document.getElementById('tkt-approval-panel');
   if(!panel) return;
@@ -12589,7 +12710,13 @@ function renderTicketApprovalPanel(t){
         + '<div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">No quotes or approval needed \u2014 start the work, or add a quote to switch on the full approval flow automatically.</div>'
         + addQuoteBtn
         + '<button onclick="startWorkSimple()" style="padding:10px 18px;background:var(--accent);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u25b6 Set In Progress</button>'
-        + '</div>';
+        + '</div>'
+        + _addProposalBtnHtml();
+    } else if(userCan('canManageCriteria')){
+      // Open ticket where this user can't change status but can still stage a
+      // proposal for later approval \u2014 show just the Add-proposal affordance.
+      panel.style.display = '';
+      panel.innerHTML = _addProposalBtnHtml();
     } else {
       panel.style.display = 'none';
       panel.innerHTML = '';
@@ -12602,7 +12729,8 @@ function renderTicketApprovalPanel(t){
     panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
       + '<div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">This ticket needs quotes \u2014 add one and it moves to trustee approval automatically.</div>'
       + addQuoteBtn
-      + '</div>';
+      + '</div>'
+      + _addProposalBtnHtml();
     return;
   }
 
@@ -12913,13 +13041,27 @@ async function submitAddCriterion(){
   t.updated = Date.now();
   t.log = t.log || [];
   t.log.push({type:'status', text:'+ Proposal added by '+crit.createdByName+': "'+(text.length>60?text.slice(0,59)+'…':text)+'"', ts:Date.now()});
+
+  // Proposals skip the "Obtaining Quotes" stage — there's nothing to quote.
+  // If the ticket has no quote documents and is still early in the workflow,
+  // advance it straight to Awaiting Trustee Approval so the proposal can be
+  // voted on (and Work In Progress stays locked until it's accepted). Respect
+  // a just-made manual status choice so we don't fight the human.
+  var _recentManual = t._manualStatusAt && (Date.now() - t._manualStatusAt) < 4000;
+  if(!_recentManual && !_ticketHasQuoteDoc(t) && (t.status === 'open' || t.status === 'awaiting_quote')){
+    t.log.push({type:'status', text:'Status changed to ' + TKT_STATUS.awaiting_trustee_approval.label + ' — proposal added', ts:Date.now()});
+    t.status = 'awaiting_trustee_approval';
+    t.updated = Date.now();
+    try { notifyReporterStatusChange(t, 'awaiting_trustee_approval'); } catch(e){}
+  }
+
   try {
     _ticketSaveInFlight = true;
     await saveTickets([_currentTicketId]);
   } catch(e){ console.warn('submitAddCriterion: save error', e); }
   finally { _ticketSaveInFlight = false; }
-  renderTicketApprovalPanel(t);
-  renderTicketLog(t);
+  if(typeof _refreshTicketStatusUi === 'function') _refreshTicketStatusUi(t);
+  else { renderTicketApprovalPanel(t); renderTicketLog(t); }
 }
 
 // Inline edit: replaces the criterion text with an editable textarea.
@@ -13338,6 +13480,10 @@ function ticketRequiresApproval(t){
     return e && e.type === 'status' && String(e.text||'').indexOf('+ Proposal added') === 0 && e.amount != null;
   });
   if(pricedProposal) return true;
+  // Any proposal on the ticket must be accepted by trustees before work can
+  // start — same as a quote — so its mere presence puts the ticket on the
+  // approval path (not only priced proposals).
+  if(Array.isArray(t.criteria) && t.criteria.length) return true;
   if((t.approvals||[]).length) return true;
   // Legacy safety: already sitting in a quoted-path status
   if(t.status === 'awaiting_quote' || t.status === 'awaiting_trustee_approval') return true;
@@ -13402,6 +13548,7 @@ function refreshStatusDropdownGating(t){
   var wipOption = sel.querySelector('option[value="work_in_progress"]');
   if(!wipOption) return;
   var awaiting = t && t.status === 'awaiting_trustee_approval';
+  var preWork = t && (t.status === 'open' || t.status === 'awaiting_quote' || t.status === 'awaiting_trustee_approval');
   var thresholdMet = t ? isApprovalThresholdMet(t) : false;
   var isAdmin = _currentRole === 'admin';
   // Reset
@@ -13414,8 +13561,9 @@ function refreshStatusDropdownGating(t){
     var opt = sel.querySelector('option[value="'+v+'"]');
     if(opt) opt.hidden = !requires && (!t || t.status !== v);
   });
-  // Gate: only block when awaiting approval AND threshold unmet AND not admin
-  if(requires && awaiting && !thresholdMet && !isAdmin){
+  // Gate: block whenever the ticket still needs approval (quote OR proposal),
+  // is in a pre-work status, the threshold isn't met, and the user isn't admin.
+  if(requires && preWork && !thresholdMet && !isAdmin){
     wipOption.disabled = true;
     wipOption.textContent = 'Work In Progress (locked — needs '+TRUSTEE_APPROVAL_THRESHOLD+' trustee approvals)';
   }
@@ -15087,14 +15235,17 @@ function autoSaveTicket(){
     _currentTicketId = id;
     var prev = TICKETS[id] || {};
     var status = document.getElementById('tkt-status').value;
-    // Threshold gate: a non-admin trying to move from awaiting_trustee_approval
-    // to work_in_progress before 3 trustees approve the SAME item is blocked.
-    // This is defense-in-depth — the dropdown option is also disabled in UI.
-    if(prev.status === 'awaiting_trustee_approval'
-       && status === 'work_in_progress'
+    // Threshold gate: a non-admin trying to move to work_in_progress from any
+    // pre-work status, before 3 trustees approve the SAME item (quote OR
+    // proposal), is blocked. This is defense-in-depth — the dropdown option is
+    // also disabled in the UI.
+    var _preWorkStatuses = ['open','awaiting_quote','awaiting_trustee_approval'];
+    if(status === 'work_in_progress'
+       && _preWorkStatuses.indexOf(prev.status) !== -1
        && _currentRole !== 'admin'
+       && ticketRequiresApproval(prev)
        && !isApprovalThresholdMet(prev)){
-      alert('Work In Progress is locked.\n\nAt least '+TRUSTEE_APPROVAL_THRESHOLD+' trustees must approve the SAME quote (or the "no quote required" item) before this ticket can advance. Only an admin can override.');
+      alert('Work In Progress is locked.\n\nAt least '+TRUSTEE_APPROVAL_THRESHOLD+' trustees must approve the SAME quote or proposal before this ticket can advance. Only an admin can override.');
       // Revert dropdown to the previous status
       document.getElementById('tkt-status').value = prev.status;
       renderStatusFlow(prev.status);
@@ -18188,6 +18339,341 @@ async function submitNewTkt(){
 // ── Share-view rendering ─────────────────────────────────────────────────
 // Runs after DOM is ready. If _SHARE_MODE is set, hides the rest of the app
 // chrome and renders a read-only ticket view fetched via the anon key.
+// ── Share-view trustee approval ────────────────────────────────────────────
+// The shared ticket link stays open (anyone with the link can VIEW). But if
+// the person opening it is a trustee/admin who is already signed in on this
+// browser — or signs in with the inline box below — they can approve pending
+// quotes/proposals right from the share screen, casting the same threshold
+// vote the in-app approval panel uses. This is a workflow/audit convenience,
+// not an access boundary (all writes still go through the Supabase anon key,
+// exactly as everywhere else in this app).
+
+// Return {id,name,role} if a trustee/admin session exists on this browser.
+function _shareSessionTrustee(){
+  try{
+    var s = (typeof getLocalSession === 'function') ? getLocalSession() : null;
+    if(s && s.userId && (s.role === 'trustee' || s.role === 'admin')){
+      return { id: s.userId, name: s.name || s.username || 'Trustee', role: s.role };
+    }
+  }catch(e){}
+  return null;
+}
+
+// Enumerate the items a trustee can approve on this ticket — quote documents,
+// supplier-submitted quotes, and free-text proposals — mirroring the in-app
+// renderTicketApprovalPanel enumeration but self-contained for the share view.
+function _shareApprovableItems(t){
+  var items = [];
+  (t.linkedDocIds || []).forEach(function(id){
+    var inv = (typeof INVOICES !== 'undefined') ? INVOICES[id] : null;
+    if(inv && inv.docType === 'Quote'){
+      items.push({ id:id, kind:'Quote', name:(inv.invCompany || inv.name || 'Quote'), amount:inv.amount, number:inv.invNumber, docId:id });
+    }
+  });
+  if(t.quotes && typeof t.quotes === 'object'){
+    Object.keys(t.quotes).forEach(function(supId){
+      var sq = t.quotes[supId];
+      if(!sq || sq.status !== 'submitted') return;
+      var supName = (typeof SUPPLIERS !== 'undefined' && SUPPLIERS[supId] && SUPPLIERS[supId].name) || sq.byName || 'Supplier';
+      items.push({ id:'supquote_'+supId, kind:'Supplier quote', name:supName, amount:sq.amount, docId:sq.docId || null });
+    });
+  }
+  var crits = (typeof getTicketCriteria === 'function') ? getTicketCriteria(t) : (t.criteria || []);
+  (crits || []).forEach(function(c){
+    if(!c || !c.id) return;
+    items.push({ id:c.id, kind:'Proposal', name:c.text || '(proposal)' });
+  });
+  return items;
+}
+
+function _shareMoney(v){
+  if(typeof v !== 'number' || isNaN(v)) return '';
+  return 'R ' + Number(v).toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+// Render the interactive approval block into #share-approval-section.
+// Trustee roster, lazy-loaded only when an ADMIN is signed in on the share
+// screen (admins record approvals on behalf of trustees, never as themselves).
+var _shareTrustees = null;        // null = not loaded yet; [] = loaded/empty
+var _shareTrusteesLoading = false;
+async function _shareLoadTrustees(){
+  if(_shareTrustees !== null || _shareTrusteesLoading) return;
+  _shareTrusteesLoading = true;
+  try{
+    if(typeof sbLoadAll === 'function'){
+      var rows = await sbLoadAll('users');
+      // Keep USERS populated so name-resolution elsewhere works in share mode.
+      if(typeof USERS !== 'undefined' && USERS){ Object.keys(rows).forEach(function(id){ if(!USERS[id]) USERS[id] = rows[id]; }); }
+      var list = [];
+      Object.keys(rows).forEach(function(id){
+        var u = rows[id];
+        if(u && u.role === 'trustee'){ list.push({ id:id, name:(u.name || u.username || 'Trustee') }); }
+      });
+      list.sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); });
+      _shareTrustees = list;
+    } else { _shareTrustees = []; }
+  }catch(e){ _shareTrustees = []; }
+  finally { _shareTrusteesLoading = false; shareRenderApprovalSection(); }
+}
+
+function shareRenderApprovalSection(){
+  var host = document.getElementById('share-approval-section');
+  if(!host) return;
+  var t = (typeof TICKETS !== 'undefined' && _SHARE_MODE) ? TICKETS[_SHARE_MODE.ticketId] : null;
+  if(!t){ host.innerHTML = ''; return; }
+
+  // Only interactive while the ticket is awaiting trustee approval. Other
+  // statuses keep the read-only audit summary rendered elsewhere.
+  if((t.status || 'open') !== 'awaiting_trustee_approval'){ host.innerHTML = ''; return; }
+
+  var THRESH = (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined') ? TRUSTEE_APPROVAL_THRESHOLD : 3;
+  var items = _shareApprovableItems(t);
+  var approvals = Array.isArray(t.approvals) ? t.approvals : [];
+  var sess = _shareSessionTrustee();
+  var isAdmin = !!(sess && sess.role === 'admin');
+  // Admins record approvals on behalf of trustees — ensure the roster is loaded.
+  if(isAdmin && _shareTrustees === null){ _shareLoadTrustees(); }
+
+  var card = 'margin-bottom:24px;padding:16px 18px;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.3);border-radius:12px';
+  var out = '<div style="'+card+'">';
+  out += '<div style="font-size:11px;color:var(--st-appr,#c084fc);font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono);margin-bottom:4px">Awaiting Trustee Approval</div>';
+  out += '<div style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin-bottom:14px">A quote or proposal needs <b>'+THRESH+'</b> trustees to approve the <b>same</b> item before the work can start.</div>';
+
+  if(!items.length){
+    out += '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);font-style:italic">No quotes or proposals have been added to this ticket yet.</div>';
+    out += '</div>';
+    host.innerHTML = out;
+    return;
+  }
+
+  // One row per approvable item
+  items.forEach(function(it){
+    var eid = String(it.id).replace(/'/g,"\\'");
+    var count = approvals.filter(function(a){ return a && a.quoteId === it.id; }).length;
+    var met = count >= THRESH;
+    var amount = _shareMoney(it.amount);
+    var pill = met
+      ? '<span style="font-size:10px;font-family:var(--mono);font-weight:600;color:var(--green,#4ade9e);background:var(--green-bg,rgba(74,222,158,.12));border:1px solid var(--green-bd,rgba(74,222,158,.3));padding:2px 9px;border-radius:10px;white-space:nowrap">✓ '+count+' / '+THRESH+' met</span>'
+      : '<span style="font-size:10px;font-family:var(--mono);color:#f59e0b;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);padding:2px 9px;border-radius:10px;white-space:nowrap">'+count+' / '+THRESH+' approved</span>';
+
+    // Right-column action (trustee self-approve) and/or a below-row block
+    // (admin on-behalf-of chips).
+    var rightAction = '';
+    var belowBlock = '';
+    if(!sess){
+      rightAction = '<span style="font-size:10px;color:var(--muted);font-family:var(--mono)">sign in to approve</span>';
+    } else if(isAdmin){
+      // Admin cannot approve as itself — record on behalf of each trustee.
+      if(_shareTrustees === null){
+        belowBlock = '<div style="margin-top:10px;font-size:10px;color:var(--muted);font-family:var(--mono)">Loading trustees…</div>';
+      } else if(!_shareTrustees.length){
+        belowBlock = '<div style="margin-top:10px;font-size:10px;color:var(--muted);font-family:var(--mono)">No trustee accounts found to record approvals for.</div>';
+      } else {
+        var chips = _shareTrustees.map(function(tr){
+          var appr = approvals.some(function(a){ return a && a.quoteId === it.id && a.trusteeId === tr.id; });
+          var tid = String(tr.id).replace(/'/g,"\\'");
+          var st = appr
+            ? 'background:var(--green-bg,rgba(74,222,158,.14));border:1px solid var(--green-bd,rgba(74,222,158,.4));color:var(--green,#4ade9e)'
+            : 'background:var(--surface);border:1px solid var(--border2);color:var(--text2)';
+          return '<button onclick="shareApproveItem(\''+eid+'\','+(appr?'true':'false')+',\''+tid+'\')" title="'+(appr?'Remove':'Record')+' approval for '+escHtml(tr.name)+'" style="'+st+';padding:5px 11px;border-radius:14px;font-size:11px;font-family:var(--sans);cursor:pointer;white-space:nowrap">'+(appr?'✓ ':'')+escHtml(tr.name)+'</button>';
+        }).join('');
+        belowBlock = '<div style="margin-top:10px"><div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">Record approval on behalf of</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+chips+'</div></div>';
+      }
+    } else {
+      // Trustee approves as themselves.
+      var mine = approvals.some(function(a){ return a && a.quoteId === it.id && a.trusteeId === sess.id; });
+      rightAction = mine
+        ? '<button onclick="shareApproveItem(\''+eid+'\',true)" style="padding:7px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer" title="Remove your approval">✓ You approved — undo</button>'
+        : '<button onclick="shareApproveItem(\''+eid+'\',false)" style="padding:7px 16px;background:var(--green,#22c55e);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer">Approve</button>';
+    }
+
+    var approverNames = approvals.filter(function(a){ return a && a.quoteId === it.id; })
+      .map(function(a){ return escHtml(String(a.trusteeName || 'trustee').split(' ')[0]); });
+    var approverLine = approverNames.length
+      ? '<div style="font-size:10px;color:var(--green,#4ade9e);font-family:var(--mono);margin-top:6px">✓ '+approverNames.join(', ')+'</div>'
+      : '';
+
+    out += '<div style="padding:12px 0;border-top:1px solid var(--border,rgba(255,255,255,.08))">'
+      + '<div style="display:flex;align-items:flex-start;gap:12px">'
+        + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.6px;margin-bottom:3px">'+it.kind+'</div>'
+          + '<div style="font-size:13px;color:var(--text2);font-weight:600;line-height:1.4;word-break:break-word">'+escHtml(it.name)+(amount?' <span style="color:var(--green,#4ade9e);font-weight:700">· '+amount+'</span>':'')+'</div>'
+          + approverLine
+        + '</div>'
+        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">'+rightAction+pill+'</div>'
+      + '</div>'
+      + belowBlock
+      + '</div>';
+  });
+
+  // Footer: who you are, or the inline sign-in box
+  if(sess){
+    var adminNote = isAdmin
+      ? '<div style="font-size:10px;color:var(--muted);font-family:var(--sans);margin-top:4px;line-height:1.4">As admin you record approvals <b>on behalf of</b> trustees — an admin can\'t approve as itself.</div>'
+      : '';
+    out += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border,rgba(255,255,255,.08))">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'
+        + '<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">Signed in as <b style="color:var(--text2)">'+escHtml(sess.name)+'</b> ('+escHtml(sess.role)+')</div>'
+        + '<button onclick="shareSignOut()" style="padding:4px 10px;background:none;border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:10px;font-family:var(--mono);cursor:pointer">Sign out</button>'
+      + '</div>'
+      + adminNote
+      + '</div>';
+  } else {
+    out += ''
+      + '<div id="share-login-box" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border,rgba(255,255,255,.08))">'
+        + '<div style="font-size:11px;color:var(--muted);font-family:var(--sans);margin-bottom:8px">Are you a trustee? Sign in to approve — you stay on this page.</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+          + '<input id="share-login-user" placeholder="username" autocomplete="username" style="flex:1;min-width:130px;padding:9px 11px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans)">'
+          + '<input id="share-login-pass" type="password" placeholder="password" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')shareDoLogin()" style="flex:1;min-width:130px;padding:9px 11px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans)">'
+          + '<button onclick="shareDoLogin()" style="padding:9px 18px;background:var(--accent,#7b68ee);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">Sign in</button>'
+        + '</div>'
+        + '<div id="share-login-err" style="font-size:11px;color:#f06f6f;font-family:var(--mono);margin-top:8px;min-height:14px"></div>'
+      + '</div>';
+  }
+
+  out += '</div>';
+  host.innerHTML = out;
+}
+
+// Cast (or, with undo=true, remove) this trustee's approval for one item, then
+// persist to Supabase using the same anon-key upsert the app uses everywhere.
+async function shareApproveItem(itemId, undo, onBehalfTrusteeId){
+  var sess = _shareSessionTrustee();
+  if(!sess){ alert('Please sign in to approve.'); return; }
+  var t = (typeof TICKETS !== 'undefined' && _SHARE_MODE) ? TICKETS[_SHARE_MODE.ticketId] : null;
+  if(!t){ return; }
+  if((t.status || 'open') !== 'awaiting_trustee_approval'){
+    alert('This ticket is no longer awaiting trustee approval.');
+    shareRenderApprovalSection();
+    return;
+  }
+  var items = _shareApprovableItems(t);
+  var item = items.find(function(x){ return x.id === itemId; });
+  if(!item){ alert('That item is no longer on this ticket.'); shareRenderApprovalSection(); return; }
+
+  // Resolve WHOSE approval this is. An admin never approves as itself — it
+  // must target a trustee (the on-behalf-of chips). A trustee approves as self.
+  var approverId, approverName, recordedBy = null, onBehalf = false;
+  if(sess.role === 'admin'){
+    if(!onBehalfTrusteeId){
+      alert('As an admin you approve on behalf of a trustee — pick the trustee whose approval you are recording.');
+      return;
+    }
+    approverId = onBehalfTrusteeId;
+    var tr = (_shareTrustees || []).find(function(x){ return x.id === onBehalfTrusteeId; })
+      || (typeof USERS !== 'undefined' && USERS[onBehalfTrusteeId]) || null;
+    approverName = tr ? (tr.name || tr.username || 'Trustee') : 'Trustee';
+    recordedBy = sess.id;
+    onBehalf = true;
+  } else {
+    approverId = sess.id;
+    approverName = sess.name;
+  }
+
+  var approvals = Array.isArray(t.approvals) ? t.approvals.slice() : [];
+  var existing = approvals.findIndex(function(a){ return a && a.quoteId === itemId && a.trusteeId === approverId; });
+
+  if(undo){
+    if(existing < 0){ shareRenderApprovalSection(); return; }
+    if(!confirm(onBehalf ? 'Remove '+approverName+'’s approval of "'+item.name+'"?' : 'Remove your approval of "'+item.name+'"?')) return;
+    approvals.splice(existing, 1);
+    t.log = t.log || [];
+    t.log.push({ type:'status', text:'↩ Approval withdrawn '+(onBehalf?'for '+approverName+' (by '+sess.name+', admin)':'by '+approverName)+': '+item.name, ts:Date.now() });
+  } else {
+    if(existing >= 0){ shareRenderApprovalSection(); return; }
+    var amount = _shareMoney(item.amount);
+    var confirmMsg = onBehalf
+      ? 'Record '+approverName+'’s approval of this '+item.kind.toLowerCase()+'?\n\n'+item.name+(amount?'\n'+amount:'')+'\n\nThe approval is logged in '+approverName+'’s name (recorded by you as admin).'
+      : 'Approve this '+item.kind.toLowerCase()+'?\n\n'+item.name+(amount?'\n'+amount:'')+'\n\nAt least '+((typeof TRUSTEE_APPROVAL_THRESHOLD!=='undefined')?TRUSTEE_APPROVAL_THRESHOLD:3)+' trustees must approve the SAME item before the work can start.';
+    if(!confirm(confirmMsg)) return;
+    approvals.push({ quoteId:itemId, trusteeId:approverId, trusteeName:approverName, ts:Date.now(), recordedBy:recordedBy, viaShareLink:true });
+    t.log = t.log || [];
+    t.log.push({ type:'status', text:'✓ '+item.kind+' approved by '+approverName+(onBehalf?' (recorded by '+sess.name+', admin, via share link)':' (via share link)')+': '+item.name+(_shareMoney(item.amount)?' ('+_shareMoney(item.amount)+')':''), ts:Date.now() });
+  }
+
+  t.approvals = approvals;
+  // Clear the legacy single-approval fields so getTicketApprovals reads the array.
+  t.approvedQuoteId = null; t.approvedBy = null; t.approvedByName = null; t.approvedAt = null;
+  t.updated = Date.now();
+
+  // Optimistic re-render, then persist.
+  shareRenderApprovalSection();
+  if(typeof renderTicketTimeline === 'function'){ try{ renderTicketTimeline(t); }catch(e){} }
+  try {
+    try { localStorage.setItem('pm_tickets_share_'+t.id, JSON.stringify(t)); } catch(e){}
+    await sbUpsert('tickets', scopedId(t.id), t);
+  } catch(e){
+    console.warn('shareApproveItem: save failed', e);
+    alert('Your approval was recorded on screen but could not be saved to the server. Please check your connection and try again.');
+  }
+}
+
+// Inline sign-in on the share screen. Uses the server password-login endpoint
+// (works on the deployed site); on success we set the local session so the
+// approval controls appear, WITHOUT switching into the full app UI.
+async function shareDoLogin(){
+  var uEl = document.getElementById('share-login-user');
+  var pEl = document.getElementById('share-login-pass');
+  var errEl = document.getElementById('share-login-err');
+  if(errEl) errEl.textContent = '';
+  var u = uEl ? uEl.value.trim().toLowerCase() : '';
+  var p = pEl ? pEl.value : '';
+  if(!u || !p){ if(errEl) errEl.textContent = 'Enter your username and password.'; return; }
+
+  function establish(userObj){
+    if(!userObj) return false;
+    var role = userObj.role || 'viewer';
+    if(role !== 'trustee' && role !== 'admin'){
+      if(errEl) errEl.textContent = 'That account is not a trustee, so it cannot approve.';
+      return false;
+    }
+    try { if(typeof setLocalSession === 'function') setLocalSession(userObj); } catch(e){}
+    try { _currentUserObj = userObj; _currentRole = role; _isAdmin = (role === 'admin'); } catch(e){}
+    return true;
+  }
+
+  // Built-in admin fallback (matches doLogin's hard-coded admin path).
+  try{
+    if(typeof ADMIN_USER !== 'undefined' && typeof ADMIN_PASS !== 'undefined' && u === ADMIN_USER && p === ADMIN_PASS){
+      if(establish({ id:'__admin__', username:'admin', name:'Admin', role:'admin' })) shareRenderApprovalSection();
+      return;
+    }
+  }catch(e){}
+
+  // Local check when USERS is already loaded (usually not, in share view).
+  try{
+    if(typeof USERS !== 'undefined' && USERS){
+      var cand = Object.values(USERS).find(function(usr){ return usr.username === u; });
+      if(cand && typeof verifyPassword === 'function' && await verifyPassword(p, cand.password)){
+        if(establish(cand)) shareRenderApprovalSection();
+        return;
+      }
+    }
+  }catch(e){}
+
+  // Server endpoint — authoritative on the deployed site.
+  try{
+    var r = await fetch('/api/passkey/password-login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username:u, password:p })
+    });
+    if(!r.ok){ if(errEl) errEl.textContent = 'Invalid username or password.'; return; }
+    var data = await r.json();
+    if(data && data.token && typeof setSessionToken === 'function'){ try { setSessionToken(data.token); } catch(e){} }
+    var serverUser = (data && data.user) ? data.user : null;
+    if(establish(serverUser)) shareRenderApprovalSection();
+    else if(errEl && !errEl.textContent) errEl.textContent = 'Could not sign in.';
+  }catch(e){
+    if(errEl) errEl.textContent = 'Network error — please try again.';
+  }
+}
+
+function shareSignOut(){
+  try { if(typeof clearLocalSession === 'function') clearLocalSession(); } catch(e){}
+  try { _currentUserObj = null; _currentRole = null; _isAdmin = false; } catch(e){}
+  shareRenderApprovalSection();
+}
+
 async function renderShareView(){
   if(!_SHARE_MODE) return;
   // Hide everything except the share-view container
@@ -18285,10 +18771,10 @@ async function renderShareView(){
         }).join('')
     + '</div>';
   } else if(status === 'awaiting_trustee_approval'){
-    approvalsHtml = '<div style="margin-bottom:24px;padding:14px 16px;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.3);border-radius:10px">'
-      + '<div style="font-size:11px;color:var(--st-appr);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono)">Awaiting Trustee Approval</div>'
-      + '<div style="font-size:12px;color:var(--muted);margin-top:4px">Trustees are reviewing this ticket.</div>'
-    + '</div>';
+    // The interactive #share-approval-section (rendered below) owns the
+    // awaiting-approval UI — including the per-item approver list — so we
+    // don't duplicate a static "Trustees are reviewing" banner here.
+    approvalsHtml = '';
   }
 
   // Log + attachments are now rendered via the in-app timeline renderer for
@@ -18300,7 +18786,7 @@ async function renderShareView(){
     + '<div id="tkt-timeline-body"><div style="font-size:12px;color:var(--muted);font-family:var(--mono);text-align:center;padding:30px 0">Loading timeline…</div></div>'
   + '</div>';
 
-  showContent(headerHtml + descHtml + approvalsHtml + timelineHtml);
+  showContent(headerHtml + descHtml + approvalsHtml + '<div id="share-approval-section"></div>' + timelineHtml);
 
   // Stage the ticket and load its linked documents so renderTicketTimeline()
   // has everything it needs. The renderer reads from the global INVOICES map
@@ -18308,7 +18794,13 @@ async function renderShareView(){
   // both before calling it.
   var ids = ticket.linkedDocIds || [];
   if(typeof TICKETS !== 'undefined') TICKETS[ticket.id] = ticket;
+  try { _currentTicketId = ticket.id; } catch(e){}
   if(typeof window !== 'undefined') window._timelineTicketId = ticket.id;
+
+  // Render the trustee approval controls now (quotes may be supplier-quotes or
+  // proposals that don't need the linked-doc fetch). It re-renders again after
+  // linked documents load so quote *documents* become approvable too.
+  try { shareRenderApprovalSection(); } catch(e){ console.warn('shareRenderApprovalSection error', e); }
 
   // In the share view, clicks on a document in the timeline open a lightbox
   // (read-only) instead of the editable invoice modal. Override the click
@@ -18331,6 +18823,9 @@ async function renderShareView(){
     _shareFetchLinkedDocs(ids).then(function(){
       // Re-render now that thumbnails and inline data are available.
       if(typeof renderTicketTimeline === 'function') renderTicketTimeline(ticket);
+      // Quote documents are now in INVOICES — refresh the approval section so
+      // they show as approvable items.
+      try { shareRenderApprovalSection(); } catch(e){}
     });
   }
 }
