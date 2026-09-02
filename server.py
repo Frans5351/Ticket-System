@@ -55,6 +55,12 @@ class ParkManorHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json({'ok': True})
         elif path.startswith('/api/'):
             self.proxy_netlify('GET')
+        elif path.startswith('/s/'):
+            # Pretty share link (/s/<ticketId>?t=<token>). In production a
+            # Netlify function serves this with a rich preview card; locally we
+            # just serve the app — the SPA reads the ticket id from the path.
+            self.path = '/index.html'
+            super().do_GET()
         else:
             super().do_GET()
 

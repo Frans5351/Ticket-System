@@ -245,7 +245,15 @@ function updateSchemeHeader(){
 var _SHARE_MODE = (function(){
   try {
     var qs = new URLSearchParams(location.search);
-    var sid = qs.get('share'), tok = qs.get('t');
+    var sid = qs.get('share');
+    var tok = qs.get('t');
+    // Also accept the pretty /s/<ticketId>?t=<token> form. In production the
+    // Netlify preview function serves that path, but this lets the app work if
+    // it's ever loaded there directly (e.g. local dev serving the SPA for /s/).
+    if(!sid){
+      var m = location.pathname.match(/\/s\/([^\/?#]+)\/?$/);
+      if(m) sid = decodeURIComponent(m[1]);
+    }
     return (sid && tok) ? {ticketId: sid, token: tok} : null;
   } catch(e){ return null; }
 })();
@@ -289,8 +297,21 @@ function generateShareToken(){
   return out;
 }
 function buildShareUrl(ticketId, token){
-  var u = location.origin + location.pathname;
-  return u + '?share=' + encodeURIComponent(ticketId) + '&t=' + encodeURIComponent(token);
+  // On the deployed site, route through the /s/:id preview function so pasting
+  // the link into WhatsApp / Facebook / Slack / iMessage shows a rich card
+  // (ticket title, status and description) instead of a bare URL. The function
+  // serves the Open Graph tags to link crawlers and forwards real visitors to
+  // the live ticket view (?share=…).
+  //
+  // On localhost the simple dev server doesn't run that function, so a /s/…
+  // link would 404 — use the direct ?share= form there instead (rich previews
+  // are irrelevant locally anyway).
+  var host = location.hostname;
+  var isLocal = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '';
+  if(isLocal){
+    return location.origin + location.pathname + '?share=' + encodeURIComponent(ticketId) + '&t=' + encodeURIComponent(token);
+  }
+  return location.origin + '/s/' + encodeURIComponent(ticketId) + '?t=' + encodeURIComponent(token);
 }
 // Per-supplier quote link. Distinct from buildShareUrl (which is an admin-
 // granted view-anything link) because this one is scoped to ONE supplier on
