@@ -5859,9 +5859,54 @@ document.getElementById('tbody').addEventListener('click', function(e){
         <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Address</div>
         <textarea id="sup-address" placeholder="Street, suburb, city, postcode" style="width:100%;height:60px;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);resize:none;outline:none;box-sizing:border-box"></textarea>
       </div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">VAT Number</div>
+          <input id="sup-vat" type="text" placeholder="e.g. 4123456789" style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+        </div>
+        <div style="flex:1">
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Company Reg. Number</div>
+          <input id="sup-regno" type="text" placeholder="e.g. 2015/123456/07" style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <!-- Banking details -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">🏦 Banking details</div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Bank</div>
+            <input id="sup-bank-name" type="text" placeholder="e.g. FNB" style="width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Account Type</div>
+            <select id="sup-bank-type" style="width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+              <option value="">—</option>
+              <option value="Cheque">Cheque / Current</option>
+              <option value="Savings">Savings</option>
+              <option value="Transmission">Transmission</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Account Holder</div>
+          <input id="sup-bank-holder" type="text" placeholder="Name the account is held under" style="width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:2">
+            <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Account Number</div>
+            <input id="sup-bank-acc" type="text" inputmode="numeric" placeholder="e.g. 62012345678" style="width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Branch Code</div>
+            <input id="sup-bank-branch" type="text" inputmode="numeric" placeholder="e.g. 250655" style="width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+          </div>
+        </div>
+      </div>
+
       <div>
         <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Notes</div>
-        <input id="sup-notes" type="text" placeholder="VAT number, speciality, etc." style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
+        <input id="sup-notes" type="text" placeholder="speciality, lead time, etc." style="width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;box-sizing:border-box">
       </div>
       <div>
         <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px">Tags <span style="color:#3a5070;font-weight:400">(e.g. plumber, electrician — press Enter or comma to add)</span></div>
@@ -6208,6 +6253,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
         <button id="tkt-view-list" class="tkt-vt active" onclick="setTktView('list')" title="List view">\u2630</button>
         <button id="tkt-view-board" class="tkt-vt" onclick="setTktView('board')" title="Board view (drag cards between statuses)">\u25a5</button>
       </span>
+      <button id="tkt-export-btn" onclick="exportTicketsExcel()" title="Export open tickets, sub-tickets &amp; quotes to Excel" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⬇ Export</button>
       <button id="new-tkt-btn" onclick="openTrackerTypeChooser()" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> New</button>
     </div>
   </div>
@@ -6556,11 +6602,17 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <div id="tkt-status-flow" style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0;overflow-x:auto"></div>
     <div id="tkt-journey" style="display:none;padding:10px 20px 8px;border-bottom:1px solid var(--border)"></div>
 
+    <!-- Parent banner (only on a sub-ticket) — links back to the epic. -->
+    <div id="tkt-parent-banner" style="display:none;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--surface2)"></div>
+
     <!-- Description (full-width row; reads naturally before approvals) -->
     <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
       <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Description</div>
       <textarea id="tkt-desc" placeholder="Describe the issue..." style="width:100%;min-height:72px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:14px;padding:10px;resize:vertical;outline:none;box-sizing:border-box;font-family:var(--sans);line-height:1.45" oninput="autoSaveTicket()"></textarea>
     </div>
+
+    <!-- Sub-tickets (epic → story). Only on a saved parent ticket; populated by renderSubticketsSection. -->
+    <div id="tkt-subtickets-section" style="display:none;padding:14px 16px;border-bottom:1px solid var(--border)"></div>
 
     <!-- Trustee-approval panel (shown only when status is awaiting_trustee_approval or already-approved). Populated by renderTicketApprovalPanel. -->
     <div id="tkt-approval-panel" style="display:none;border-bottom:1px solid var(--border);padding:14px 20px;background:var(--appr-wash)"></div>
@@ -10262,7 +10314,7 @@ function clearSupplierTagFilters(){
 function openSupplierModal(supplierId){
   _currentSupplierId = supplierId;
   var isNew = !supplierId || !SUPPLIERS[supplierId];
-  var s = isNew ? {name:'',phone:'',whatsappPhone:'',email:'',address:'',notes:'',tags:[]} : SUPPLIERS[supplierId];
+  var s = isNew ? {name:'',phone:'',whatsappPhone:'',email:'',address:'',notes:'',tags:[],vat:'',regNo:'',bankName:'',bankType:'',bankHolder:'',bankAccount:'',bankBranch:''} : SUPPLIERS[supplierId];
   document.getElementById('supplier-modal-title').textContent = isNew ? 'Add Supplier' : 'Edit Supplier';
   document.getElementById('supplier-delete-btn').style.display = isNew ? 'none' : '';
   document.getElementById('sup-name').value = s.name||'';
@@ -10270,6 +10322,15 @@ function openSupplierModal(supplierId){
   document.getElementById('sup-whatsapp').value = s.whatsappPhone||'';
   document.getElementById('sup-email').value = s.email||'';
   document.getElementById('sup-address').value = s.address||'';
+  // VAT / company registration / banking details
+  function _setSup(id, val){ var el = document.getElementById(id); if(el) el.value = val || ''; }
+  _setSup('sup-vat', s.vat);
+  _setSup('sup-regno', s.regNo);
+  _setSup('sup-bank-name', s.bankName);
+  _setSup('sup-bank-type', s.bankType);
+  _setSup('sup-bank-holder', s.bankHolder);
+  _setSup('sup-bank-acc', s.bankAccount);
+  _setSup('sup-bank-branch', s.bankBranch);
   document.getElementById('sup-notes').value = s.notes||'';
   // Clone tags into a working buffer. The Save button is the only thing
   // that flushes _supModalTags back onto SUPPLIERS[id].tags — until then,
@@ -10365,6 +10426,7 @@ async function saveSupplierFromModal(){
   // invoice references to the OLD name and re-create a ghost supplier —
   // "I renamed a supplier and now there are two of them."
   var prevName = (SUPPLIERS[id] && SUPPLIERS[id].name) ? SUPPLIERS[id].name : '';
+  function _supVal(elId){ var el = document.getElementById(elId); return el ? el.value.trim() : ''; }
   SUPPLIERS[id] = {
     id: id,
     name: name,
@@ -10372,6 +10434,13 @@ async function saveSupplierFromModal(){
     whatsappPhone: document.getElementById('sup-whatsapp').value.trim(),
     email:   document.getElementById('sup-email').value.trim(),
     address: document.getElementById('sup-address').value.trim(),
+    vat:        _supVal('sup-vat'),
+    regNo:      _supVal('sup-regno'),
+    bankName:   _supVal('sup-bank-name'),
+    bankType:   _supVal('sup-bank-type'),
+    bankHolder: _supVal('sup-bank-holder'),
+    bankAccount:_supVal('sup-bank-acc'),
+    bankBranch: _supVal('sup-bank-branch'),
     notes:   document.getElementById('sup-notes').value.trim(),
     tags:    _supModalTags.slice(),
     added:   SUPPLIERS[id] ? SUPPLIERS[id].added : Date.now()
@@ -14081,7 +14150,165 @@ function renderTicketFilterChips(){
   }).join('');
 }
 
+// ── Export tickets → Excel ──────────────────────────────────────────────────
+// Exports every NON-closed ticket and sub-ticket, plus the quotes associated
+// with them, to a two-sheet .xlsx (Tickets + Quotes). The activity log is
+// intentionally excluded. Uses SheetJS, lazy-loaded from a CDN on first use
+// (falls back to CSV if the library can't load, e.g. offline).
+
+function _xlsxLoad(){
+  return new Promise(function(resolve, reject){
+    if(window.XLSX) return resolve(window.XLSX);
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = function(){ window.XLSX ? resolve(window.XLSX) : reject(new Error('XLSX failed to initialise')); };
+    s.onerror = function(){ reject(new Error('Could not load the Excel library (offline?)')); };
+    document.head.appendChild(s);
+  });
+}
+function _expNum(v){ var n = parseFloat(v); return isFinite(n) ? n : null; }
+function _expStatusLabel(t){
+  var s = (typeof TKT_STATUS !== 'undefined') ? TKT_STATUS[normalizeStatus(t.status)] : null;
+  return (s && s.label) || t.status || 'Open';
+}
+// All quotes on a ticket — both document quotes and supplier-portal quotes.
+function _expTicketQuotes(t){
+  var out = [];
+  (t.linkedDocIds || []).forEach(function(id){
+    var inv = (typeof INVOICES !== 'undefined') ? INVOICES[id] : null;
+    if(inv && /quote/i.test(String(inv.docType || ''))){
+      out.push({ quoteId:id, type:'Document', company:(inv.invCompany || inv.name || ''), amount:_expNum(inv.amount != null ? inv.amount : inv.invAmount), ref:(inv.invNumber || ''), date:(inv.invDate || '') });
+    }
+  });
+  if(t.quotes && typeof t.quotes === 'object'){
+    Object.keys(t.quotes).forEach(function(supId){
+      var q = t.quotes[supId];
+      if(!q || q.status !== 'submitted') return;
+      var nm = (typeof SUPPLIERS !== 'undefined' && SUPPLIERS[supId] && SUPPLIERS[supId].name) || q.byName || 'Supplier';
+      out.push({ quoteId:'supquote_' + supId, type:'Supplier portal', company:nm, amount:_expNum(q.amount), ref:'', date:(q.submittedAt ? new Date(q.submittedAt).toISOString().slice(0,10) : '') });
+    });
+  }
+  return out;
+}
+function _expApprovalCounts(t){
+  var counts = {};
+  (typeof getTicketApprovals === 'function' ? getTicketApprovals(t) : (t.approvals || [])).forEach(function(a){
+    if(a && a.quoteId) counts[a.quoteId] = (counts[a.quoteId] || 0) + 1;
+  });
+  return counts;
+}
+function _expAcceptedQuoteId(t){
+  if(t.approvedQuoteId) return t.approvedQuoteId;
+  var counts = _expApprovalCounts(t), lead = null, max = 0;
+  Object.keys(counts).forEach(function(k){ if(counts[k] > max){ max = counts[k]; lead = k; } });
+  var thr = (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined') ? TRUSTEE_APPROVAL_THRESHOLD : 3;
+  return max >= thr ? lead : null;
+}
+
+async function exportTicketsExcel(){
+  if(!(_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management')){
+    alert('Only admin, trustees or management can export the tracker.');
+    return;
+  }
+  var btn = document.getElementById('tkt-export-btn');
+  var prevLabel = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Exporting…'; }
+  try {
+    var thr = (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined') ? TRUSTEE_APPROVAL_THRESHOLD : 3;
+    // Non-closed tickets and sub-tickets, ordered so a parent is followed by
+    // its children.
+    var open = Object.values(TICKETS).filter(function(t){ return t && normalizeStatus(t.status) !== 'closed'; });
+    function sortKey(t){
+      var parentNum = t.parentId && TICKETS[t.parentId] ? (TICKETS[t.parentId].ticketNumber || 0) : (t.ticketNumber || 0);
+      return parentNum * 1000 + (t.parentId ? (t.ticketNumber || 0) % 1000 + 1 : 0);
+    }
+    open.sort(function(a,b){ return sortKey(a) - sortKey(b); });
+
+    var tHead = ['Ticket #','Level','Parent #','Title','Status','Priority','Category','Unit','Reporter','Date Opened','Description','Sub-tickets (done/total)','# Quotes','Total quoted (R)','Accepted quote','Accepted amount (R)','Trustee approvals','Assigned suppliers'];
+    var tRows = [tHead];
+    var qHead = ['Ticket #','Ticket title','Quote type','Supplier / Company','Amount (R)','Ref #','Date','Approvals','Accepted'];
+    var qRows = [qHead];
+
+    open.forEach(function(t){
+      var kids = (typeof getChildTickets === 'function') ? getChildTickets(t.id) : [];
+      var kidsDone = kids.filter(function(k){ return normalizeStatus(k.status) === 'closed'; }).length;
+      var parent = t.parentId ? TICKETS[t.parentId] : null;
+      var quotes = _expTicketQuotes(t);
+      var total = quotes.reduce(function(s,q){ return s + (q.amount || 0); }, 0);
+      var counts = _expApprovalCounts(t);
+      var accId = _expAcceptedQuoteId(t);
+      var acc = accId ? quotes.find(function(q){ return q.quoteId === accId; }) : null;
+      var lead = 0; Object.keys(counts).forEach(function(k){ if(counts[k] > lead) lead = counts[k]; });
+      var apprStr = Object.keys(counts).length ? (lead + ' / ' + thr + (lead >= thr ? ' (met)' : '')) : '';
+      var supNames = (t.assignedSupplierIds || []).map(function(sid){ return (SUPPLIERS[sid] && SUPPLIERS[sid].name) || sid; }).join(', ');
+      tRows.push([
+        t.ticketNumber || '',
+        t.parentId ? 'Sub-ticket' : 'Ticket',
+        parent ? (parent.ticketNumber || '') : '',
+        t.title || '',
+        _expStatusLabel(t),
+        (TKT_PRIORITY[t.priority] && TKT_PRIORITY[t.priority].label) || t.priority || '',
+        t.category || '',
+        t.unit || '',
+        t.reporter || '',
+        t.dateOpen || '',
+        t.desc || '',
+        (!t.parentId && kids.length) ? (kidsDone + '/' + kids.length) : '',
+        quotes.length || '',
+        total || '',
+        acc ? acc.company : '',
+        (acc && acc.amount != null) ? acc.amount : '',
+        apprStr,
+        supNames
+      ]);
+      quotes.forEach(function(q){
+        qRows.push([ t.ticketNumber || '', t.title || '', q.type, q.company, (q.amount != null ? q.amount : ''), q.ref, q.date, (counts[q.quoteId] || 0), (accId && accId === q.quoteId) ? 'Yes' : '' ]);
+      });
+    });
+
+    var stamp = new Date().toISOString().slice(0,10);
+
+    try {
+      var XLSX = await _xlsxLoad();
+      var wb = XLSX.utils.book_new();
+      var ws1 = XLSX.utils.aoa_to_sheet(tRows);
+      var ws2 = XLSX.utils.aoa_to_sheet(qRows);
+      ws1['!cols'] = [{wch:8},{wch:10},{wch:8},{wch:36},{wch:22},{wch:9},{wch:14},{wch:8},{wch:16},{wch:12},{wch:46},{wch:16},{wch:9},{wch:15},{wch:24},{wch:16},{wch:16},{wch:26}];
+      ws2['!cols'] = [{wch:8},{wch:36},{wch:14},{wch:26},{wch:13},{wch:12},{wch:12},{wch:10},{wch:9}];
+      ws1['!freeze'] = { xSplit:0, ySplit:1 };
+      XLSX.utils.book_append_sheet(wb, ws1, 'Tickets');
+      XLSX.utils.book_append_sheet(wb, ws2, 'Quotes');
+      XLSX.writeFile(wb, 'Park_Manor_Tickets_' + stamp + '.xlsx');
+    } catch(libErr){
+      console.warn('exportTicketsExcel: XLSX unavailable, falling back to CSV', libErr);
+      _expDownloadCsv(tRows, 'Park_Manor_Tickets_' + stamp + '.csv');
+      alert('The Excel library could not load (you may be offline), so I exported the tickets as a CSV instead — it still opens in Excel. Try again when online for the full multi-sheet .xlsx (with the separate Quotes sheet).');
+    }
+  } catch(e){
+    console.error('exportTicketsExcel error', e);
+    alert('Sorry — the export failed: ' + (e && e.message ? e.message : e));
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = prevLabel || '⬇ Export'; }
+  }
+}
+function _expDownloadCsv(rows, filename){
+  var csv = rows.map(function(r){
+    return r.map(function(c){
+      var s = (c == null ? '' : String(c));
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(',');
+  }).join('\r\n');
+  var blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 500);
+}
+
 function renderTickets(){
+  var _expBtn = document.getElementById('tkt-export-btn');
+  if(_expBtn) _expBtn.style.display = (_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management') ? '' : 'none';
   var list = document.getElementById('ticket-list');
   var empty = document.getElementById('ticket-empty');
   var stats = document.getElementById('ticket-stats');
@@ -14155,6 +14382,11 @@ function renderTickets(){
         }).join(' ');
     return hay.toLowerCase().includes(q);
   });
+
+  // Sub-tickets: keep child tickets out of the top-level list/board so the
+  // epic stays tidy — they're reached from their parent. A search still finds
+  // them (only hide when there's no active query).
+  if(!q) filtered = filtered.filter(function(t){ return !t.parentId; });
 
   // Unit filter (options rebuilt from the scoped data, selection preserved)
   var unitSel = document.getElementById('ticket-unit-filter');
@@ -14331,6 +14563,16 @@ function renderTickets(){
     var rightPill = ttype === 'action'
       ? '<div style="font-size:11px;color:var(--info)">'+(t.reporter ? escHtml(t.reporter) : '')+'</div>'
       : '<div style="font-size:11px;font-weight:600;color:'+p.color+'">'+p.label+'</div>';
+    // Sub-ticket roll-up pill on parent cards (🧩 done/total). Green when all done.
+    var subPill = '';
+    if(!t.parentId){
+      var _kids = getChildTickets(t.id);
+      if(_kids.length){
+        var _kd = _kids.filter(function(k){ return normalizeStatus(k.status) === 'closed'; }).length;
+        var _allDone = _kd === _kids.length;
+        subPill = '<span title="' + _kids.length + ' sub-ticket' + (_kids.length!==1?'s':'') + ', ' + _kd + ' done" style="font-size:9px;font-family:var(--mono);font-weight:600;color:' + (_allDone?'#4ade9e':'#8aa0bd') + ';background:' + (_allDone?'var(--green-bg)':'rgba(138,160,189,.1)') + ';border:1px solid ' + (_allDone?'var(--green-bd)':'rgba(138,160,189,.25)') + ';padding:1px 7px;border-radius:9px;white-space:nowrap">🧩 ' + _kd + '/' + _kids.length + ' sub</span>';
+      }
+    }
     return '<div class="tkt-card priority-'+(t.priority||'medium')+' status-'+(t.status||'open')+' type-'+ttype+'" onclick="openTicketModal(\''+t.id+'\''+')">'
       +'<div style="flex:1;min-width:0">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px">'
@@ -14338,6 +14580,7 @@ function renderTickets(){
           +(t.ticketNumber?'<span style="font-size:10px;color:var(--accent2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600">#'+t.ticketNumber+'</span>':'')
           +tktStatusBadge(t.status)
           +awaitApprovalPill
+          +subPill
           +duePill
           +(t.createdViaPublicForm?'<span class="tkt-type-badge tkt-type-a" title="Submitted via the public report form">🌐 Public</span>':'')
           +(t.category?'<span style="font-size:10px;color:var(--muted);font-family:var(--sans);background:var(--surface2);border:1px solid var(--border);padding:2px 9px;border-radius:99px;white-space:nowrap">'+escHtml(t.category)+'</span>':'')
@@ -14520,6 +14763,126 @@ async function unlinkTicketUser(){
   if(typeof renderTickets === 'function') renderTickets();
 }
 
+// ── Sub-tickets (epic → story) ──────────────────────────────────────────────
+// A ticket may have child "sub-tickets" linked by child.parentId === parent.id.
+// Children are full tickets in their own right (own status, quotes, trustee
+// approvals, share link); the parent behaves like an epic — it lists its
+// children and shows roll-up progress. We allow a single level (a sub-ticket
+// can't itself have sub-tickets) to keep the model simple and predictable.
+
+function getChildTickets(parentId){
+  if(!parentId || typeof TICKETS === 'undefined') return [];
+  return Object.values(TICKETS)
+    .filter(function(t){ return t && t.parentId === parentId; })
+    .sort(function(a,b){ return (a.ticketNumber||0) - (b.ticketNumber||0); });
+}
+function _canManageSubtickets(){
+  return _currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management';
+}
+function _safeId(id){ return String(id).replace(/[^A-Za-z0-9_\-]/g, ''); }
+
+// Banner shown at the top of a CHILD ticket: "Sub-ticket of #N — title".
+function renderParentBanner(t){
+  var el = document.getElementById('tkt-parent-banner');
+  if(!el) return;
+  var parent = (t && t.parentId && typeof TICKETS !== 'undefined') ? TICKETS[t.parentId] : null;
+  if(!parent){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    + '<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">🧩 Sub-ticket of</span>'
+    + '<button onclick="openTicketModal(\'' + _safeId(parent.id) + '\')" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:4px 10px;color:var(--accent2);font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer">#' + (parent.ticketNumber||'?') + ' — ' + escHtml(String(parent.title||'').slice(0,60)) + '</button>'
+    + '</div>';
+}
+
+// Section shown on a PARENT ticket: roll-up + list of children + add button.
+function renderSubticketsSection(t){
+  var el = document.getElementById('tkt-subtickets-section');
+  if(!el) return;
+  var saved = t && t.id && typeof TICKETS !== 'undefined' && TICKETS[t.id];
+  // Only non-child, saved tickets can host sub-tickets (single-level nesting).
+  if(!saved || t.parentId){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  var kids = getChildTickets(t.id);
+  var canManage = _canManageSubtickets();
+  if(!kids.length && !canManage){ el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+
+  var done = kids.filter(function(k){ return normalizeStatus(k.status) === 'closed'; }).length;
+  var pct = kids.length ? Math.round(done / kids.length * 100) : 0;
+
+  var header = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:' + (kids.length ? '10px' : '8px') + '">'
+    + '<span style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Sub-tickets</span>'
+    + (kids.length ? '<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">' + done + ' of ' + kids.length + ' done</span>' : '')
+    + (canManage ? '<button onclick="createSubticket()" style="margin-left:auto;padding:5px 12px;background:var(--accent-bg);border:1px dashed var(--accent-bd);border-radius:8px;color:var(--accent2);font-size:11px;font-family:var(--mono);cursor:pointer">+ Add sub-ticket</button>' : '')
+    + '</div>';
+
+  var bar = kids.length
+    ? '<div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:10px"><div style="height:100%;width:' + pct + '%;background:var(--green,#4ade9e);transition:width .2s"></div></div>'
+    : '';
+
+  var rows = kids.map(function(k){
+    var s = TKT_STATUS[normalizeStatus(k.status)] || TKT_STATUS.open;
+    var p = TKT_PRIORITY[k.priority] || TKT_PRIORITY.medium;
+    return '<div onclick="openTicketModal(\'' + _safeId(k.id) + '\')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--surface)">'
+      + '<span style="width:7px;height:7px;border-radius:50%;background:' + p.color + '" title="' + escHtml(p.label) + '"></span>'
+      + '<span style="font-size:10px;color:var(--accent2);font-family:var(--mono);font-weight:600">#' + (k.ticketNumber||'') + '</span>'
+      + '<span style="flex:1;min-width:0;font-size:13px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(k.title||'(untitled)') + '</span>'
+      + '<span style="font-size:9px;padding:2px 8px;border-radius:9px;background:' + s.bg + ';color:' + s.color + ';border:1px solid ' + s.border + ';font-family:var(--mono);white-space:nowrap">' + escHtml(s.label) + '</span>'
+      + '</div>';
+  }).join('');
+
+  var emptyNote = (!kids.length && canManage)
+    ? '<div style="font-size:11px;color:var(--muted);font-family:var(--sans);font-style:italic;line-height:1.5">Break a big job into sub-tickets — each one gets its own quotes, trustee approvals and status, and rolls up here.</div>'
+    : '';
+
+  el.innerHTML = header + bar + rows + emptyNote;
+}
+
+// Create a child ticket under the currently-open ticket and jump into it.
+async function createSubticket(){
+  var parentId = _currentTicketId;
+  var parent = parentId && typeof TICKETS !== 'undefined' && TICKETS[parentId];
+  if(!parent){ alert('Open a ticket first, then add a sub-ticket to it.'); return; }
+  if(parent.parentId){ alert('A sub-ticket can’t have its own sub-tickets. Add it to the parent ticket instead.'); return; }
+  if(!_canManageSubtickets()){ alert('Only admin, trustees or management can add sub-tickets.'); return; }
+  var title = prompt('Sub-ticket title — what needs doing?', '');
+  if(title === null) return;
+  title = title.trim();
+  if(!title){ alert('Please enter a title for the sub-ticket.'); return; }
+
+  var id = 'tkt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  var now = Date.now();
+  var byName = _currentUserObj ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
+  var child = {
+    id: id,
+    type: parent.type || 'maintenance',
+    parentId: parent.id,
+    title: title,
+    ticketNumber: nextTicketNumber(),
+    desc: '',
+    category: parent.category || '',
+    status: 'open',
+    priority: parent.priority || 'medium',
+    unit: parent.unit || '',
+    reporter: '', reporterPhone: '', reporterEmail: '',
+    dateOpen: new Date().toISOString().slice(0, 10),
+    dateClose: '',
+    createdBy: _currentUserObj ? _currentUserObj.id : null,
+    linkedDocIds: [],
+    log: [{ type: 'status', text: 'Sub-ticket created under #' + (parent.ticketNumber||'?') + ' by ' + byName, ts: now }],
+    assignedSupplierIds: [], quotes: {}, quoteTokens: {}, criteria: [], approvals: [],
+    added: now, updated: now,
+  };
+  TICKETS[id] = child;
+  parent.log = parent.log || [];
+  parent.log.push({ type: 'status', text: '+ Sub-ticket #' + child.ticketNumber + ' added: ' + title.slice(0, 60), ts: now });
+  parent.updated = now;
+
+  try { await saveTickets([id, parent.id]); }
+  catch(e){ console.warn('createSubticket: save failed', e); }
+  if(typeof renderTickets === 'function') renderTickets();
+  openTicketModal(id);   // jump straight into the new sub-ticket
+}
+
 function openTicketModal(ticketId){
   try { return _openTicketModalInner(ticketId); }
   catch(e){
@@ -14641,6 +15004,8 @@ function _openTicketModalInner(ticketId){
   document.getElementById('tkt-doc-results').innerHTML = '';
   renderStatusFlow(t.status||'open');
   renderTicketJourney(t);
+  if(typeof renderParentBanner === 'function') renderParentBanner(t);
+  if(typeof renderSubticketsSection === 'function') renderSubticketsSection(t);
   setupReqApprUI(t);
   refreshStatusDropdownGating(t);
   renderTicketApprovalPanel(t);
@@ -15193,6 +15558,7 @@ function _buildTicketFromForm(id, prev){
   return {
     id: id,
     type: prev.type || 'maintenance',
+    parentId: prev.parentId || null,   // set for sub-tickets (epic → story)
     title: vt('tkt-title'),
     ticketNumber: (prev.ticketNumber !== undefined && prev.ticketNumber !== null) ? prev.ticketNumber : nextTicketNumber(),
     desc: vt('tkt-desc'),
