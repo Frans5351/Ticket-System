@@ -98,6 +98,9 @@ export default async function handler(req) {
   const isWaterReading = category === "Water Reading";
   const ticketNumber = body.ticketNumber;
   const notifyOnly = !!body.notifyOnly;
+  // Optional Body Corporate inbox — added to the trustee/management notification
+  // so that inbox receives a copy of every new-ticket email.
+  const bcInbox = (body.bcInbox || "").toString().trim();
 
   // Media attachments for the agent email. Each: { name, type, dataUrl } or
   // { name, type, skipped:true, sizeMB } when the client couldn't fit it in
@@ -214,6 +217,8 @@ export default async function handler(req) {
     .map((s) => s.trim())
     .filter((s) => looksLikeEmail(bareAddress(s)))
     .forEach((s) => agentSet.add(bareAddress(s).toLowerCase()));
+  // Body Corporate inbox (set in-app) — always copied on new-ticket emails.
+  if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
   const agentList = Array.from(agentSet);
   if (agentList.length) {
     const aSubject = isWaterReading

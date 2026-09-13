@@ -54,7 +54,16 @@ export default async function handler(req) {
   try { body = await req.json(); } catch (_) { return errorResponse(400, "Invalid JSON body"); }
 
   const email = String(body.email || "").trim();
-  if (!looksLikeEmail(email)) return errorResponse(400, "A valid email is required");
+  // Optional Body Corporate inbox address — BCC'd so that inbox gets a copy of
+  // every status change (used for oversight / correspondence monitoring).
+  const bccAddr = String(body.bcc || "").trim();
+  const hasReporter = looksLikeEmail(email);
+  const hasBcc = looksLikeEmail(bccAddr);
+  if (!hasReporter && !hasBcc) return errorResponse(400, "A valid recipient email is required");
+  // Prefer the reporter as the visible recipient; if there's no reporter email,
+  // send straight to the BC inbox so movement is still captured.
+  const toAddr = hasReporter ? email : bccAddr;
+  const bccList = (hasBcc && bccAddr.toLowerCase() !== toAddr.toLowerCase()) ? [bccAddr] : undefined;
   const ticketNumber = String(body.ticketNumber || "").slice(0, 20);
   const title = String(body.title || "").trim().slice(0, 300);
   const statusKey = String(body.statusKey || "").slice(0, 60);
@@ -81,15 +90,16 @@ export default async function handler(req) {
   const text = `Update on your Park Manor report ${ref}\n\n${title}\nNew status: ${statusLabel}\n${meta.note || ""}\n\n${editUrl ? "View or update it: " + editUrl : "Park Manor: " + APP_URL}`;
 
   const r = await sendEmail({
-    to: [email],
+    to: [toAddr],
     subject: `Your Park Manor report ${ref}: ${statusLabel}`.trim(),
     text,
     html,
+    bcc: bccList,
   });
   if (!r.ok) {
-    console.error("send-status-update failed:", r.status, r.msg, "| to:", email, "| ticket:", ref);
+    console.error("send-status-update failed:", r.status, r.msg, "| to:", toAddr, "| ticket:", ref);
     return errorResponse(502, r.msg);
   }
-  console.log("send-status-update: sent", ref, "->", statusLabel, "to", email);
+  console.log("send-status-update: sent", ref, "->", statusLabel, "to", toAddr, bccList ? "(bcc BC inbox)" : "");
   return jsonResponse(200, { ok: true, id: r.id });
 }

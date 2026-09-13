@@ -71,6 +71,10 @@ export async function sendEmail(opts) {
     const cc = opts.cc.filter(looksLikeEmail).map((e) => ({ email: e.trim() }));
     if (cc.length) payload.cc = cc;
   }
+  if (Array.isArray(opts.bcc)) {
+    const bcc = opts.bcc.filter(looksLikeEmail).map((e) => ({ email: e.trim() }));
+    if (bcc.length) payload.bcc = bcc;
+  }
   if (Array.isArray(opts.attachments) && opts.attachments.length) {
     payload.attachment = opts.attachments
       .filter((a) => a && a.name && a.content)

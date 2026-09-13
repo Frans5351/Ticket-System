@@ -203,6 +203,26 @@ async function updateSchemeEmail(schemeId, email){
   return { ok:true };
 }
 
+// The "Body Corporate inbox" for a scheme — an address copied on every ticket
+// email (new tickets + status changes) so the body corporate keeps a full
+// record and can monitor correspondence. Separate from the reply-to email above.
+function schemeNotifyEmail(schemeId){
+  var s = SCHEMES.find(function(x){ return x.id === (schemeId || CURRENT_SCHEME); });
+  return (s && s.notifyEmail) ? s.notifyEmail : '';
+}
+function currentSchemeNotifyEmail(){ return schemeNotifyEmail(CURRENT_SCHEME); }
+async function updateSchemeNotifyEmail(schemeId, email){
+  email = (email || '').trim();
+  var s = SCHEMES.find(function(x){ return x.id === schemeId; });
+  if(!s) return { ok:false, error:'Scheme not found' };
+  s.notifyEmail = email;
+  try {
+    await sbSetSetting(SCHEMES_SETTING_KEY, JSON.stringify(SCHEMES));
+    try { window.localStorage.setItem('pm_schemes_cache', JSON.stringify(SCHEMES)); } catch(e){}
+  } catch(e){ console.warn('updateSchemeNotifyEmail save', e); return { ok:false, error:'Could not save' }; }
+  return { ok:true };
+}
+
 // Seed SCHEMES from cache synchronously so the switcher shows immediately,
 // before the async registry load completes.
 (function(){
@@ -4783,7 +4803,8 @@ function buildNavDrawer(){
               +'<span style="font-size:13px">'+(active?'🏢':'🏠')+'</span>'
               +'<span style="flex:1;min-width:0"><span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(s.name)+(active?' <span style="font-size:9px;color:var(--accent);font-family:var(--mono)">ACTIVE</span>':'')+'</span>'+emailLine+'</span>'
             +'</button>'
-            +'<button onclick="promptSchemeEmail(\''+s.id+'\')" title="Set the email address this scheme\'s communications are sent from" style="flex-shrink:0;padding:0 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--accent2);font-size:13px;cursor:pointer">✉</button>'
+            +'<button onclick="promptSchemeEmail(\''+s.id+'\')" title="Set the email address this scheme\'s communications are sent from / reply to" style="flex-shrink:0;padding:0 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--accent2);font-size:13px;cursor:pointer">✉</button>'
+            +'<button onclick="promptSchemeNotifyEmail(\''+s.id+'\')" title="Body Corporate inbox — copied on every ticket email (new tickets and status changes)" style="flex-shrink:0;padding:0 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--accent2);font-size:13px;cursor:pointer">📥</button>'
           +'</div>';
         }).join('')
       + '</div>'
@@ -4837,6 +4858,24 @@ async function promptSchemeEmail(schemeId){
   var res = await updateSchemeEmail(schemeId, input);
   if(!res.ok){ alert('Could not save the email address: '+(res.error||'unknown error')); return; }
   updateSchemeHeader();
+  buildNavDrawer();
+}
+
+// Admin sets / edits the Body Corporate inbox — copied on every ticket email
+// (new tickets and status changes) so the BC keeps a full record.
+async function promptSchemeNotifyEmail(schemeId){
+  var s = SCHEMES.find(function(x){ return x.id === schemeId; });
+  if(!s) return;
+  var current = s.notifyEmail || '';
+  var input = prompt('Body Corporate inbox for "'+s.name+'"\n\nThis address is copied on every ticket email — new tickets and status changes — so the body corporate has a full record (and can monitor correspondence by ticket number).\n\nLeave blank to turn it off.', current);
+  if(input === null) return;
+  input = input.trim();
+  if(input && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input)){
+    alert('That doesn\'t look like a valid email address. Please try again.');
+    return;
+  }
+  var res = await updateSchemeNotifyEmail(schemeId, input);
+  if(!res.ok){ alert('Could not save the inbox address: '+(res.error||'unknown error')); return; }
   buildNavDrawer();
 }
 
@@ -12706,8 +12745,14 @@ function hexToRgb(hex){
 function notifyReporterStatusChange(t, newStatusKey){
   try {
     if(!t) return;
+    var reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     var em = String(t.reporterEmail||'').trim();
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) return;
+    var emValid = reEmail.test(em);
+    // Body Corporate inbox — BCC'd so it gets a copy of every status change.
+    var bc = (typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '';
+    var bcValid = reEmail.test(bc);
+    // Nothing to send to (no reporter email AND no BC inbox) — skip.
+    if(!emValid && !bcValid) return;
     var meta = TKT_STATUS[newStatusKey] || {};
     var editUrl = t.reporterEditToken
       ? (location.origin + location.pathname + '?reportEdit=' + t.reporterEditToken)
@@ -12715,7 +12760,8 @@ function notifyReporterStatusChange(t, newStatusKey){
     fetch('/api/send-status-update', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        email: em,
+        email: emValid ? em : '',
+        bcc: bcValid ? bc : '',
         ticketNumber: t.ticketNumber || '',
         title: t.title || '',
         statusKey: newStatusKey,
@@ -12723,7 +12769,7 @@ function notifyReporterStatusChange(t, newStatusKey){
         editUrl: editUrl
       })
     }).then(function(r){
-      if(r && r.ok) console.log('status email queued for', em);
+      if(r && r.ok) console.log('status email queued', em ? ('for '+em) : '', bcValid ? '(bcc BC inbox)' : '');
     }).catch(function(e){ console.warn('status email failed', e); });
   } catch(e){}
 }
@@ -15748,7 +15794,12 @@ function renderTicketLog(t){
   el.innerHTML = log.slice().reverse().map(function(entry, revIdx){
     var origIdx = log.length - 1 - revIdx;
     var d = new Date(entry.ts).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    var icon = entry.type==='note'?'💬':entry.type==='status'?'🔄':'📎';
+    var icon = entry.type==='note'?'💬':entry.type==='status'?'🔄':entry.type==='email'?'✉️':'📎';
+    // Ingested email entries carry a Gmail deep-link so a trustee can open the
+    // full correspondence in one tap.
+    var emailLink = (entry.type==='email' && entry.url)
+      ? '<a href="'+escHtml(entry.url)+'" target="_blank" rel="noopener" style="display:inline-block;margin-left:6px;font-size:11px;color:var(--accent2);font-family:var(--mono);white-space:nowrap">Open email →</a>'
+      : '';
     var adminBtns = isAdmin
       ? '<div style="display:flex;gap:6px;margin-top:5px">'
         +'<button onclick="tktLogEdit('+origIdx+')" style="font-size:10px;padding:2px 8px;background:rgba(123,104,238,.15);border:1px solid rgba(123,104,238,.3);border-radius:4px;color:var(--accent2);cursor:pointer;font-family:var(--mono)">✏ Edit</button>'
@@ -15762,7 +15813,7 @@ function renderTicketLog(t){
         +'<input type="checkbox" '+(entry.inTimeline===true?'checked':'')+' onchange="tktLogToggleTimeline('+origIdx+', this.checked)" style="cursor:pointer;accent-color:var(--green);margin:0">'
         +'Show on timeline</label>'
       : '';
-    return '<div class="tkt-log-entry" id="tkt-log-'+origIdx+'">'+icon+' '+escHtml(entry.text)+'<div class="tkt-log-time">'+d+'</div>'+tlToggle+adminBtns+'</div>';
+    return '<div class="tkt-log-entry" id="tkt-log-'+origIdx+'">'+icon+' '+escHtml(entry.text)+emailLink+'<div class="tkt-log-time">'+d+'</div>'+tlToggle+adminBtns+'</div>';
   }).join('');
 }
 
@@ -20522,6 +20573,7 @@ async function submitPublicReport(){
               reporter: name,
               phone: phone,
               category: window._pubCategory || 'Other',
+              bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
               attachments: notifyAtt
             })
           });
@@ -20563,6 +20615,7 @@ async function submitPublicReport(){
           phone: phone,
           email: email,
           category: window._pubCategory || 'Other',
+          bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
           attachments: notifyAtt
         })
       }).catch(function(e){ console.warn('agent notify failed', e); });
