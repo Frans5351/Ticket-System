@@ -109,10 +109,12 @@ async function loadSchemesRegistry(){
       list.forEach(function(s){
         if(s && s.id && !merged.some(function(m){ return m.id === s.id; })) merged.push(s);
       });
-      // Server is authoritative for names + email; overlay them.
+      // Server is authoritative for names + email; overlay them. Preserve
+      // notifyEmail (the Body Corporate inbox) too — it lives on the same
+      // registry and would otherwise be dropped on every reload.
       merged = merged.map(function(m){
         var srv = list.find(function(s){ return s.id === m.id; });
-        return srv ? { id:m.id, name:srv.name, email:(srv.email || m.email || '') } : m;
+        return srv ? { id:m.id, name:srv.name, email:(srv.email || m.email || ''), notifyEmail:(srv.notifyEmail || m.notifyEmail || '') } : m;
       });
     }
   } catch(e){ console.warn('loadSchemesRegistry', e); }
