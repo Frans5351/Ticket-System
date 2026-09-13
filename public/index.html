@@ -12802,6 +12802,23 @@ async function setTicketStatus(newStatus){
     if(typeof renderTicketSuppliers === 'function') renderTicketSuppliers(TICKETS[_currentTicketId]);
   if(typeof renderTicketRating === 'function') renderTicketRating(TICKETS[_currentTicketId]);
   }
+  // Because we pre-set the status just above for snappy UI, the debounced
+  // autoSaveTicket() below won't detect a status change — so on its own it
+  // would skip BOTH the activity-log entry and the reporter/BC-inbox email.
+  // The status-flow pills come through here, so own those side-effects now.
+  // (The dropdown path goes straight to autoSaveTicket and still handles them
+  // there; board drag and the approval buttons notify on their own paths — so
+  // this fires exactly once per change.)
+  try {
+    var _t = TICKETS[_currentTicketId];
+    if(_t && currentStatus !== newStatus){
+      _t.log = _t.log || [];
+      var _sm = TKT_STATUS[newStatus] || TKT_STATUS.open;
+      _t.log.push({ type:'status', text:'Status changed to ' + (_sm.label || newStatus), ts: Date.now() });
+      if(typeof renderTicketLog === 'function') renderTicketLog(_t);
+      notifyReporterStatusChange(_t, newStatus);
+    }
+  } catch(e){ console.warn('setTicketStatus: status side-effects failed', e); }
   autoSaveTicket();
 }
 
