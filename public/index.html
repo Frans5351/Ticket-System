@@ -257,6 +257,17 @@ var _SHARE_MODE = (function(){
     return (sid && tok) ? {ticketId: sid, token: tok} : null;
   } catch(e){ return null; }
 })();
+// ── Overview share mode ──────────────────────────────────────────────────
+// ?overview=<token> renders a read-only, status-grouped board of every OPEN
+// ticket — a shareable "where does everything stand" snapshot. Each row links
+// through to that ticket's own share view so a trustee can engage with it.
+var _OVERVIEW_MODE = (function(){
+  try {
+    var qs = new URLSearchParams(location.search);
+    var tok = qs.get('overview');
+    return tok ? { token: tok } : null;
+  } catch(e){ return null; }
+})();
 // Public-report mode: ?contact-public opens the public ticket-submission
 // form (anyone can submit; admin can disable). We also accept the legacy
 // ?report=1 form so any links already shared in WhatsApp keep working.
@@ -1561,6 +1572,21 @@ async function checkStorageSetup(){
     </div>
     <div id="share-view-content" style="display:none"></div>
     <div style="margin-top:40px;padding:16px;text-align:center;border-top:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px">Park Manor Body Corporate — shared view</div>
+  </div>
+</div>
+
+<!-- Overview share view: ?overview=<token> renders a status-grouped board of
+     all open tickets. Bootstrapped near the bottom of <body>. -->
+<div id="overview-view" style="display:none;position:fixed;inset:0;z-index:2000;background:var(--bg);overflow-y:auto;color:var(--text);font-family:var(--sans)">
+  <div style="max-width:1000px;margin:0 auto;padding:28px 18px">
+    <div id="overview-loading" style="text-align:center;padding:80px 20px;color:var(--muted);font-family:var(--mono);font-size:13px">Loading Park Manor ticket overview…</div>
+    <div id="overview-error" style="display:none;text-align:center;padding:80px 20px">
+      <div style="font-size:48px;margin-bottom:14px">🔗</div>
+      <div style="font-size:16px;color:var(--text2);font-weight:600;margin-bottom:8px">Overview not available</div>
+      <div id="overview-error-msg" style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:440px;margin:0 auto"></div>
+    </div>
+    <div id="overview-content" style="display:none"></div>
+    <div style="margin-top:40px;padding:16px;text-align:center;border-top:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px">Park Manor Body Corporate — live ticket overview</div>
   </div>
 </div>
 
@@ -6253,6 +6279,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
         <button id="tkt-view-list" class="tkt-vt active" onclick="setTktView('list')" title="List view">\u2630</button>
         <button id="tkt-view-board" class="tkt-vt" onclick="setTktView('board')" title="Board view (drag cards between statuses)">\u25a5</button>
       </span>
+      <button id="tkt-overview-btn" onclick="shareOverview()" title="Share a read-only overview of all open tickets" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">🔗 Share overview</button>
       <button id="tkt-export-btn" onclick="exportTicketsExcel()" title="Export open tickets, sub-tickets &amp; quotes to Excel" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⬇ Export</button>
       <button id="new-tkt-btn" onclick="openTrackerTypeChooser()" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> New</button>
     </div>
@@ -14307,8 +14334,11 @@ function _expDownloadCsv(rows, filename){
 }
 
 function renderTickets(){
+  var _priv = (_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management');
   var _expBtn = document.getElementById('tkt-export-btn');
-  if(_expBtn) _expBtn.style.display = (_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management') ? '' : 'none';
+  if(_expBtn) _expBtn.style.display = _priv ? '' : 'none';
+  var _ovBtn = document.getElementById('tkt-overview-btn');
+  if(_ovBtn) _ovBtn.style.display = _priv ? '' : 'none';
   var list = document.getElementById('ticket-list');
   var empty = document.getElementById('ticket-empty');
   var stats = document.getElementById('ticket-stats');
@@ -19061,6 +19091,186 @@ function shareSignOut(){
   shareRenderApprovalSection();
 }
 
+// ── Overview share: render + share-link action ──────────────────────────────
+
+async function renderOverviewShare(){
+  if(!_OVERVIEW_MODE) return;
+  Array.prototype.forEach.call(document.body.children, function(el){ if(el.id !== 'overview-view') el.style.display = 'none'; });
+  var host = document.getElementById('overview-view'); if(host) host.style.display = 'block';
+  document.body.style.overflow = 'auto';
+  var loadingEl = document.getElementById('overview-loading');
+  var errEl = document.getElementById('overview-error');
+  var errMsg = document.getElementById('overview-error-msg');
+  var contentEl = document.getElementById('overview-content');
+  function showErr(m){ if(loadingEl)loadingEl.style.display='none'; if(errEl)errEl.style.display=''; if(contentEl)contentEl.style.display='none'; if(errMsg)errMsg.textContent=m; }
+  function showContent(h){ if(loadingEl)loadingEl.style.display='none'; if(errEl)errEl.style.display='none'; if(contentEl){ contentEl.style.display=''; contentEl.innerHTML=h; } }
+
+  // Verify the overview token against the stored setting.
+  var stored = null;
+  try { stored = await sbGetSetting('overviewToken'); } catch(e){}
+  if(!stored){ showErr('No overview has been shared yet. An admin needs to open the Tracker and tap “Share overview” first.'); return; }
+  if(stored !== _OVERVIEW_MODE.token){ showErr('This overview link is no longer valid — it may have been refreshed or revoked. Ask an admin for the current link.'); return; }
+
+  // Load all tickets via the same Supabase client the app uses (works on
+  // localhost and in production — a raw proxy fetch of ?select=* 404s under
+  // the local dev server).
+  var tickets;
+  try {
+    if(typeof sbLoadAll === 'function'){
+      var map = await sbLoadAll('tickets');
+      tickets = Object.values(map || {});
+    } else {
+      var r = await fetch(SUPA_BASE+'/rest/v1/tickets?select=*', {headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}});
+      if(!r.ok){ showErr('Could not load tickets (server returned '+r.status+').'); return; }
+      var rows = await r.json();
+      tickets = (rows||[]).map(function(row){ return row.data || row; });
+    }
+  } catch(e){ showErr('Could not load tickets (' + (e && e.message ? e.message : 'network error') + ').'); return; }
+
+  tickets = (tickets || []).filter(function(t){ return t && t.id && t.title != null; });
+  var openT = tickets.filter(function(t){ return normalizeStatus(t.status) !== 'closed'; });
+  function childrenOf(id){ return tickets.filter(function(t){ return t.parentId === id; }); }
+  function parentOf(id){ return tickets.find(function(t){ return t.id === id; }); }
+
+  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress'];
+  var groups = {}; order.forEach(function(k){ groups[k] = []; });
+  openT.forEach(function(t){ var s = normalizeStatus(t.status); (groups[s] = groups[s] || []).push(t); });
+
+  var THRESH = (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined') ? TRUSTEE_APPROVAL_THRESHOLD : 3;
+  function fmtDate(t){ var d = t.dateOpen || t.added; if(!d) return ''; try { return new Date(d).toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}); } catch(e){ return ''; } }
+  function daysAgo(t){ var d = t.dateOpen ? Date.parse(t.dateOpen) : (t.added||0); if(!d) return null; return Math.floor((Date.now()-d)/86400000); }
+
+  function ticketRow(t){
+    var pr = (TKT_PRIORITY[t.priority] || TKT_PRIORITY.medium);
+    var kids = childrenOf(t.id);
+    var kidsDone = kids.filter(function(k){ return normalizeStatus(k.status) === 'closed'; }).length;
+    var da = daysAgo(t);
+    var stale = (da != null && da >= 14);
+    var st = normalizeStatus(t.status);
+    var flag = '';
+    if(st === 'awaiting_trustee_approval'){
+      var counts = {}; (t.approvals||[]).forEach(function(a){ if(a && a.quoteId) counts[a.quoteId] = (counts[a.quoteId]||0)+1; });
+      var lead = 0; Object.keys(counts).forEach(function(k){ if(counts[k] > lead) lead = counts[k]; });
+      var met = lead >= THRESH;
+      flag = '<span style="font-size:9px;font-family:var(--mono);font-weight:600;color:'+(met?'#4ade9e':'#f59e0b')+';background:'+(met?'var(--green-bg)':'var(--st-open-bg)')+';border:1px solid '+(met?'var(--green-bd)':'var(--st-open-bd)')+';padding:1px 7px;border-radius:9px;white-space:nowrap">'+(met?'✓ approved — ready':('⚠ needs trustees '+lead+'/'+THRESH))+'</span>';
+    }
+    var subPill = (!t.parentId && kids.length) ? '<span style="font-size:9px;font-family:var(--mono);color:#8aa0bd;background:rgba(138,160,189,.1);border:1px solid rgba(138,160,189,.25);padding:1px 7px;border-radius:9px">🧩 '+kidsDone+'/'+kids.length+' sub</span>' : '';
+    var subOf = t.parentId ? '<span style="font-size:9px;color:#8aa0bd;font-family:var(--mono)">↳ sub of #'+((parentOf(t.parentId)||{}).ticketNumber||'?')+'</span>' : '';
+    var stalePill = stale ? '<span style="font-size:9px;font-family:var(--mono);color:#f06f6f;background:var(--red-bg);border:1px solid var(--red-bd);padding:1px 7px;border-radius:9px">quiet '+da+'d</span>' : '';
+    var link = t.shareToken ? (location.origin + '/s/' + encodeURIComponent(t.id) + '?t=' + encodeURIComponent(t.shareToken)) : '';
+    var open = link ? '<span style="font-size:11px;color:var(--accent2);font-family:var(--mono);white-space:nowrap;align-self:center">Open →</span>' : '';
+    var clickable = link ? ('onclick="location.href=\''+link.replace(/'/g,"\\'")+'\'" style="cursor:pointer;') : ('style="');
+    return '<div '+clickable+'display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border:1px solid var(--border);border-radius:9px;margin-bottom:7px;background:var(--surface)">'
+      + '<span style="width:8px;height:8px;border-radius:50%;background:'+pr.color+';margin-top:5px;flex-shrink:0" title="'+escHtml(pr.label)+' priority"></span>'
+      + '<div style="flex:1;min-width:0">'
+        + '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
+          + '<span style="font-size:10px;color:var(--accent2);font-family:var(--mono);font-weight:600">#'+(t.ticketNumber||'')+'</span>'
+          + '<span style="font-size:14px;color:var(--text2);font-weight:600">'+escHtml(t.title||'(untitled)')+'</span>'
+          + subOf
+        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:5px">'
+          + (t.unit?'<span style="font-size:10px;color:#5a7fa8;font-family:var(--mono)">Unit '+escHtml(t.unit)+'</span>':'')
+          + (t.category?'<span style="font-size:10px;color:var(--muted);font-family:var(--mono)">'+escHtml(t.category)+'</span>':'')
+          + '<span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Logged '+fmtDate(t)+'</span>'
+          + flag + subPill + stalePill
+        + '</div>'
+      + '</div>'
+      + open
+      + '</div>';
+  }
+
+  var totalOpen = openT.length;
+  var head = '<div style="margin-bottom:22px">'
+    + '<div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Park Manor Body Corporate</div>'
+    + '<h1 style="font-size:24px;color:var(--text2);font-weight:700;margin:0 0 6px">Ticket Status Overview</h1>'
+    + '<div style="font-size:12px;color:var(--muted);font-family:var(--mono)">'+totalOpen+' open item'+(totalOpen!==1?'s':'')+' · as at '+new Date().toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})+'</div>'
+    + '</div>';
+
+  var body = '';
+  order.forEach(function(k){
+    var list = groups[k] || []; if(!list.length) return;
+    var info = TKT_STATUS[k] || {label:k, color:'#999'};
+    list.sort(function(a,b){ var da=(a.dateOpen?Date.parse(a.dateOpen):a.added||0), db=(b.dateOpen?Date.parse(b.dateOpen):b.added||0); return da-db; });
+    body += '<div style="margin-bottom:26px">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+        + '<span style="width:10px;height:10px;border-radius:50%;background:'+info.color+'"></span>'
+        + '<span style="font-size:13px;font-weight:700;color:var(--text2)">'+escHtml(info.label)+'</span>'
+        + '<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">'+list.length+'</span>'
+      + '</div>'
+      + list.map(ticketRow).join('')
+      + '</div>';
+  });
+  if(!body) body = '<div style="text-align:center;padding:40px;color:var(--muted);font-family:var(--mono);font-size:13px">🎉 No open tickets right now.</div>';
+
+  showContent(head + body);
+}
+
+// Admin/trustee action: prepare and copy a shareable overview link. Ensures
+// every open ticket has a share token (so click-through works) and that an
+// overview token exists, then shows a copy dialog.
+async function shareOverview(){
+  if(!(_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management')){
+    alert('Only admin, trustees or management can share the overview.');
+    return;
+  }
+  var btn = document.getElementById('tkt-overview-btn');
+  var prev = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparing…'; }
+  try {
+    // Ensure every OPEN ticket has a share token so the board can link into it.
+    var changed = [];
+    Object.values(TICKETS).forEach(function(t){
+      if(!t || normalizeStatus(t.status) === 'closed') return;
+      if(!t.shareToken){ t.shareToken = generateShareToken(); t.updated = Date.now(); changed.push(t.id); }
+    });
+    if(changed.length){ try { await saveTickets(changed); } catch(e){ console.warn('shareOverview: token save failed', e); } }
+
+    // Ensure an overview token exists (stored in settings so the public page can verify it).
+    var token = null;
+    try { token = await sbGetSetting('overviewToken'); } catch(e){}
+    if(!token){
+      token = generateShareToken() + generateShareToken().slice(0, 8);
+      try { await sbSetSetting('overviewToken', token); } catch(e){ console.warn('shareOverview: token store failed', e); }
+    }
+    var url = location.origin + '/?overview=' + encodeURIComponent(token);
+    showOverviewLinkDialog(url, changed.length);
+  } catch(e){
+    console.error('shareOverview error', e);
+    alert('Could not prepare the overview link: ' + (e && e.message ? e.message : e));
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = prev || '🔗 Share overview'; }
+  }
+}
+
+function showOverviewLinkDialog(url, tokenCount){
+  var existing = document.getElementById('overview-link-dialog'); if(existing) existing.remove();
+  var box = document.createElement('div'); box.id = 'overview-link-dialog';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:900;display:flex;align-items:center;justify-content:center;padding:20px';
+  box.onclick = function(e){ if(e.target === box) box.remove(); };
+  box.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(520px,94vw);padding:22px">'
+    + '<div style="font-size:15px;font-weight:700;color:var(--text2);margin-bottom:6px">🔗 Share ticket overview</div>'
+    + '<div style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin-bottom:14px">Anyone with this link sees a live, read-only board of every open ticket grouped by status — and can tap any ticket to open it and engage. Trustees don’t need an account to view.</div>'
+    + '<div style="display:flex;gap:8px">'
+      + '<input id="overview-link-input" readonly value="'+escHtml(url)+'" style="flex:1;padding:9px 11px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:12px;font-family:var(--mono)">'
+      + '<button id="overview-link-copy" style="padding:9px 16px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer">Copy</button>'
+    + '</div>'
+    + (tokenCount ? '<div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-top:8px">Enabled sharing on '+tokenCount+' ticket'+(tokenCount!==1?'s':'')+' so they open from the board.</div>' : '')
+    + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">'
+      + '<a href="'+escHtml(url)+'" target="_blank" rel="noopener" style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:12px;font-family:var(--sans);text-decoration:none">Open</a>'
+      + '<button onclick="document.getElementById(\'overview-link-dialog\').remove()" style="padding:8px 16px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;font-family:var(--sans);cursor:pointer">Close</button>'
+    + '</div>'
+  + '</div>';
+  document.body.appendChild(box);
+  var input = document.getElementById('overview-link-input');
+  var copyBtn = document.getElementById('overview-link-copy');
+  if(copyBtn) copyBtn.onclick = function(){
+    try { input.select(); } catch(e){}
+    var done = function(){ copyBtn.textContent = 'Copied ✓'; setTimeout(function(){ copyBtn.textContent = 'Copy'; }, 1500); };
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(input.value).then(done).catch(function(){ try { document.execCommand('copy'); done(); } catch(e){} }); }
+    else { try { document.execCommand('copy'); done(); } catch(e){} }
+  };
+}
+
 async function renderShareView(){
   if(!_SHARE_MODE) return;
   // Hide everything except the share-view container
@@ -19286,6 +19496,15 @@ if(_SHARE_MODE){
   if(shareDivEarly) shareDivEarly.style.display = 'block';
   // Defer rendering so the rest of the script finishes parsing.
   setTimeout(renderShareView, 0);
+}
+
+// Overview share bootstrap — hide app chrome and render the status board.
+if(typeof _OVERVIEW_MODE !== 'undefined' && _OVERVIEW_MODE){
+  document.documentElement.style.background = 'var(--bg)';
+  Array.prototype.forEach.call(document.body.children, function(el){ if(el.id !== 'overview-view') el.style.display = 'none'; });
+  var ovEarly = document.getElementById('overview-view');
+  if(ovEarly) ovEarly.style.display = 'block';
+  setTimeout(renderOverviewShare, 0);
 }
 
 // ── Public report form bootstrap & rendering ─────────────────────────────
