@@ -1574,6 +1574,7 @@ async function checkStorageSetup(){
     .tab[data-tab="users"]::before{content:'👥'}
     .tab[data-tab="recon"]::before{content:'📥'}
     .tab[data-tab="supplier-portal"]::before{content:'🛠️'}
+    .tab[data-tab="billing"]::before{content:'🧾'}
     .header{margin-left:198px}
     .panel{margin-left:198px}
   }
@@ -1691,6 +1692,7 @@ async function checkStorageSetup(){
   <button class="tab admin-only" data-tab="income">Income</button>
   <button class="tab admin-only" data-tab="invoices">Documents</button>
   <button class="tab admin-only" data-tab="suppliers">Suppliers</button>
+  <button class="tab admin-only" data-tab="billing">Billing</button>
   <button class="tab admin-only" data-tab="resolutions">Resolutions</button>
   <button class="tab active" data-tab="tickets" id="tickets-tab">Tracker <span id="tickets-badge" style="display:none;background:#f59e0b;color:#000;border-radius:10px;font-size:9px;padding:1px 5px;font-weight:700;margin-left:4px;vertical-align:middle"></span></button>
   <button class="tab admin-only" data-tab="users">Users</button>
@@ -4740,6 +4742,7 @@ document.querySelectorAll('.tab').forEach(function(tab){
     if(tab.dataset.tab==='transactions'){render(); setTimeout(function(){ refreshAttachmentBadges(); refreshAllInvBadges(); },100);}
     if(tab.dataset.tab==='invoices'){renderInvoices();}
     if(tab.dataset.tab==='suppliers'){importSuppliersFromInvoices();renderSuppliers();}
+    if(tab.dataset.tab==='billing'){ if(typeof openBillingTab==='function') openBillingTab(); }
     if(tab.dataset.tab==='resolutions'){renderResolutionsPanel();}
     if(tab.dataset.tab==='tickets'){renderTickets();}
     if(tab.dataset.tab==='users'){renderUsers();}
@@ -4761,6 +4764,7 @@ var NAV_MENU_META = {
   income:       { label:'Income',       icon:'\u{1F4B0}' },
   invoices:     { label:'Documents',    icon:'\u{1F4C4}' },
   suppliers:    { label:'Suppliers',    icon:'\u{1F527}' },
+  billing:      { label:'Billing',      icon:'\u{1F9FE}' },
   resolutions:  { label:'Resolutions',  icon:'\u2696\uFE0F' },
   tickets:      { label:'Tracker',      icon:'\u{1F6E0}\uFE0F' },
   users:        { label:'Users',        icon:'\u{1F465}' },
@@ -6297,6 +6301,319 @@ document.getElementById('tbody').addEventListener('click', function(e){
   </div>
 </div>
 
+
+<style>
+  #panel-billing .ul,#unit-modal .ul{font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px}
+  #panel-billing .ui,#unit-modal .ui{width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box;font-family:var(--sans)}
+  #unit-modal .ui2{width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none;box-sizing:border-box;font-family:var(--mono)}
+  #units-table-wrap th{white-space:nowrap}
+  /* Insulate the billing table from the global (transactions) table CSS:
+     the app-wide rules make thead sticky (top:48px) and, on mobile, turn every
+     table into a transaction-shaped card grid. Both break this register. */
+  #units-table-wrap table{display:table!important}
+  #units-table-wrap thead{position:static!important;display:table-header-group!important;top:auto!important}
+  #units-table-wrap tbody{display:table-row-group!important}
+  #units-table-wrap tr{display:table-row!important}
+  #units-table-wrap th,#units-table-wrap td{display:table-cell!important;width:auto!important}
+</style>
+
+<!-- BILLING PANEL (Levies) — Phase 1: Units register -->
+<div class="panel" id="panel-billing">
+  <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:10">
+    <div style="font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap">🧾 Levies &amp; Billing</div>
+    <span style="font-size:10px;color:#5a7fa8;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border);padding:2px 9px;border-radius:20px">Phase 1 · Units register · runs alongside your current billing</span>
+    <input id="units-search" type="text" placeholder="Search units / owners…" style="flex:1;min-width:140px;padding:7px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none" oninput="renderUnits()">
+    <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+      <button id="units-seed-btn" onclick="seedParkManorUnits()" title="Load the 20 Park Manor units from your levy schedule (owner details you've entered are kept)" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⤓ Load Park Manor units</button>
+      <button onclick="openUnitModal(null)" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> Add unit</button>
+    </div>
+  </div>
+  <div id="units-summary" style="padding:14px 20px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px"></div>
+  <div id="units-table-wrap" style="padding:16px 20px;overflow-x:auto"></div>
+  <div id="units-empty" style="display:none;padding:50px 20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:13px"></div>
+</div>
+
+<!-- Unit add/edit modal -->
+<div id="unit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:700;align-items:center;justify-content:center" onclick="if(event.target===this)closeUnitModal()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(560px,95vw);max-height:92vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)">
+      <div id="unit-modal-title" style="font-size:14px;font-weight:600;color:var(--text2)">Add unit</div>
+      <div style="display:flex;gap:8px">
+        <button id="unit-delete-btn" onclick="deleteUnit(_currentUnitId)" style="display:none;padding:5px 12px;border-radius:6px;background:var(--red-bg);border:1px solid var(--red-bd);color:#f06f6f;font-size:11px;cursor:pointer;font-family:var(--mono)">🗑 Delete</button>
+        <button onclick="closeUnitModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px">✕</button>
+      </div>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <div class="ul">Section #</div>
+          <input id="u-section" type="number" class="ui" placeholder="e.g. 1">
+        </div>
+        <div style="flex:1">
+          <div class="ul">Type</div>
+          <select id="u-type" class="ui">
+            <option value="house">House</option>
+            <option value="store">Store / Garage</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <div class="ul">House #</div>
+          <input id="u-house" type="text" class="ui" placeholder="e.g. 1">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <div class="ul">Area (m²)</div>
+          <input id="u-area" type="number" step="0.01" class="ui" placeholder="e.g. 137">
+        </div>
+        <div style="flex:1">
+          <div class="ul">Participation Quota (PQ %)</div>
+          <input id="u-pq" type="number" step="0.0001" class="ui" placeholder="e.g. 10.8385">
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">👤 Owner</div>
+        <div><div class="ul">Owner name</div><input id="u-owner" type="text" class="ui2" placeholder="Registered owner"></div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1"><div class="ul">Email</div><input id="u-email" type="email" class="ui2" placeholder="owner@email.com"></div>
+          <div style="flex:1"><div class="ul">Phone</div><input id="u-phone" type="tel" class="ui2" placeholder="082 …"></div>
+        </div>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">💳 Monthly levy lines (R)</div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1"><div class="ul">Admin levy</div><input id="u-admin" type="number" step="0.01" class="ui2" placeholder="0.00"></div>
+          <div style="flex:1"><div class="ul">10-yr maintenance</div><input id="u-maint" type="number" step="0.01" class="ui2" placeholder="0.00"></div>
+          <div style="flex:1"><div class="ul">CSOS levy</div><input id="u-csos" type="number" step="0.01" class="ui2" placeholder="0.00"></div>
+        </div>
+        <div id="u-total-preview" style="font-size:11px;color:var(--muted);font-family:var(--mono);text-align:right">Monthly total: —</div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1"><div class="ul">Water meter #</div><input id="u-water" type="text" class="ui" placeholder="optional"></div>
+        <div style="flex:1"><div class="ul">Electricity meter #</div><input id="u-elec" type="text" class="ui" placeholder="optional"></div>
+      </div>
+      <div><div class="ul">Notes</div><input id="u-notes" type="text" class="ui" placeholder="optional"></div>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface2);position:sticky;bottom:0">
+      <button onclick="closeUnitModal()" style="padding:8px 16px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:12px;font-family:var(--mono);cursor:pointer">Cancel</button>
+      <button onclick="saveUnitFromModal()" style="padding:8px 20px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer">💾 Save unit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Billing / Levies — Phase 1: Units register ──────────────────────────────
+// Sectional-title units with participation quota (PQ) and the standard monthly
+// levy lines (admin, 10-yr maintenance, CSOS). Stored in the scheme's settings
+// so it needs no new Supabase table. Foundation for meter readings, tariffs and
+// statement generation in later phases. Changes nothing in the current
+// (external) billing — it runs alongside it.
+
+var UNITS = {};
+var _unitsLoaded = false;
+var _currentUnitId = null;
+
+function _uMoney(n){ n = Number(n||0); return 'R ' + n.toLocaleString('en-ZA',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function _uNum(id){ var el=document.getElementById(id); var v=el?parseFloat(el.value):NaN; return isFinite(v)?v:0; }
+function _uStr(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+function unitTotal(u){ var c=(u&&u.charges)||{}; return (Number(c.adminLevy||0)+Number(c.maintLevy||0)+Number(c.csos||0)); }
+
+// The 20 Park Manor sections, straight from the Levy Allocation Schedule
+// (effective 01.06.2026). Sections 1–12 are houses, 13–20 are stores/garages.
+var PARK_MANOR_UNITS_SEED = [
+  {section:1, type:'house', houseNo:'1',  area:137, pq:10.8385, adminLevy:3148.37, maintLevy:188.91, csos:40.00},
+  {section:2, type:'house', houseNo:'2',  area:70,  pq:5.5380,  adminLevy:1608.68, maintLevy:96.52,  csos:22.17},
+  {section:3, type:'house', houseNo:'3',  area:71,  pq:5.6171,  adminLevy:1631.66, maintLevy:97.90,  csos:22.63},
+  {section:4, type:'house', houseNo:'4',  area:70,  pq:5.5380,  adminLevy:1608.68, maintLevy:96.52,  csos:22.17},
+  {section:5, type:'house', houseNo:'5',  area:70,  pq:5.5380,  adminLevy:1608.68, maintLevy:96.52,  csos:22.17},
+  {section:6, type:'house', houseNo:'6',  area:141, pq:11.1550, adminLevy:3240.31, maintLevy:194.42, csos:40.00},
+  {section:7, type:'house', houseNo:'7',  area:89,  pq:7.0411,  adminLevy:2045.30, maintLevy:122.72, csos:30.91},
+  {section:8, type:'house', houseNo:'8',  area:91,  pq:7.1994,  adminLevy:2091.28, maintLevy:125.48, csos:31.86},
+  {section:9, type:'house', houseNo:'9',  area:150, pq:11.8670, adminLevy:3447.13, maintLevy:206.83, csos:40.00},
+  {section:10,type:'house', houseNo:'10', area:71,  pq:5.6171,  adminLevy:1631.66, maintLevy:97.90,  csos:22.63},
+  {section:11,type:'house', houseNo:'11', area:70,  pq:5.5380,  adminLevy:1608.68, maintLevy:96.52,  csos:22.17},
+  {section:12,type:'house', houseNo:'12', area:91,  pq:7.1994,  adminLevy:2091.28, maintLevy:125.48, csos:31.86},
+  {section:13,type:'store', houseNo:'1',  area:18,  pq:1.4241,  adminLevy:209.42,  maintLevy:12.57,  csos:0},
+  {section:14,type:'store', houseNo:'3',  area:18,  pq:1.4241,  adminLevy:209.42,  maintLevy:12.57,  csos:0},
+  {section:15,type:'store', houseNo:'5',  area:18,  pq:1.4241,  adminLevy:209.42,  maintLevy:12.57,  csos:0},
+  {section:16,type:'store', houseNo:'7',  area:18,  pq:1.4241,  adminLevy:209.42,  maintLevy:12.57,  csos:0},
+  {section:17,type:'store', houseNo:'8',  area:18,  pq:1.4241,  adminLevy:209.42,  maintLevy:12.57,  csos:0},
+  {section:18,type:'store', houseNo:'9',  area:17,  pq:1.3449,  adminLevy:197.77,  maintLevy:11.87,  csos:0},
+  {section:19,type:'store', houseNo:'10', area:17,  pq:1.3449,  adminLevy:197.77,  maintLevy:11.87,  csos:0},
+  {section:20,type:'store', houseNo:'6',  area:19,  pq:1.5031,  adminLevy:221.03,  maintLevy:13.26,  csos:0}
+];
+
+async function loadUnits(){
+  try { var ls = localStorage.getItem('pm_units'); if(ls) UNITS = JSON.parse(ls)||{}; } catch(e){}
+  try {
+    var remote = await sbGetSetting('units');
+    if(remote){ UNITS = (typeof remote==='string') ? (JSON.parse(remote)||{}) : remote; localStorage.setItem('pm_units', JSON.stringify(UNITS)); }
+  } catch(e){ console.warn('loadUnits', e); }
+  _unitsLoaded = true;
+}
+async function saveUnits(){
+  try { localStorage.setItem('pm_units', JSON.stringify(UNITS)); } catch(e){}
+  try { await sbSetSetting('units', UNITS); } catch(e){ console.warn('saveUnits', e); }
+}
+
+async function openBillingTab(){
+  if(!_unitsLoaded){ await loadUnits(); }
+  renderUnits();
+}
+
+async function seedParkManorUnits(){
+  if(Object.keys(UNITS).length && !confirm('Load the 20 Park Manor units from the levy schedule?\n\nExisting units are kept; sections with the same number are overwritten with the schedule values (owner details preserved).')) return;
+  PARK_MANOR_UNITS_SEED.forEach(function(s){
+    var id = 'unit_' + s.section;
+    var prev = UNITS[id] || {};
+    UNITS[id] = {
+      id:id, section:s.section, type:s.type, houseNo:s.houseNo, area:s.area, pq:s.pq,
+      ownerName: prev.ownerName||'', ownerEmail: prev.ownerEmail||'', ownerPhone: prev.ownerPhone||'',
+      charges: { adminLevy:s.adminLevy, maintLevy:s.maintLevy, csos:s.csos },
+      waterMeter: prev.waterMeter||'', elecMeter: prev.elecMeter||'', notes: prev.notes||'',
+      added: prev.added||Date.now(), updated: Date.now()
+    };
+  });
+  await saveUnits();
+  renderUnits();
+}
+
+function renderUnits(){
+  var wrap = document.getElementById('units-table-wrap');
+  var summary = document.getElementById('units-summary');
+  var empty = document.getElementById('units-empty');
+  var seedBtn = document.getElementById('units-seed-btn');
+  if(!wrap) return;
+  var all = Object.values(UNITS).sort(function(a,b){ return (a.section||0)-(b.section||0); });
+
+  // Keep the seed action available at all times — even after the first unit is
+  // added — so the schedule can always be (re)loaded. Label reflects state.
+  if(seedBtn){ seedBtn.style.display=''; seedBtn.innerHTML = all.length ? '⤓ Reload from schedule' : '⤓ Load Park Manor units'; }
+
+  if(!all.length){
+    wrap.innerHTML=''; if(summary) summary.innerHTML='';
+    if(empty){ empty.style.display='block'; empty.innerHTML='No units yet. Tap <b>“Load Park Manor units”</b> to import your 20 sections from the levy schedule, or <b>Add unit</b> to enter them manually.'; }
+    return;
+  }
+  if(empty) empty.style.display='none';
+
+  var q = ((document.getElementById('units-search')||{}).value||'').toLowerCase().trim();
+  var rows = all.filter(function(u){
+    if(!q) return true;
+    return (String(u.section)+' '+(u.houseNo||'')+' '+(u.type||'')+' '+(u.ownerName||'')+' '+(u.ownerEmail||'')).toLowerCase().indexOf(q)>=0;
+  });
+
+  var totPQ = all.reduce(function(s,u){ return s+Number(u.pq||0); },0);
+  var totAdmin = all.reduce(function(s,u){ return s+Number((u.charges||{}).adminLevy||0); },0);
+  var totMaint = all.reduce(function(s,u){ return s+Number((u.charges||{}).maintLevy||0); },0);
+  var totCsos = all.reduce(function(s,u){ return s+Number((u.charges||{}).csos||0); },0);
+  var totAll = totAdmin+totMaint+totCsos;
+  var pqOk = Math.abs(totPQ-100) < 0.05;
+  function tile(lbl,val,extra){ return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:9px;padding:10px 12px"><div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">'+lbl+'</div><div style="font-size:16px;font-weight:700;color:var(--text2);font-family:var(--sans)">'+val+'</div>'+(extra||'')+'</div>'; }
+  if(summary) summary.innerHTML =
+      tile('Units', all.length)
+    + tile('Total PQ', totPQ.toFixed(4)+'%', pqOk?'<div style="font-size:9px;color:var(--green);font-family:var(--mono)">✓ balances to 100%</div>':'<div style="font-size:9px;color:#f59e0b;font-family:var(--mono)">⚠ should total 100%</div>')
+    + tile('Monthly levies', _uMoney(totAll))
+    + tile('Admin levy', _uMoney(totAdmin), '<div style="font-size:9px;color:var(--muted);font-family:var(--mono)">+ maint '+_uMoney(totMaint)+' · CSOS '+_uMoney(totCsos)+'</div>');
+
+  var head = '<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.5px">'
+    + '<th style="padding:7px 8px">Sec</th><th style="padding:7px 8px">Type</th><th style="padding:7px 8px">House</th>'
+    + '<th style="padding:7px 8px;text-align:right">Area</th><th style="padding:7px 8px;text-align:right">PQ %</th>'
+    + '<th style="padding:7px 8px">Owner</th>'
+    + '<th style="padding:7px 8px;text-align:right">Admin</th><th style="padding:7px 8px;text-align:right">10-yr</th><th style="padding:7px 8px;text-align:right">CSOS</th>'
+    + '<th style="padding:7px 8px;text-align:right">Monthly total</th></tr>';
+  var body = rows.map(function(u){
+    var c=u.charges||{};
+    var typeBadge = u.type==='store'
+      ? '<span style="font-size:9px;font-family:var(--mono);color:#8aa0bd;background:rgba(138,160,189,.1);border:1px solid rgba(138,160,189,.25);padding:1px 7px;border-radius:9px">store</span>'
+      : '<span style="font-size:9px;font-family:var(--mono);color:var(--accent2);background:var(--accent-bg);border:1px solid var(--accent-bd);padding:1px 7px;border-radius:9px">house</span>';
+    return '<tr onclick="openUnitModal(\''+u.id+'\')" style="cursor:pointer;border-top:1px solid var(--border)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+      + '<td style="padding:8px;font-family:var(--mono);color:var(--accent2);font-weight:600">'+escHtml(String(u.section||''))+'</td>'
+      + '<td style="padding:8px">'+typeBadge+'</td>'
+      + '<td style="padding:8px;color:var(--text2)">'+escHtml(u.houseNo||'')+'</td>'
+      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+escHtml(String(u.area||''))+'</td>'
+      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+Number(u.pq||0).toFixed(4)+'</td>'
+      + '<td style="padding:8px;color:var(--text2)">'+(u.ownerName?escHtml(u.ownerName):'<span style="color:var(--st-open);font-style:italic;font-size:11px">— set owner —</span>')+'</td>'
+      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--text2)">'+_uMoney(c.adminLevy)+'</td>'
+      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(c.maintLevy)+'</td>'
+      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(c.csos)+'</td>'
+      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--green);font-weight:700">'+_uMoney(unitTotal(u))+'</td>'
+    + '</tr>';
+  }).join('');
+  var foot = '<tr style="border-top:2px solid var(--border2);font-weight:700">'
+    + '<td colspan="4" style="padding:8px;color:var(--muted);font-family:var(--mono);font-size:11px">TOTAL ('+rows.length+(rows.length!==all.length?' of '+all.length:'')+')</td>'
+    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:'+(pqOk?'var(--green)':'#f59e0b')+'">'+totPQ.toFixed(4)+'</td>'
+    + '<td></td>'
+    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--text2)">'+_uMoney(totAdmin)+'</td>'
+    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(totMaint)+'</td>'
+    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(totCsos)+'</td>'
+    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--green)">'+_uMoney(totAll)+'</td>'
+  + '</tr>';
+  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:720px"><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table>';
+}
+
+function _uTotalPreview(){
+  var el=document.getElementById('u-total-preview');
+  if(el) el.textContent = 'Monthly total: ' + _uMoney(_uNum('u-admin')+_uNum('u-maint')+_uNum('u-csos'));
+}
+
+function openUnitModal(id){
+  _currentUnitId = id;
+  var isNew = !id || !UNITS[id];
+  var u = isNew ? {section:'',type:'house',houseNo:'',area:'',pq:'',ownerName:'',ownerEmail:'',ownerPhone:'',charges:{},waterMeter:'',elecMeter:'',notes:''} : UNITS[id];
+  document.getElementById('unit-modal-title').textContent = isNew ? 'Add unit' : ('Unit — Section '+(u.section||''));
+  document.getElementById('unit-delete-btn').style.display = isNew ? 'none' : '';
+  var c=u.charges||{};
+  document.getElementById('u-section').value = u.section||'';
+  document.getElementById('u-type').value = u.type||'house';
+  document.getElementById('u-house').value = u.houseNo||'';
+  document.getElementById('u-area').value = u.area||'';
+  document.getElementById('u-pq').value = u.pq||'';
+  document.getElementById('u-owner').value = u.ownerName||'';
+  document.getElementById('u-email').value = u.ownerEmail||'';
+  document.getElementById('u-phone').value = u.ownerPhone||'';
+  document.getElementById('u-admin').value = (c.adminLevy!=null?c.adminLevy:'');
+  document.getElementById('u-maint').value = (c.maintLevy!=null?c.maintLevy:'');
+  document.getElementById('u-csos').value = (c.csos!=null?c.csos:'');
+  document.getElementById('u-water').value = u.waterMeter||'';
+  document.getElementById('u-elec').value = u.elecMeter||'';
+  document.getElementById('u-notes').value = u.notes||'';
+  ['u-admin','u-maint','u-csos'].forEach(function(fid){ var e=document.getElementById(fid); if(e) e.oninput=_uTotalPreview; });
+  _uTotalPreview();
+  document.getElementById('unit-modal').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeUnitModal(){
+  document.getElementById('unit-modal').style.display='none';
+  document.body.style.overflow='';
+  _currentUnitId=null;
+}
+async function saveUnitFromModal(){
+  var section = _uNum('u-section');
+  if(!section){ alert('Please enter the section number.'); return; }
+  var id = _currentUnitId || ('unit_'+section);
+  var prev = UNITS[id] || {};
+  UNITS[id] = {
+    id:id, section:section, type:_uStr('u-type')||'house', houseNo:_uStr('u-house'),
+    area:_uNum('u-area'), pq:_uNum('u-pq'),
+    ownerName:_uStr('u-owner'), ownerEmail:_uStr('u-email'), ownerPhone:_uStr('u-phone'),
+    charges:{ adminLevy:_uNum('u-admin'), maintLevy:_uNum('u-maint'), csos:_uNum('u-csos') },
+    waterMeter:_uStr('u-water'), elecMeter:_uStr('u-elec'), notes:_uStr('u-notes'),
+    added: prev.added||Date.now(), updated: Date.now()
+  };
+  closeUnitModal();
+  renderUnits();
+  await saveUnits();
+}
+async function deleteUnit(id){
+  if(!id || !UNITS[id]) return;
+  if(!confirm('Delete Section '+(UNITS[id].section||'')+'? This only removes it from the billing register.')) return;
+  delete UNITS[id];
+  closeUnitModal();
+  renderUnits();
+  await saveUnits();
+}
+</script>
 
 <!-- TICKETS PANEL -->
 <div class="panel active" id="panel-tickets">
