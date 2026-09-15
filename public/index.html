@@ -6325,6 +6325,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <input id="units-search" type="text" placeholder="Search units / owners…" style="flex:1;min-width:140px;padding:7px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none" oninput="renderUnits()">
     <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
       <button id="units-seed-btn" onclick="seedParkManorUnits()" title="Load the 20 Park Manor units from your levy schedule (owner details you've entered are kept)" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⤓ Load Park Manor units</button>
+      <button id="stmts-seed-btn" onclick="seedParkManorStatements()" title="Import the latest levy statements (ledger + ageing) onto the matching units" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">📄 Import statements</button>
       <button onclick="openUnitModal(null)" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> Add unit</button>
     </div>
   </div>
@@ -6335,7 +6336,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
 
 <!-- Unit add/edit modal -->
 <div id="unit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:700;align-items:center;justify-content:center" onclick="if(event.target===this)closeUnitModal()">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(560px,95vw);max-height:92vh;overflow-y:auto">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(760px,96vw);max-height:92vh;overflow-y:auto">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)">
       <div id="unit-modal-title" style="font-size:14px;font-weight:600;color:var(--text2)">Add unit</div>
       <div style="display:flex;gap:8px">
@@ -6388,11 +6389,52 @@ document.getElementById('tbody').addEventListener('click', function(e){
         </div>
         <div id="u-total-preview" style="font-size:11px;color:var(--muted);font-family:var(--mono);text-align:right">Monthly total: —</div>
       </div>
-      <div style="display:flex;gap:10px">
-        <div style="flex:1"><div class="ul">Water meter #</div><input id="u-water" type="text" class="ui" placeholder="optional"></div>
-        <div style="flex:1"><div class="ul">Electricity meter #</div><input id="u-elec" type="text" class="ui" placeholder="optional"></div>
-      </div>
       <div><div class="ul">Notes</div><input id="u-notes" type="text" class="ui" placeholder="optional"></div>
+
+      <!-- ── Levy statement / ledger (Phase 2) ─────────────────────────────── -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">📄 Levy statement</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">Ref</span>
+            <input id="u-stmt-ref" type="text" class="ui2" placeholder="e.g. FER001-D1" style="width:150px" oninput="_uLedgerDirty()">
+            <button type="button" onclick="printUnitStatement(_currentUnitId)" title="Open a print-ready statement in the Davies Group layout (print → Save as PDF)" style="padding:7px 12px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">🖨 Statement</button>
+          </div>
+        </div>
+        <div id="u-ledger-wrap" style="overflow-x:auto"></div>
+        <!-- guided add-line -->
+        <div style="border-top:1px dashed var(--border);padding-top:11px;display:flex;flex-direction:column;gap:9px">
+          <div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Add a line</div>
+          <div id="ul-type-chips" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div><div class="ul">Date</div><input id="ul-date" type="date" class="ui2" style="width:150px" onchange="_ulSyncDesc()"></div>
+            <div style="flex:1;min-width:150px"><div class="ul" id="ul-desc-lbl">Description</div><input id="ul-desc" type="text" class="ui2" placeholder="Description"></div>
+            <div><div class="ul" id="ul-amt-lbl">Charge (R)</div><input id="ul-amt" type="number" step="0.01" class="ui2" placeholder="0.00" style="width:120px"></div>
+            <button type="button" onclick="addLedgerLine()" style="padding:9px 16px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">＋ Add</button>
+          </div>
+          <div id="ul-hint" style="font-size:9px;color:var(--muted);font-family:var(--mono);line-height:1.5"></div>
+        </div>
+      </div>
+
+      <!-- ── Meter readings (Phase 2) ──────────────────────────────────────── -->
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">🔢 Meter readings</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:120px"><div class="ul">💧 Water meter #</div><input id="u-water" type="text" class="ui2" placeholder="optional"></div>
+          <div style="flex:1;min-width:120px"><div class="ul">Water tariff (R/kL)</div><input id="u-water-tariff" type="number" step="0.01" class="ui2" placeholder="e.g. 35.00"></div>
+          <div style="flex:1;min-width:120px"><div class="ul">⚡ Electricity meter #</div><input id="u-elec" type="text" class="ui2" placeholder="optional"></div>
+          <div style="flex:1;min-width:120px"><div class="ul">Elec tariff (R/kWh)</div><input id="u-elec-tariff" type="number" step="0.01" class="ui2" placeholder="e.g. 2.80"></div>
+        </div>
+        <div id="u-meters-wrap" style="overflow-x:auto"></div>
+        <!-- capture a month's readings -->
+        <div style="border-top:1px dashed var(--border);padding-top:11px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div><div class="ul">Reading date</div><input id="mr-date" type="date" class="ui2" style="width:150px"></div>
+          <div><div class="ul">💧 Water reading</div><input id="mr-water" type="number" step="0.001" class="ui2" placeholder="kL" style="width:120px"></div>
+          <div><div class="ul">⚡ Elec reading</div><input id="mr-elec" type="number" step="0.001" class="ui2" placeholder="kWh" style="width:120px"></div>
+          <button type="button" onclick="addMeterReading()" style="padding:9px 16px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">＋ Add reading</button>
+        </div>
+        <div style="font-size:9px;color:var(--muted);font-family:var(--mono);line-height:1.5">Enter the cumulative meter value each month — usage is the difference from the previous reading. Set a tariff to turn a month's usage into a charge on the statement with “Bill usage”. Readings are saved with the unit.</div>
+      </div>
     </div>
     <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface2);position:sticky;bottom:0">
       <button onclick="closeUnitModal()" style="padding:8px 16px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:12px;font-family:var(--mono);cursor:pointer">Cancel</button>
@@ -6443,6 +6485,213 @@ var PARK_MANOR_UNITS_SEED = [
   {section:20,type:'store', houseNo:'6',  area:19,  pq:1.5031,  adminLevy:221.03,  maintLevy:13.26,  csos:0}
 ];
 
+// ── Davies Group levy-statement snapshot, as at 2026-09-14 ──────────────────
+// Parsed from the 16 owner statements Franco supplied. Keyed by section
+// number (Davies "Door No" == scheme section). Each entry seeds unit.statement
+// = { ref, asOf, ageing, ledger[] }. debit/credit are rands; cumulative is
+// recomputed in-app (running debit − credit) and matches these printed totals.
+var PARK_MANOR_STATEMENTS_SEED = {
+  "1": {
+    ref:"FER001-D1", owner:"FERREIRA FRANCO & FERREIRA HESTER CHRISTINA", tel:"27716822127", email:"franco.frans@gmail.com", total:-1576.57,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:-1576.57,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - FERREIRA F&H", debit:0.00, credit:7664.37},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00001", debit:6174.76, credit:0.00},
+      {date:"2026-07-27", src:"FIRST NATIONAL BANK: 63217912145", desc:"FER001-D1 FER001-D1 000000 - \"Payment - Thank you\"", debit:0.00, credit:6000.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00021", debit:6518.00, credit:0.00},
+      {date:"2026-08-29", src:"FIRST NATIONAL BANK: 63217912145", desc:"FER001-D1 - \"Payment - Thank you\"", debit:0.00, credit:7000.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00041", debit:6395.04, credit:0.00},
+    ]
+  },
+  "2": {
+    ref:"MCM001-D2", owner:"MCMATH SARA JANE & KRUGER LUTZ WERNER WOLFGANG", tel:"27827478004", email:"sjmcmath@mweb.co.za", total:-1749.74,
+    ageing:{d120:0.00,d90:0.00,d60:-1749.74,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - S McMATH & L KRUGER", debit:0.00, credit:5304.54},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00002", debit:5412.46, credit:0.00},
+      {date:"2026-07-24", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM 2 AND 11 PARK MANOR", debit:0.00, credit:3000.00},
+      {date:"2026-07-28", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM MCM001-D2 - \"Payment - Thank you\"", debit:0.00, credit:5279.10},
+      {date:"2026-07-30", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM MCM001-D2 - \"Payment - Thank you\"", debit:0.00, credit:3000.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00022", debit:5171.18, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00042", debit:4250.26, credit:0.00},
+    ]
+  },
+  "3": {
+    ref:"BRE001-D3", owner:"BREAKEY ALAN JOHN", tel:"27824190375", email:"alchan@absamail.co.za", total:-716.42,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:-716.42,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - BREAKEY, MR AJ", debit:0.00, credit:3313.38},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00003", debit:2952.78, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00023", debit:3243.24, credit:0.00},
+      {date:"2026-08-01", src:"FIRST NATIONAL BANK: 63217912145", desc:"ABSA BANK BRE001-D3 - \"Payment - Thank you\"", debit:0.00, credit:3234.24},
+      {date:"2026-08-25", src:"FIRST NATIONAL BANK: 63217912145", desc:"ABSA BANK BRE001-D3 - \"Payment - Thank you\"", debit:0.00, credit:3500.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00043", debit:3135.18, credit:0.00},
+    ]
+  },
+  "4": {
+    ref:"LOY001-D4", owner:"LO YAO", tel:"27619885453", email:"luyao75@hotmail.com", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00004", debit:2535.99, credit:0.00},
+      {date:"2026-07-25", src:"FIRST NATIONAL BANK: 63217912145", desc:"INT-BANKING PMT FRM LOY001-D4 - \"Payment - Thank you\"", debit:0.00, credit:2535.99},
+      {date:"2026-07-25", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB OB PMT LOY001-D4 - \"Payment - Thank you\"", debit:0.00, credit:2589.39},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00024", debit:2589.39, credit:0.00},
+      {date:"2026-08-28", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB OB PMT LOY001-D4 - \"Payment - Thank you\"", debit:0.00, credit:2613.23},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00044", debit:2613.23, credit:0.00},
+    ]
+  },
+  "5": {
+    ref:"WAT001-D5", owner:"WATERHOUSE DENISE AMANDA", tel:"27833215404", email:"ginawaterhouse@icloud.com", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - WATERHOUSE, MRS D", debit:0.00, credit:3299.90},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00005", debit:3816.79, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00025", debit:3581.44, credit:0.00},
+      {date:"2026-08-03", src:"FIRST NATIONAL BANK: 63217912145", desc:"DA WATERHOUSE - UNIT 5 - \"Payment - Thank you\"", debit:0.00, credit:4098.33},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00045", debit:3765.37, credit:0.00},
+      {date:"2026-09-07", src:"FIRST NATIONAL BANK: 63217912145", desc:"DA WATERHOUSE - UNIT 5 - \"Payment - Thank you\"", debit:0.00, credit:3765.37},
+    ]
+  },
+  "6": {
+    ref:"LIG001-D6", owner:"LIGGETT CARMELITA", tel:"27823972023", email:"carmliggett@gmail.com", total:7236.98,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:7236.98},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - LIGGETT, MRS C", debit:0.00, credit:6542.18},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00006", debit:6331.49, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00026", debit:7221.43, credit:0.00},
+      {date:"2026-08-04", src:"FIRST NATIONAL BANK: 63217912145", desc:"C. LIGGETT 6 PARK MANOR - \"Payment - Thank you\"", debit:0.00, credit:7011.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00046", debit:7237.24, credit:0.00},
+    ]
+  },
+  "7": {
+    ref:"LUH001-D7", owner:"LUHANGA LAVERNE ANTHEA", tel:"27728925264", email:"editor@isolabantunews.co.za", total:4570.73,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:4570.73},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - LUHANGA LA (H/O) (R/K)", debit:65655.25, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00007", debit:6994.68, credit:0.00},
+      {date:"2026-07-09", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM 7PARKMANOR - \"Payment - Thank you\"", debit:0.00, credit:30000.00},
+      {date:"2026-07-25", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM LUH001-D7 - \"Payment - Thank you\"", debit:0.00, credit:6994.68},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00027", debit:6682.42, credit:0.00},
+      {date:"2026-08-22", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM LUH001-D7 - \"Payment - Thank you\"", debit:0.00, credit:42337.67},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00047", debit:4570.73, credit:0.00},
+    ]
+  },
+  "8": {
+    ref:"HAG001-D8", owner:"HAGGLUND SUZANNE", tel:"27711256195", email:"su.o.zanne@gmail.com", total:-0.38,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:-0.38,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - HUGGLUND S", debit:0.00, credit:4100.94},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00008", debit:4095.07, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00028", debit:4673.23, credit:0.00},
+      {date:"2026-08-01", src:"FIRST NATIONAL BANK: 63217912145", desc:"ABSA BANK HAG001-D8 - \"Payment - Thank you\"", debit:0.00, credit:4668.00},
+      {date:"2026-08-31", src:"FIRST NATIONAL BANK: 63217912145", desc:"ABSA BANK HAG001-D8 - \"Payment - Thank you\"", debit:0.00, credit:4430.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00048", debit:4430.26, credit:0.00},
+    ]
+  },
+  "9": {
+    ref:"SAL001-D9", owner:"SALEHZADEH SEYED AMIRSALEH & SALEHZADEH COURTNEY", tel:"27827752852", email:"dpritchard.courtney@gmail.com", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00009", debit:4978.39, credit:0.00},
+      {date:"2026-07-01", src:"Credit Note", desc:"CRN00001 - INV00009: Solar powered unit", debit:0.00, credit:301.91},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00029", debit:6045.83, credit:0.00},
+      {date:"2026-08-11", src:"FIRST NATIONAL BANK: 63217912145", desc:"SAL001-D9 - \"Payment - Thank you\"", debit:0.00, credit:4978.39},
+      {date:"2026-08-28", src:"Credit Note", desc:"CRN00002 - INV00029:", debit:0.00, credit:1428.09},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00049", debit:5668.79, credit:0.00},
+      {date:"2026-09-01", src:"Credit Note", desc:"CRN00003 - INV00049: Uses Solar Power", debit:0.00, credit:1472.82},
+      {date:"2026-09-04", src:"FIRST NATIONAL BANK: 63217912145", desc:"SAL001-D9 - \"Payment - Thank you\"", debit:0.00, credit:8511.80},
+    ]
+  },
+  "10": {
+    ref:"KOE001-D10", owner:"KOEGELENBERG JOMARE & KOEGELENBERG JEANA", tel:"", email:"", total:3168.15,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:3168.15},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00010", debit:3098.53, credit:0.00},
+      {date:"2026-07-30", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM KOE002-D19 - \"Payment - Thank you\"", debit:0.00, credit:6222.57},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00030", debit:3124.04, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00050", debit:3168.15, credit:0.00},
+    ]
+  },
+  "11": {
+    ref:"MCM002-D11", owner:"MCMATH SARA JANE & KRUGER LUTZ WERNER WOLFGANG", tel:"27827478004", email:"sjmcmath@mweb.co.za", total:-3001.37,
+    ageing:{d120:0.00,d90:0.00,d60:-3001.37,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - S McMATH & L KRUGER", debit:0.00, credit:2870.46},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00011", debit:2872.73, credit:0.00},
+      {date:"2026-07-24", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM 2 AND 11 PARK MANOR", debit:0.00, credit:3000.00},
+      {date:"2026-07-28", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM MCM002-D11 - \"Payment - Thank you\"", debit:0.00, credit:2975.17},
+      {date:"2026-07-30", src:"FIRST NATIONAL BANK: 63217912145", desc:"FNB APP PAYMENT FROM MCM002-D11 - \"Payment - Thank you\"", debit:0.00, credit:3000.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00031", debit:2975.17, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00051", debit:2996.36, credit:0.00},
+    ]
+  },
+  "12": {
+    ref:"CHE001-D12", owner:"CHEN CHI JUNG", tel:"27832827084", email:"echobruce@gmail.com", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-06-30", src:"Journal Batch 1", desc:"Take-on as at 30 June 2026 - CHEN, MR CJ", debit:0.00, credit:5346.52},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00012", debit:5565.63, credit:0.00},
+      {date:"2026-07-31", src:"FIRST NATIONAL BANK: 63217912145", desc:"CHE001-D12 - \"Payment - Thank you\"", debit:0.00, credit:219.11},
+      {date:"2026-07-31", src:"FIRST NATIONAL BANK: 63217912145", desc:"CHE001-D12 - \"Payment - Thank you\"", debit:0.00, credit:5399.41},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00032", debit:5399.41, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00052", debit:5595.92, credit:0.00},
+      {date:"2026-09-02", src:"FIRST NATIONAL BANK: 63217912145", desc:"CHE001-D12 - \"Payment - Thank you\"", debit:0.00, credit:5595.92},
+    ]
+  },
+  "13": {
+    ref:"FER002-D13", owner:"FERREIRA FRANCO & FERREIRA HESTER CHRISTINA", tel:"27716822127", email:"franco.frans@gmail.com", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00013", debit:0.00, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00033", debit:0.00, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00053", debit:0.00, credit:0.00},
+    ]
+  },
+  "14": {
+    ref:"BRE002-D14", owner:"BREAKEY ALAN JOHN", tel:"27824190375", email:"alchan@absamail.co.za", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00014", debit:0.00, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00034", debit:0.00, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00054", debit:0.00, credit:0.00},
+    ]
+  },
+  "15": {
+    ref:"WAT002-D15", owner:"WATERHOUSE DENISE AMANDA", tel:"27833215404", email:"ginawaterhouse@icloud.com", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00015", debit:0.00, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00035", debit:0.00, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00055", debit:0.00, credit:0.00},
+    ]
+  },
+  "16": {
+    ref:"LUH002-D16", owner:"LUHANGA LAVERNE ANTHEA", tel:"27728925264", email:"editor@isolabantunews.co.za", total:0.00,
+    ageing:{d120:0.00,d90:0.00,d60:0.00,d30:0.00,current:0.00},
+    ledger:[
+      {date:"2026-03-01", src:"", desc:"Balance b/f", debit:0.00, credit:0.00},
+      {date:"2026-07-01", src:"Invoice", desc:"INV00016", debit:0.00, credit:0.00},
+      {date:"2026-08-01", src:"Invoice", desc:"INV00036", debit:0.00, credit:0.00},
+      {date:"2026-09-01", src:"Invoice", desc:"INV00056", debit:0.00, credit:0.00},
+    ]
+  },
+};
+
 async function loadUnits(){
   try { var ls = localStorage.getItem('pm_units'); if(ls) UNITS = JSON.parse(ls)||{}; } catch(e){}
   try {
@@ -6471,6 +6720,7 @@ async function seedParkManorUnits(){
       ownerName: prev.ownerName||'', ownerEmail: prev.ownerEmail||'', ownerPhone: prev.ownerPhone||'',
       charges: { adminLevy:s.adminLevy, maintLevy:s.maintLevy, csos:s.csos },
       waterMeter: prev.waterMeter||'', elecMeter: prev.elecMeter||'', notes: prev.notes||'',
+      tariffs: prev.tariffs||{}, meterReadings: prev.meterReadings||[], statement: prev.statement,
       added: prev.added||Date.now(), updated: Date.now()
     };
   });
@@ -6509,19 +6759,27 @@ function renderUnits(){
   var totCsos = all.reduce(function(s,u){ return s+Number((u.charges||{}).csos||0); },0);
   var totAll = totAdmin+totMaint+totCsos;
   var pqOk = Math.abs(totPQ-100) < 0.05;
+  // Statement balances across the register
+  var balances = all.map(unitBalance);
+  var arrears = balances.reduce(function(s,b){ return s + (b>0.005?b:0); },0);
+  var arrearsCount = balances.filter(function(b){ return b>0.005; }).length;
+  var haveStmts = all.some(function(u){ return u.statement && (u.statement.ledger||[]).length; });
   function tile(lbl,val,extra){ return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:9px;padding:10px 12px"><div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">'+lbl+'</div><div style="font-size:16px;font-weight:700;color:var(--text2);font-family:var(--sans)">'+val+'</div>'+(extra||'')+'</div>'; }
+  function tileWarn(lbl,val,extra){ return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid '+(arrearsCount?'#f0a06f':'var(--green)')+';border-radius:9px;padding:10px 12px"><div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">'+lbl+'</div><div style="font-size:16px;font-weight:700;color:'+(arrearsCount?'#f0a06f':'var(--green)')+';font-family:var(--sans)">'+val+'</div>'+(extra||'')+'</div>'; }
   if(summary) summary.innerHTML =
       tile('Units', all.length)
     + tile('Total PQ', totPQ.toFixed(4)+'%', pqOk?'<div style="font-size:9px;color:var(--green);font-family:var(--mono)">✓ balances to 100%</div>':'<div style="font-size:9px;color:#f59e0b;font-family:var(--mono)">⚠ should total 100%</div>')
     + tile('Monthly levies', _uMoney(totAll))
-    + tile('Admin levy', _uMoney(totAdmin), '<div style="font-size:9px;color:var(--muted);font-family:var(--mono)">+ maint '+_uMoney(totMaint)+' · CSOS '+_uMoney(totCsos)+'</div>');
+    + tile('Admin levy', _uMoney(totAdmin), '<div style="font-size:9px;color:var(--muted);font-family:var(--mono)">+ maint '+_uMoney(totMaint)+' · CSOS '+_uMoney(totCsos)+'</div>')
+    + (haveStmts ? tileWarn('Arrears', _uMoney(arrears), '<div style="font-size:9px;color:var(--muted);font-family:var(--mono)">'+(arrearsCount?arrearsCount+' unit'+(arrearsCount>1?'s':'')+' in arrears':'all clear')+'</div>') : '');
 
   var head = '<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.5px">'
     + '<th style="padding:7px 8px">Sec</th><th style="padding:7px 8px">Type</th><th style="padding:7px 8px">House</th>'
     + '<th style="padding:7px 8px;text-align:right">Area</th><th style="padding:7px 8px;text-align:right">PQ %</th>'
     + '<th style="padding:7px 8px">Owner</th>'
     + '<th style="padding:7px 8px;text-align:right">Admin</th><th style="padding:7px 8px;text-align:right">10-yr</th><th style="padding:7px 8px;text-align:right">CSOS</th>'
-    + '<th style="padding:7px 8px;text-align:right">Monthly total</th></tr>';
+    + '<th style="padding:7px 8px;text-align:right">Monthly total</th>'
+    + '<th style="padding:7px 8px;text-align:right">Balance due</th></tr>';
   var body = rows.map(function(u){
     var c=u.charges||{};
     var typeBadge = u.type==='store'
@@ -6538,6 +6796,7 @@ function renderUnits(){
       + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(c.maintLevy)+'</td>'
       + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(c.csos)+'</td>'
       + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--green);font-weight:700">'+_uMoney(unitTotal(u))+'</td>'
+      + (function(){ var b=unitBalance(u); var has=u.statement&&(u.statement.ledger||[]).length; if(!has) return '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">—</td>'; var col=b>0.005?'#f0a06f':(b<-0.005?'var(--green)':'var(--muted)'); return '<td style="padding:8px;text-align:right;font-family:var(--mono);font-weight:600;color:'+col+'">'+_uMoney(b)+'</td>'; })()
     + '</tr>';
   }).join('');
   var foot = '<tr style="border-top:2px solid var(--border2);font-weight:700">'
@@ -6548,8 +6807,9 @@ function renderUnits(){
     + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(totMaint)+'</td>'
     + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(totCsos)+'</td>'
     + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--green)">'+_uMoney(totAll)+'</td>'
+    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:'+(arrears>0.005?'#f0a06f':'var(--muted)')+'">'+(haveStmts?_uMoney(arrears):'—')+'</td>'
   + '</tr>';
-  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:720px"><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table>';
+  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:800px"><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table>';
 }
 
 function _uTotalPreview(){
@@ -6580,6 +6840,23 @@ function openUnitModal(id){
   document.getElementById('u-notes').value = u.notes||'';
   ['u-admin','u-maint','u-csos'].forEach(function(fid){ var e=document.getElementById(fid); if(e) e.oninput=_uTotalPreview; });
   _uTotalPreview();
+  // Statement / ledger — load a working copy so Cancel discards edits
+  var st = u.statement || {};
+  _editLedger = (st.ledger||[]).map(function(l){ return {date:l.date||'', src:l.src||'', desc:l.desc||'', debit:Number(l.debit||0), credit:Number(l.credit||0)}; });
+  _editStmtMeta = { ageing: st.ageing||null, asOf: st.asOf||'' };
+  var refEl=document.getElementById('u-stmt-ref'); if(refEl) refEl.value = st.ref||'';
+  var today = new Date().toISOString().slice(0,10);
+  var dEl=document.getElementById('ul-date'); if(dEl) dEl.value = today;
+  renderUnitLedger();
+  // Guided line-item entry — reset to the default type
+  _lineType='levy'; renderLineChips(); var dd=document.getElementById('ul-desc'); if(dd){ dd.value=''; dd.dataset.auto='1'; } var aa=document.getElementById('ul-amt'); if(aa) aa.value=''; setLineType('levy');
+  // Meter readings + tariffs — load working copy so Cancel discards edits
+  var tf = u.tariffs || {};
+  var wtEl=document.getElementById('u-water-tariff'); if(wtEl) wtEl.value = (tf.water!=null&&tf.water!==0)?tf.water:'';
+  var etEl=document.getElementById('u-elec-tariff'); if(etEl) etEl.value = (tf.elec!=null&&tf.elec!==0)?tf.elec:'';
+  _editReadings = (u.meterReadings||[]).map(function(r){ return {date:r.date, water:(r.water==null?null:Number(r.water)), elec:(r.elec==null?null:Number(r.elec))}; });
+  var mrEl=document.getElementById('mr-date'); if(mrEl) mrEl.value = today;
+  renderMeters();
   document.getElementById('unit-modal').style.display='flex';
   document.body.style.overflow='hidden';
 }
@@ -6599,6 +6876,9 @@ async function saveUnitFromModal(){
     ownerName:_uStr('u-owner'), ownerEmail:_uStr('u-email'), ownerPhone:_uStr('u-phone'),
     charges:{ adminLevy:_uNum('u-admin'), maintLevy:_uNum('u-maint'), csos:_uNum('u-csos') },
     waterMeter:_uStr('u-water'), elecMeter:_uStr('u-elec'), notes:_uStr('u-notes'),
+    tariffs:{ water:_uNum('u-water-tariff'), elec:_uNum('u-elec-tariff') },
+    meterReadings: (_editReadings||[]).map(function(r){ return {date:r.date, water:r.water, elec:r.elec}; }),
+    statement: _uCollectStatement(prev),
     added: prev.added||Date.now(), updated: Date.now()
   };
   closeUnitModal();
@@ -6612,6 +6892,416 @@ async function deleteUnit(id){
   closeUnitModal();
   renderUnits();
   await saveUnits();
+}
+
+// ── Levy statements / owner ledger — Phase 2 ────────────────────────────────
+// Each unit carries an optional `statement` = { ref, asOf, ageing, ledger[] }.
+// A ledger line is { date, src, desc, debit, credit }; the running balance
+// (cumulative) and the Total Due are computed from debit − credit so they can
+// never drift. `ageing` is a snapshot { d120,d90,d60,d30,current }; while it is
+// present (e.g. straight from the Davies import) we show it verbatim, and once
+// the ledger is edited in the modal we recompute it by age of the oldest
+// unsettled charge. The printable statement mirrors the managing-agent layout.
+
+// Issuer / banking constants — edit here if the agent or bank account changes.
+var PM_STMT = {
+  bcName:'Park Manor Body Corporate', regNo:'SS145/1987',
+  agent:['c/o Davies Group','Cohesive Building','46 Orange Street','Gardens','Cape Town','8001'],
+  agentEmail:'Tara@daviesgroup.co.za', agentTel:'021 4195392',
+  bankName:'FIRST NATIONAL BANK', bankAcc:'63217912145', bankBranch:'250655',
+  bankBranchName:'UNIVERSAL', bankHolder:'PARK MANOR BODY CORPORATE', bankType:'CURRENT'
+};
+
+var _editLedger = [];                       // working copy while the modal is open
+var _editStmtMeta = { ageing:null, asOf:'' };
+
+// Manual money formatter — space thousands, dot decimals, matches the statements
+// (avoids en-ZA locale rendering the decimal as a comma).
+function _uAmt(n){
+  n = Number(n||0); var neg = n < 0; n = Math.abs(n);
+  var p = n.toFixed(2).split('.');
+  p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+  return (neg?'-':'') + p[0] + '.' + p[1];
+}
+function _uAmtR(n){ return 'R ' + _uAmt(n); }
+function _uLedgerDirty(){ /* ref field edits — nothing to recompute, kept for future */ }
+
+// Running balance for a ledger (array of {debit,credit}); returns cumulative[].
+function _uRunning(ledger){
+  var run = 0, out = [];
+  (ledger||[]).forEach(function(l){ run += Number(l.debit||0) - Number(l.credit||0); out.push(Math.round(run*100)/100); });
+  return out;
+}
+function _uLedgerTotal(ledger){ var c = _uRunning(ledger); return c.length ? c[c.length-1] : 0; }
+// Total due straight off a unit (used by the register view).
+function unitBalance(u){ var st=(u&&u.statement)||{}; return _uLedgerTotal(st.ledger||[]); }
+
+// Age the unsettled charges: credits settle oldest debits first (FIFO); whatever
+// remains is bucketed by how many days old the charge is, relative to `asOf`.
+function _computeAgeing(ledger, asOf){
+  var ref = asOf ? new Date(asOf) : new Date();
+  var charges = [];
+  (ledger||[]).forEach(function(l){
+    var d = Number(l.debit||0), c = Number(l.credit||0);
+    if(d>0) charges.push({date:l.date, amt:d});
+    if(c>0){ // apply credit to oldest open charges
+      var rem = c;
+      for(var i=0;i<charges.length && rem>0.0001;i++){
+        var take = Math.min(charges[i].amt, rem); charges[i].amt -= take; rem -= take;
+      }
+      // leftover credit becomes a negative "current" charge (owner in credit)
+      if(rem>0.0001) charges.push({date:l.date, amt:-rem});
+    }
+  });
+  var b = {d120:0,d90:0,d60:0,d30:0,current:0};
+  charges.forEach(function(ch){
+    if(Math.abs(ch.amt) < 0.005) return;
+    var days = Math.floor((ref - new Date(ch.date))/86400000);
+    if(days>=120) b.d120 += ch.amt;
+    else if(days>=90) b.d90 += ch.amt;
+    else if(days>=60) b.d60 += ch.amt;
+    else if(days>=30) b.d30 += ch.amt;
+    else b.current += ch.amt;
+  });
+  Object.keys(b).forEach(function(k){ b[k]=Math.round(b[k]*100)/100; });
+  return b;
+}
+function _uAgeing(){
+  if(_editStmtMeta.ageing) return _editStmtMeta.ageing;
+  return _computeAgeing(_editLedger, _editStmtMeta.asOf);
+}
+
+// Render the ledger table inside the unit modal.
+function renderUnitLedger(){
+  var wrap = document.getElementById('u-ledger-wrap');
+  if(!wrap) return;
+  var L = _editLedger || [];
+  if(!L.length){
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);padding:8px 2px">No statement lines yet. Add an opening balance / invoice / payment below, or use “Import statements” on the register to load the latest Davies statements.</div>';
+    return;
+  }
+  var cum = _uRunning(L);
+  var head = '<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.5px">'
+    + '<th style="padding:5px 6px">Date</th><th style="padding:5px 6px">Source</th><th style="padding:5px 6px">Description</th>'
+    + '<th style="padding:5px 6px;text-align:right">Debit</th><th style="padding:5px 6px;text-align:right">Credit</th>'
+    + '<th style="padding:5px 6px;text-align:right">Balance</th><th style="padding:5px 6px"></th></tr>';
+  var body = L.map(function(l,i){
+    var bal = cum[i];
+    return '<tr style="border-top:1px solid var(--border)">'
+      + '<td style="padding:5px 6px;font-family:var(--mono);color:var(--muted);white-space:nowrap">'+escHtml(l.date||'')+'</td>'
+      + '<td style="padding:5px 6px;color:#8aa0bd;font-size:11px">'+escHtml(l.src||'')+'</td>'
+      + '<td style="padding:5px 6px;color:var(--text2);font-size:11px">'+escHtml(l.desc||'')+'</td>'
+      + '<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+(Number(l.debit)?_uAmt(l.debit):'<span style="color:var(--muted)">·</span>')+'</td>'
+      + '<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--green);white-space:nowrap">'+(Number(l.credit)?_uAmt(l.credit):'<span style="color:var(--muted)">·</span>')+'</td>'
+      + '<td style="padding:5px 6px;text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap;color:'+(bal>0.005?'#f0a06f':(bal<-0.005?'var(--green)':'var(--muted)'))+'">'+_uAmt(bal)+'</td>'
+      + '<td style="padding:5px 6px;text-align:right"><button type="button" title="Remove line" onclick="deleteLedgerLine('+i+')" style="background:none;border:none;color:#f06f6f;cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></td>'
+    + '</tr>';
+  }).join('');
+  var ag = _uAgeing();
+  var total = _uLedgerTotal(L);
+  var ageRow = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
+    + [['120+',ag.d120],['90+',ag.d90],['60+',ag.d60],['30+',ag.d30],['Current',ag.current]].map(function(x){
+        return '<div style="flex:1;min-width:70px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 8px;text-align:center">'
+          + '<div style="font-size:8px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase">'+x[0]+'</div>'
+          + '<div style="font-size:12px;font-family:var(--mono);color:'+(Math.abs(x[1])>0.005?'var(--text2)':'var(--muted)')+'">'+_uAmt(x[1])+'</div></div>';
+      }).join('')
+    + '</div>';
+  var totalRow = '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:2px solid var(--border2)">'
+    + '<span style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Total due</span>'
+    + '<span style="font-size:16px;font-weight:700;font-family:var(--mono);color:'+(total>0.005?'#f0a06f':(total<-0.005?'var(--green)':'var(--text2)'))+'">'+_uAmtR(total)+'</span></div>'
+    + (total<-0.005?'<div style="font-size:9px;color:var(--green);font-family:var(--mono);text-align:right">owner in credit</div>':'')
+    + (!_editStmtMeta.ageing?'<div style="font-size:9px;color:var(--muted);font-family:var(--mono);text-align:right;margin-top:2px">ageing recalculated from ledger</div>':'');
+  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>' + ageRow + totalRow;
+}
+
+// Guided line-item types — the user picks what the line IS; the app decides
+// which side (debit = charge to owner, credit = money in) and fills sensible
+// source + description. No accounting knowledge needed.
+var LINE_TYPES = [
+  { key:'levy',    label:'📋 Monthly levy', side:'debit',  src:'Invoice',                          descTpl:'Monthly levy — {month}', prefill:'levy', amtLbl:'Charge (R)' },
+  { key:'payment', label:'💰 Payment',      side:'credit', src:'FIRST NATIONAL BANK: 63217912145', descTpl:'Payment - Thank you',     amtLbl:'Payment (R)' },
+  { key:'water',   label:'💧 Water',        side:'debit',  src:'Water',                            descTpl:'Water usage — {month}',  amtLbl:'Charge (R)' },
+  { key:'elec',    label:'⚡ Electricity',  side:'debit',  src:'Electricity',                      descTpl:'Electricity usage — {month}', amtLbl:'Charge (R)' },
+  { key:'credit',  label:'↩ Credit note',   side:'credit', src:'Credit Note',                      descTpl:'',                        amtLbl:'Credit (R)' },
+  { key:'other',   label:'✎ Other charge',  side:'debit',  src:'',                                 descTpl:'',                        amtLbl:'Charge (R)' }
+];
+var _lineType = 'levy';
+function _lineTypeDef(k){ for(var i=0;i<LINE_TYPES.length;i++) if(LINE_TYPES[i].key===k) return LINE_TYPES[i]; return LINE_TYPES[0]; }
+function _monthLabel(d){ if(!d) return ''; var dt=new Date(d+'T00:00:00'); if(isNaN(dt)) return ''; return dt.toLocaleDateString('en-ZA',{month:'short',year:'numeric'}); }
+function renderLineChips(){
+  var wrap=document.getElementById('ul-type-chips'); if(!wrap) return;
+  wrap.innerHTML = LINE_TYPES.map(function(t){
+    var on = t.key===_lineType;
+    return '<button type="button" onclick="setLineType(\''+t.key+'\')" style="padding:5px 11px;border-radius:20px;font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap;'
+      + (on ? 'background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:600' : 'background:var(--surface);border:1px solid var(--border2);color:var(--text2)')
+      + '">'+t.label+'</button>';
+  }).join('');
+}
+function setLineType(k){
+  _lineType=k; var t=_lineTypeDef(k);
+  renderLineChips();
+  var amtLbl=document.getElementById('ul-amt-lbl'); if(amtLbl) amtLbl.textContent=t.amtLbl;
+  var hint=document.getElementById('ul-hint');
+  if(hint) hint.textContent = t.side==='credit' ? 'Records money received — reduces the balance owing.' : 'Charges the owner — increases the balance owing.';
+  var amt=document.getElementById('ul-amt');
+  if(t.prefill==='levy' && amt){
+    var u=_currentUnitId?UNITS[_currentUnitId]:null; var tot=u?unitTotal(u):0;
+    if(tot){ amt.value=tot.toFixed(2); }
+  }
+  _ulSyncDesc();
+}
+// Fill the description placeholder/value from the type template + chosen month.
+function _ulSyncDesc(){
+  var t=_lineTypeDef(_lineType);
+  var descEl=document.getElementById('ul-desc'); if(!descEl) return;
+  var month=_monthLabel((document.getElementById('ul-date')||{}).value||'');
+  var suggested = t.descTpl ? t.descTpl.replace('{month}', month||'') : '';
+  descEl.placeholder = suggested || 'Description';
+  // only auto-populate if the user hasn't typed their own text
+  if(!descEl.value || descEl.dataset.auto==='1'){ descEl.value = suggested; descEl.dataset.auto='1'; }
+}
+
+function addLedgerLine(){
+  var t=_lineTypeDef(_lineType);
+  var date=(document.getElementById('ul-date')||{}).value||'';
+  var descEl=document.getElementById('ul-desc');
+  var desc=(descEl?descEl.value:'').trim();
+  var amt=parseFloat((document.getElementById('ul-amt')||{}).value)||0;
+  if(!date){ alert('Please choose a date for the line.'); return; }
+  if(!amt){ alert('Please enter an amount.'); return; }
+  if(!desc) desc = t.descTpl ? t.descTpl.replace('{month}', _monthLabel(date)) : t.label.replace(/^\S+\s/,'');
+  var line={date:date, src:t.src, desc:desc, debit:0, credit:0};
+  if(t.side==='credit') line.credit=Math.abs(amt); else line.debit=Math.abs(amt);
+  _editLedger.push(line);
+  _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  _editStmtMeta.ageing = null;   // snapshot no longer valid once edited
+  var a=document.getElementById('ul-amt'); if(a) a.value='';
+  if(descEl){ descEl.value=''; descEl.dataset.auto='1'; }
+  _ulSyncDesc();
+  renderUnitLedger();
+}
+function deleteLedgerLine(i){
+  if(i<0 || i>=_editLedger.length) return;
+  _editLedger.splice(i,1);
+  _editStmtMeta.ageing = null;
+  renderUnitLedger();
+}
+function deleteLedgerLine(i){
+  if(i<0 || i>=_editLedger.length) return;
+  _editLedger.splice(i,1);
+  _editStmtMeta.ageing = null;
+  renderUnitLedger();
+}
+
+// ── Meter readings ──────────────────────────────────────────────────────────
+// One row per reading date: cumulative water (kL) and electricity (kWh) values.
+// Usage for a row is the increase over the previous row that has that meter.
+var _editReadings = [];   // [{date, water, elec}] — working copy while modal open
+function _mrNum(v){ return (v===''||v==null||isNaN(Number(v))) ? null : Number(v); }
+function _meterUsage(readings, i, key){
+  var cur = readings[i]; if(cur[key]==null) return null;
+  for(var j=i-1;j>=0;j--){ if(readings[j][key]!=null) return Math.round((cur[key]-readings[j][key])*1000)/1000; }
+  return null; // first reading — no baseline yet
+}
+function renderMeters(){
+  var wrap=document.getElementById('u-meters-wrap'); if(!wrap) return;
+  var R=_editReadings||[];
+  if(!R.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--muted);font-family:var(--mono);padding:6px 2px">No readings yet. Capture this month’s meter values below to start the history.</div>'; return; }
+  var head='<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.5px">'
+    +'<th style="padding:5px 6px">Date</th>'
+    +'<th style="padding:5px 6px;text-align:right">💧 Reading</th><th style="padding:5px 6px;text-align:right">Usage (kL)</th>'
+    +'<th style="padding:5px 6px;text-align:right">⚡ Reading</th><th style="padding:5px 6px;text-align:right">Usage (kWh)</th>'
+    +'<th style="padding:5px 6px"></th></tr>';
+  var body=R.map(function(r,i){
+    var wu=_meterUsage(R,i,'water'), eu=_meterUsage(R,i,'elec');
+    function cell(v){ return v==null?'<span style="color:var(--muted)">·</span>':_uAmt(v); }
+    function usg(v){ if(v==null) return '<span style="color:var(--muted)">—</span>'; var neg=v<0; return '<span style="color:'+(neg?'#f0a06f':'var(--text2)')+'">'+_uAmt(v)+'</span>'; }
+    return '<tr style="border-top:1px solid var(--border)">'
+      +'<td style="padding:5px 6px;font-family:var(--mono);color:var(--muted);white-space:nowrap">'+escHtml(r.date||'')+'</td>'
+      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+cell(r.water)+'</td>'
+      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(wu)+'</td>'
+      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+cell(r.elec)+'</td>'
+      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(eu)+'</td>'
+      +'<td style="padding:5px 6px;text-align:right;white-space:nowrap">'
+        +((wu||eu)?'<button type="button" title="Bill this month’s usage to the statement" onclick="billMeterUsage('+i+')" style="background:none;border:1px solid var(--accent-bd);border-radius:6px;color:var(--accent2);cursor:pointer;font-size:10px;font-family:var(--mono);padding:2px 7px;margin-right:4px">Bill</button>':'')
+        +'<button type="button" title="Remove reading" onclick="deleteMeterReading('+i+')" style="background:none;border:none;color:#f06f6f;cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></td>'
+    +'</tr>';
+  }).join('');
+  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>';
+}
+function addMeterReading(){
+  var date=(document.getElementById('mr-date')||{}).value||'';
+  var water=_mrNum((document.getElementById('mr-water')||{}).value);
+  var elec=_mrNum((document.getElementById('mr-elec')||{}).value);
+  if(!date){ alert('Please choose the reading date.'); return; }
+  if(water==null && elec==null){ alert('Enter a water and/or electricity reading.'); return; }
+  var existing=null; _editReadings.forEach(function(r){ if(r.date===date) existing=r; });
+  if(existing){ if(water!=null) existing.water=water; if(elec!=null) existing.elec=elec; }
+  else _editReadings.push({date:date, water:water, elec:elec});
+  _editReadings.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  ['mr-water','mr-elec'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  renderMeters();
+}
+function deleteMeterReading(i){
+  if(i<0||i>=_editReadings.length) return;
+  _editReadings.splice(i,1);
+  renderMeters();
+}
+// Turn a month's usage into charge line(s) on the statement, using the tariffs.
+function billMeterUsage(i){
+  var R=_editReadings; if(i<0||i>=R.length) return;
+  var wt=parseFloat((document.getElementById('u-water-tariff')||{}).value)||0;
+  var et=parseFloat((document.getElementById('u-elec-tariff')||{}).value)||0;
+  var month=_monthLabel(R[i].date);
+  var wu=_meterUsage(R,i,'water'), eu=_meterUsage(R,i,'elec');
+  var added=[];
+  if(wu!=null && wu>0){
+    if(wt>0){ _editLedger.push({date:R[i].date, src:'Water', desc:'Water: '+_uAmt(wu)+' kL @ R'+_uAmt(wt)+'/kL ('+month+')', debit:Math.round(wu*wt*100)/100, credit:0}); added.push('water'); }
+    else added.push('water-no-tariff');
+  }
+  if(eu!=null && eu>0){
+    if(et>0){ _editLedger.push({date:R[i].date, src:'Electricity', desc:'Electricity: '+_uAmt(eu)+' kWh @ R'+_uAmt(et)+'/kWh ('+month+')', debit:Math.round(eu*et*100)/100, credit:0}); added.push('elec'); }
+    else added.push('elec-no-tariff');
+  }
+  var billed=added.filter(function(x){ return x==='water'||x==='elec'; });
+  if(!billed.length){
+    if(added.length) alert('Set a water and/or electricity tariff above to bill this usage.');
+    else alert('No positive usage to bill for this reading.');
+    return;
+  }
+  _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  _editStmtMeta.ageing=null;
+  renderUnitLedger();
+}
+
+// Build the statement object saved onto the unit from the modal's working copy.
+function _uCollectStatement(prev){
+  prev = prev || {}; var pst = prev.statement || {};
+  var refEl = document.getElementById('u-stmt-ref');
+  var ref = refEl ? refEl.value.trim() : (pst.ref||'');
+  var ledger = (_editLedger||[]).slice();
+  if(!ledger.length && !ref) return prev.statement || undefined;
+  return {
+    ref: ref,
+    asOf: _editStmtMeta.asOf || pst.asOf || '',
+    ageing: _editStmtMeta.ageing || null,   // null ⇒ recompute on display
+    ledger: ledger
+  };
+}
+
+// Open a print-ready statement (owner picks “Save as PDF” in the print dialog).
+function printUnitStatement(id){
+  var u = id && UNITS[id] ? UNITS[id] : null;
+  // Use the live modal edits if this unit is open, else the saved statement.
+  var ledger, ref, ageing, asOf, owner, email, tel;
+  if(id && id===_currentUnitId){
+    ledger=_editLedger.slice(); ref=(document.getElementById('u-stmt-ref')||{}).value||'';
+    ageing=_editStmtMeta.ageing; asOf=_editStmtMeta.asOf;
+    owner=(document.getElementById('u-owner')||{}).value||''; email=(document.getElementById('u-email')||{}).value||''; tel=(document.getElementById('u-phone')||{}).value||'';
+  } else if(u){
+    var st=u.statement||{}; ledger=(st.ledger||[]).slice(); ref=st.ref||''; ageing=st.ageing; asOf=st.asOf;
+    owner=u.ownerName||''; email=u.ownerEmail||''; tel=u.ownerPhone||'';
+  } else { alert('No unit selected.'); return; }
+  if(!ledger.length){ alert('This unit has no statement lines yet. Add lines or import the latest statements first.'); return; }
+  var cum=_uRunning(ledger);
+  var total=cum.length?cum[cum.length-1]:0;
+  var ag = ageing || _computeAgeing(ledger, asOf);
+  var today = (asOf||new Date().toISOString().slice(0,10));
+  var doorNo = u ? (u.section||'') : '';
+
+  var rows = ledger.map(function(l,i){
+    return '<tr>'
+      +'<td class="dt">'+escHtml(l.date||'')+'</td>'
+      +'<td class="sr">'+escHtml(l.src||'')+'</td>'
+      +'<td class="ds">'+escHtml(l.desc||'')+'</td>'
+      +'<td class="num">'+(Number(l.debit)?_uAmt(l.debit):'0')+'</td>'
+      +'<td class="num">'+(Number(l.credit)?_uAmt(l.credit):'0')+'</td>'
+      +'<td class="num">'+_uAmt(cum[i])+'</td>'
+    +'</tr>';
+  }).join('');
+
+  var agentLines = PM_STMT.agent.map(function(x){ return escHtml(x); }).join('<br>');
+  var html = '<!doctype html><html><head><meta charset="utf-8"><title>Statement '+escHtml(ref||owner)+'</title>'
+    + '<style>'
+    + '*{box-sizing:border-box}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:11px;margin:26px 30px}'
+    + '.top{display:flex;justify-content:space-between;border-bottom:2px solid #1a1a1a;padding-bottom:10px;margin-bottom:14px}'
+    + '.bc{font-size:15px;font-weight:bold}.reg{font-size:10px;color:#555}'
+    + '.agent{font-size:10px;color:#333;text-align:right;line-height:1.45}'
+    + '.who{display:flex;justify-content:space-between;margin-bottom:16px}'
+    + '.who .o{font-size:12px;font-weight:bold;text-transform:uppercase}'
+    + '.who .meta{font-size:10px;color:#444;line-height:1.5;margin-top:3px}'
+    + '.who .right{text-align:right}'
+    + '.stmtlbl{font-size:13px;font-weight:bold;letter-spacing:1px}'
+    + 'table.led{width:100%;border-collapse:collapse;margin-bottom:16px}'
+    + 'table.led th{background:#1a1a1a;color:#fff;font-size:9px;text-transform:uppercase;letter-spacing:.5px;padding:6px 7px;text-align:left}'
+    + 'table.led td{padding:5px 7px;border-bottom:1px solid #e2e2e2;font-size:10px;vertical-align:top}'
+    + 'table.led td.num,table.led th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}'
+    + 'table.led td.dt{white-space:nowrap;color:#555}table.led td.sr{color:#555}'
+    + '.age{width:100%;border-collapse:collapse;margin-bottom:16px}'
+    + '.age th{font-size:9px;text-transform:uppercase;color:#555;padding:4px 7px;border:1px solid #ccc;background:#f4f4f4;text-align:right}'
+    + '.age td{font-size:10px;padding:5px 7px;border:1px solid #ccc;text-align:right;font-variant-numeric:tabular-nums}'
+    + '.foot{display:flex;justify-content:space-between;align-items:flex-start;border-top:2px solid #1a1a1a;padding-top:12px}'
+    + '.bank{font-size:10px;line-height:1.7}.bank .h{font-weight:bold;text-transform:uppercase;font-size:9px;letter-spacing:.5px;margin-bottom:4px}'
+    + '.due{text-align:right}.due .h{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#555}'
+    + '.due .v{font-size:20px;font-weight:bold;margin-top:4px}'
+    + '.credback{color:#0a7a3f}'
+    + '.tag{font-size:8px;color:#888;text-align:center;margin-top:22px}'
+    + '@media print{body{margin:12mm}}'
+    + '</style></head><body>'
+    + '<div class="top"><div><div class="bc">'+escHtml(PM_STMT.bcName)+'</div><div class="reg">Reg No: '+escHtml(PM_STMT.regNo)+'</div>'
+    +   '<div class="reg">Email: '+escHtml(PM_STMT.agentEmail)+'</div><div class="reg">Contact No.: '+escHtml(PM_STMT.agentTel)+'</div></div>'
+    +   '<div class="agent">'+agentLines+'</div></div>'
+    + '<div class="who"><div><div class="o">'+escHtml(owner||'')+'</div>'
+    +   '<div class="meta">'+(doorNo!==''?'Door No '+escHtml(String(doorNo))+'<br>':'')
+    +     'Reference: '+escHtml(ref||'')+(tel?'<br>Tel: '+escHtml(tel):'')+(email?'<br>Email: '+escHtml(email):'')+'</div></div>'
+    +   '<div class="right"><div class="stmtlbl">STATEMENT</div><div class="meta">'+escHtml(today)+'</div></div></div>'
+    + '<table class="led"><thead><tr><th>Date</th><th>Source</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Cumulative</th></tr></thead>'
+    +   '<tbody>'+rows+'</tbody></table>'
+    + '<table class="age"><thead><tr><th>120+ days</th><th>90+ days</th><th>60+ days</th><th>30+ days</th><th>Current</th></tr></thead>'
+    +   '<tbody><tr><td>'+_uAmt(ag.d120)+'</td><td>'+_uAmt(ag.d90)+'</td><td>'+_uAmt(ag.d60)+'</td><td>'+_uAmt(ag.d30)+'</td><td>'+_uAmt(ag.current)+'</td></tr></tbody></table>'
+    + '<div class="foot"><div class="bank"><div class="h">Banking Details</div>'
+    +   'Bank Name: '+escHtml(PM_STMT.bankName)+'<br>Account Number: '+escHtml(PM_STMT.bankAcc)+'<br>Branch Code: '+escHtml(PM_STMT.bankBranch)
+    +   '<br>Branch Name: '+escHtml(PM_STMT.bankBranchName)+'<br>Reference: '+escHtml(ref||'')
+    +   '<br>Account Holder: '+escHtml(PM_STMT.bankHolder)+'<br>Account Type: '+escHtml(PM_STMT.bankType)+'</div>'
+    +   '<div class="due"><div class="h">Total Due</div><div class="v'+(total<-0.005?' credback':'')+'">'+_uAmtR(total)+'</div>'
+    +     (total<-0.005?'<div style="font-size:9px;color:#0a7a3f">owner in credit</div>':'')+'</div></div>'
+    + '<div class="tag">Generated from the Park Manor billing register · '+escHtml(today)+'</div>'
+    + '</body></html>';
+
+  var w = window.open('');
+  if(!w){ alert('Please allow pop-ups to open the statement, then try again.'); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 350);
+}
+
+// Import the supplied Davies statement snapshot into matching units (by section
+// = Door No). Owner name / email / phone are filled only where blank so manual
+// edits are preserved; the statement (ledger + ageing snapshot) is (re)loaded.
+async function seedParkManorStatements(){
+  if(typeof PARK_MANOR_STATEMENTS_SEED === 'undefined'){ alert('Statement seed not found.'); return; }
+  var keys = Object.keys(PARK_MANOR_STATEMENTS_SEED);
+  if(!confirm('Import the latest levy statements for '+keys.length+' units?\n\nThis loads each ledger and the ageing snapshot (as at 2026-09-14) onto the matching section. Owner name/email/phone are filled only where blank; levy charges and other fields are untouched.')) return;
+  if(!_unitsLoaded){ await loadUnits(); }
+  var applied = 0;
+  keys.forEach(function(sec){
+    var s = PARK_MANOR_STATEMENTS_SEED[sec];
+    var id = 'unit_' + sec;
+    var u = UNITS[id];
+    if(!u){ // create a stub unit if the section isn't loaded yet
+      u = UNITS[id] = { id:id, section:Number(sec), type:(Number(sec)>12?'store':'house'), houseNo:'', area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, waterMeter:'', elecMeter:'', notes:'', added:Date.now() };
+    }
+    if(!u.ownerName && s.owner) u.ownerName = s.owner;
+    if(!u.ownerEmail && s.email) u.ownerEmail = s.email;
+    if(!u.ownerPhone && s.tel) u.ownerPhone = s.tel;
+    u.statement = { ref:s.ref, asOf:'2026-09-14', ageing:s.ageing, ledger:s.ledger.map(function(l){ return {date:l.date, src:l.src, desc:l.desc, debit:l.debit, credit:l.credit}; }) };
+    u.updated = Date.now();
+    applied++;
+  });
+  await saveUnits();
+  renderUnits();
+  alert('Imported statements for '+applied+' units. Open a unit to view its ledger or print the statement.');
 }
 </script>
 
