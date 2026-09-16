@@ -300,6 +300,11 @@ var _OVERVIEW_MODE = (function(){
 var _PUBLIC_MODE = (function(){
   try {
     var qs = new URLSearchParams(location.search);
+    // Dedicated water-meter reading link: ?water opens a stripped-down,
+    // one-tap form (unit number + photo + optional note) that routes ONLY to
+    // the managing agent. Kept separate from ?report so residents submitting a
+    // meter reading get the simplest possible flow.
+    if(qs.has('water')) return {kind: 'water'};
     // Canonical: ?report — legacy ?contact-public and ?report=1 keep working
     if(qs.has('report') || qs.has('contact-public')) return {kind: 'submit'};
     var editTok = qs.get('reportEdit');
@@ -9446,6 +9451,14 @@ function deleteDuplicates(){
             <button onclick="copyPublicReportsUrl(this)" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Copy</button>
           </div>
         </div>
+        <div id="water-reading-url-row" style="margin-top:14px;display:none;padding-top:12px;border-top:1px dashed var(--border2)">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">💧 Water meter reading link (agent only)</div>
+          <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-bottom:6px;line-height:1.5">A simpler link just for water meter readings — unit number, a photo, and an optional note. These go to the managing agent only, not the trustees.</div>
+          <div style="display:flex;gap:6px">
+            <input id="water-reading-url" type="text" readonly style="flex:1;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--mono);outline:none" onclick="this.select()">
+            <button onclick="copyWaterReadingUrl(this)" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Copy</button>
+          </div>
+        </div>
       </div>
       <!-- Permissions (admin only) -->
       <div id="settings-permissions-section" style="display:none;border:1px solid rgba(157,143,247,.2);border-radius:10px;padding:14px 16px;background:rgba(157,143,247,.03)">
@@ -18436,6 +18449,10 @@ function showSettingsModal(){
       var urlInput = document.getElementById('public-reports-url');
       if(urlRow) urlRow.style.display = PUBLIC_REPORTS_ENABLED ? '' : 'none';
       if(urlInput) urlInput.value = location.origin + location.pathname + '?report';
+      var waterRow = document.getElementById('water-reading-url-row');
+      var waterInput = document.getElementById('water-reading-url');
+      if(waterRow) waterRow.style.display = PUBLIC_REPORTS_ENABLED ? '' : 'none';
+      if(waterInput) waterInput.value = location.origin + location.pathname + '?water';
     }
   }
   // Refresh devices section visibility + content based on session state
@@ -18451,6 +18468,10 @@ async function onPublicReportsToggle(enabled){
   if(urlRow) urlRow.style.display = enabled ? '' : 'none';
   var urlInput = document.getElementById('public-reports-url');
   if(urlInput) urlInput.value = location.origin + location.pathname + '?report';
+  var waterRow = document.getElementById('water-reading-url-row');
+  if(waterRow) waterRow.style.display = enabled ? '' : 'none';
+  var waterInput = document.getElementById('water-reading-url');
+  if(waterInput) waterInput.value = location.origin + location.pathname + '?water';
 }
 // Robust clipboard copy used by the various "Copy link" buttons. Three
 // layers of fallback because clipboard support varies a lot in the wild:
@@ -18506,6 +18527,13 @@ function copyTextToClipboard(text, btn){
 // Used by the admin "Public link to share" Copy button
 function copyPublicReportsUrl(btn){
   var url = document.getElementById('public-reports-url');
+  if(!url) return;
+  copyTextToClipboard(url.value, btn);
+}
+
+// Used by the admin "Water meter reading link" Copy button
+function copyWaterReadingUrl(btn){
+  var url = document.getElementById('water-reading-url');
   if(!url) return;
   copyTextToClipboard(url.value, btn);
 }
@@ -20599,6 +20627,7 @@ if(typeof _PUBLIC_MODE !== 'undefined' && _PUBLIC_MODE){
   });
   setTimeout(function(){
     if(_PUBLIC_MODE.kind === 'submit') renderPublicReportForm();
+    else if(_PUBLIC_MODE.kind === 'water') renderWaterReadingForm();
     else if(_PUBLIC_MODE.kind === 'edit') renderPublicEditView(_PUBLIC_MODE.token);
     else if(_PUBLIC_MODE.kind === 'supplierQuote') renderSupplierQuoteView(_PUBLIC_MODE);
   }, 0);
@@ -21674,6 +21703,181 @@ async function submitPublicReport(){
     console.warn('submitPublicReport: failed', e);
     showPublicErr('Could not submit. Please check your connection and try again.');
     if(btn){ btn.disabled = false; btn.textContent = 'Submit'; btn.style.opacity = '1'; }
+  }
+}
+
+// ── Dedicated water-meter reading form (?water) ───────────────────────────
+// A deliberately stripped-down cousin of the public report form: unit number,
+// a photo of the meter, and an optional note — nothing else. Submissions are
+// tagged category "Water Reading", which the server-side notifier routes to
+// the managing agent only (not the trustees). Reuses the same photo helpers
+// (pubAddFiles / publicCompressPhoto / _pubFiles) and rate limiter as the
+// main public form.
+function renderWaterReadingForm(){
+  var host = document.getElementById('public-view-content');
+  if(!host) return;
+  window._pubFiles = [];   // fresh staging area every time the form renders
+  function showForm(){
+    if(!PUBLIC_REPORTS_ENABLED){
+      host.innerHTML = ''
+        + '<div style="text-align:center;padding:60px 20px">'
+        +   '<div style="font-size:48px;margin-bottom:14px">🔒</div>'
+        +   '<div style="font-size:16px;color:var(--text2);font-weight:600;margin-bottom:8px">Submissions currently disabled</div>'
+        +   '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.6">The body corporate has temporarily turned off public submissions. Please contact a trustee directly.</div>'
+        + '</div>';
+      return;
+    }
+    host.innerHTML = ''
+      + '<div class="pub-hero">'
+      +   '<img src="park-manor-entrance.jpg" alt="">'
+      +   '<div class="pub-hero-shade"></div>'
+      +   '<div class="pub-hero-text">'
+      +     '<div class="pub-hero-brand">PARK MANOR</div>'
+      +     '<div class="pub-hero-sub">💧 Submit your water meter reading</div>'
+      +     '<div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div>'
+      +   '</div>'
+      + '</div>'
+      // Honeypot — bots fill this in, humans don\'t see it.
+      + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Your unit</b></span></div>'
+      +   '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Unit number *</label>'
+      +   '<input id="wr-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;font-family:var(--sans)">'
+      + '</div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Photo of your meter</b><i>point your camera at the meter and snap</i></span></div>'
+      +   '<div style="display:flex;gap:8px;margin-bottom:8px">'
+      +     '<button type="button" onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:14px;font-family:var(--sans);font-weight:700;cursor:pointer">📷 Take a photo</button>'
+      +     '<button type="button" onclick="document.getElementById(\'pub-photos\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:14px;font-family:var(--sans);font-weight:600;cursor:pointer">🖼 From gallery</button>'
+      +   '</div>'
+      +   '<div id="pub-file-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"></div>'
+      +   '<input id="pub-photos-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
+      +   '<input id="pub-photos" type="file" accept="image/*" multiple style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
+      + '</div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>Anything to add?</b><i>optional</i></span></div>'
+      +   '<textarea id="wr-note" rows="2" placeholder="e.g. the reading is 03457, or a note about the meter" maxlength="500" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;font-family:var(--sans);resize:vertical;min-height:60px"></textarea>'
+      + '</div>'
+      + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
+      + '<div id="pub-submit-bar">'
+      +   '<button id="pub-submit-btn" onclick="submitWaterReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer;letter-spacing:.3px;box-shadow:0 2px 10px rgba(25,39,60,.14)">Send my reading</button>'
+      + '</div>';
+    var uEl = document.getElementById('wr-unit'); if(uEl) setTimeout(function(){ uEl.focus(); }, 60);
+  }
+  if(typeof PUBLIC_REPORTS_ENABLED === 'undefined'){
+    return setTimeout(showForm, 300);
+  }
+  showForm();
+}
+
+async function submitWaterReading(){
+  clearPublicErr();
+  // Honeypot — if a bot filled this, silently pretend success.
+  var honey = document.getElementById('pub-honey');
+  if(honey && honey.value){
+    document.getElementById('public-view-content').innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>';
+    return;
+  }
+  if(!publicRateLimitOk()){
+    showPublicErr('You\'ve submitted several times recently. Please wait a bit before submitting another.');
+    return;
+  }
+  var unit = (document.getElementById('wr-unit').value || '').trim();
+  var note = (document.getElementById('wr-note').value || '').trim();
+  var files = (window._pubFiles || []).filter(function(f){ return !!f; });
+  if(!unit){ showPublicErr('Please enter your unit number.'); return; }
+  if(!files.length && !note){ showPublicErr('Please add a photo of your meter (or type the reading in the note).'); return; }
+  if(files.length > MAX_PUBLIC_PHOTOS){ showPublicErr('A maximum of ' + MAX_PUBLIC_PHOTOS + ' photos can be attached.'); return; }
+  var btn = document.getElementById('pub-submit-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; btn.style.opacity = '0.7'; }
+  try {
+    var photoIds = [];
+    var notifyAtt = [];
+    var NOTIFY_BUDGET = 4200000;  // ~4.2 MB of base64 across all attachments
+    var notifyUsed = 0;
+    for(var i = 0; i < files.length; i++){
+      var f = files[i];
+      var compressed = await publicCompressPhoto(f);
+      var photoId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + i;
+      var photoRec = {
+        id: photoId,
+        name: compressed.name,
+        type: compressed.type,
+        data: compressed.data,
+        thumb: compressed.thumb || '',
+        docType: 'Supporting Evidence',
+        invCompany: '(water meter reading)',
+        added: Date.now()
+      };
+      INVOICES[photoId] = photoRec;
+      try { await sbUpsert('invoices', photoId, photoRec); }
+      catch(e){ console.warn('water submit: photo save failed', e); }
+      photoIds.push(photoId);
+      var attSize = (compressed.data || '').length;
+      if(notifyUsed + attSize <= NOTIFY_BUDGET){
+        notifyAtt.push({ name: compressed.name, type: compressed.type, dataUrl: compressed.data });
+        notifyUsed += attSize;
+      } else {
+        notifyAtt.push({ name: compressed.name, type: compressed.type, skipped: true,
+                         sizeMB: (attSize * 0.75 / 1048576).toFixed(1) });
+      }
+    }
+    var ticketId = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    var editToken = generateShareToken();
+    var ticket = {
+      id: ticketId,
+      title: 'Water meter reading',
+      desc: note || '(Photo of meter submitted — see attachment.)',
+      unit: unit,
+      category: 'Water Reading',
+      priority: 'low',
+      status: 'open',
+      reporter: 'Anonymous',
+      reporterEmail: '',
+      reporterPhone: '',
+      createdViaPublicForm: true,
+      reporterEditToken: editToken,
+      dateOpen: new Date().toISOString().split('T')[0],
+      added: Date.now(),
+      updated: Date.now(),
+      ticketNumber: (typeof nextTicketNumber === 'function') ? nextTicketNumber() : undefined,
+      linkedDocIds: photoIds,
+      log: [{type: 'status', text: '+ Water meter reading submitted via public form', ts: Date.now()}]
+    };
+    TICKETS[ticketId] = ticket;
+    await sbUpsert('tickets', ticketId, ticket);
+    try { localStorage.setItem('pm_tickets', JSON.stringify(TICKETS)); } catch(e){}
+    // Notify the managing agent (server routes Water Reading submissions to the
+    // agent only — not the trustees). Fire-and-forget.
+    fetch('/api/send-edit-link', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        notifyOnly: true,
+        title: 'Water meter reading',
+        ticketNumber: ticket.ticketNumber,
+        desc: note || '(Photo of meter submitted — see attachment.)',
+        unit: unit,
+        reporter: '',
+        phone: '',
+        email: '',
+        category: 'Water Reading',
+        bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
+        attachments: notifyAtt
+      })
+    }).catch(function(e){ console.warn('water reading notify failed', e); });
+
+    document.getElementById('public-view-content').innerHTML = ''
+      + '<div style="text-align:center;padding:48px 16px 24px">'
+      +   '<svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
+      +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
+      +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has been sent to the managing agent.</div>'
+      + '</div>'
+      + '<div style="text-align:center;margin-top:8px">'
+      +   '<button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
+      + '</div>';
+    if(typeof pubCelebrate === 'function') pubCelebrate();
+  } catch(e){
+    console.warn('submitWaterReading: failed', e);
+    showPublicErr('Could not send your reading. Please check your connection and try again.');
+    if(btn){ btn.disabled = false; btn.textContent = 'Send my reading'; btn.style.opacity = '1'; }
   }
 }
 

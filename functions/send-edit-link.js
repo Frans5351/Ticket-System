@@ -200,9 +200,11 @@ export default async function handler(req) {
     let recipSeen = 0;
     (Array.isArray(rows) ? rows : []).forEach((r) => {
       const u = r && r.data ? r.data : r;
-      // Management users AND trustees with an email assigned all receive the
-      // public-report notification.
-      if (u && (u.role === "management" || u.role === "trustee")) {
+      // Management users always receive the notification. Trustees receive it
+      // for ordinary reports too — but NOT for water meter readings, which are
+      // routed to the managing agent only (management role + AGENT_NOTIFY_EMAIL).
+      const wants = u && (u.role === "management" || (u.role === "trustee" && !isWaterReading));
+      if (wants) {
         recipSeen++;
         if (looksLikeEmail(u.email)) agentSet.add(u.email.trim().toLowerCase());
       }
@@ -217,7 +219,10 @@ export default async function handler(req) {
     .map((s) => s.trim())
     .filter((s) => looksLikeEmail(bareAddress(s)))
     .forEach((s) => agentSet.add(bareAddress(s).toLowerCase()));
-  // Body Corporate inbox (set in-app) — always copied on new-ticket emails.
+  // Body Corporate inbox (set in-app) — the Park Manor Gmail account. Copied on
+  // EVERY new-ticket email, including water meter readings. (Water readings go
+  // to this inbox + the managing agent, but NOT the individual trustees — see
+  // the role filter above.)
   if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
   const agentList = Array.from(agentSet);
   if (agentList.length) {
