@@ -21788,28 +21788,14 @@ async function submitWaterReading(){
   var btn = document.getElementById('pub-submit-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; btn.style.opacity = '0.7'; }
   try {
-    var photoIds = [];
+    // Water meter readings are NOT logged as tickets — we only email the photo
+    // and reading to the Park Manor inbox + managing agent, so we compress the
+    // photos straight into email attachments and never touch TICKETS/INVOICES.
     var notifyAtt = [];
     var NOTIFY_BUDGET = 4200000;  // ~4.2 MB of base64 across all attachments
     var notifyUsed = 0;
     for(var i = 0; i < files.length; i++){
-      var f = files[i];
-      var compressed = await publicCompressPhoto(f);
-      var photoId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + i;
-      var photoRec = {
-        id: photoId,
-        name: compressed.name,
-        type: compressed.type,
-        data: compressed.data,
-        thumb: compressed.thumb || '',
-        docType: 'Supporting Evidence',
-        invCompany: '(water meter reading)',
-        added: Date.now()
-      };
-      INVOICES[photoId] = photoRec;
-      try { await sbUpsert('invoices', photoId, photoRec); }
-      catch(e){ console.warn('water submit: photo save failed', e); }
-      photoIds.push(photoId);
+      var compressed = await publicCompressPhoto(files[i]);
       var attSize = (compressed.data || '').length;
       if(notifyUsed + attSize <= NOTIFY_BUDGET){
         notifyAtt.push({ name: compressed.name, type: compressed.type, dataUrl: compressed.data });
@@ -21819,40 +21805,15 @@ async function submitWaterReading(){
                          sizeMB: (attSize * 0.75 / 1048576).toFixed(1) });
       }
     }
-    var ticketId = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    var editToken = generateShareToken();
-    var ticket = {
-      id: ticketId,
-      title: 'Water meter reading',
-      desc: note || '(Photo of meter submitted — see attachment.)',
-      unit: unit,
-      category: 'Water Reading',
-      priority: 'low',
-      status: 'open',
-      reporter: 'Anonymous',
-      reporterEmail: '',
-      reporterPhone: '',
-      createdViaPublicForm: true,
-      reporterEditToken: editToken,
-      dateOpen: new Date().toISOString().split('T')[0],
-      added: Date.now(),
-      updated: Date.now(),
-      ticketNumber: (typeof nextTicketNumber === 'function') ? nextTicketNumber() : undefined,
-      linkedDocIds: photoIds,
-      log: [{type: 'status', text: '+ Water meter reading submitted via public form', ts: Date.now()}]
-    };
-    TICKETS[ticketId] = ticket;
-    await sbUpsert('tickets', ticketId, ticket);
-    try { localStorage.setItem('pm_tickets', JSON.stringify(TICKETS)); } catch(e){}
-    // Notify the managing agent (server routes Water Reading submissions to the
-    // agent only — not the trustees). Fire-and-forget.
-    fetch('/api/send-edit-link', {
+    // Email only — server routes Water Reading submissions to the Park Manor
+    // inbox + managing agent (never the trustees). We await so we can tell the
+    // resident whether it actually went out.
+    var r = await fetch('/api/send-edit-link', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         notifyOnly: true,
         title: 'Water meter reading',
-        ticketNumber: ticket.ticketNumber,
         desc: note || '(Photo of meter submitted — see attachment.)',
         unit: unit,
         reporter: '',
@@ -21862,13 +21823,14 @@ async function submitWaterReading(){
         bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
         attachments: notifyAtt
       })
-    }).catch(function(e){ console.warn('water reading notify failed', e); });
+    });
+    if(!r.ok) throw new Error('send failed: ' + r.status);
 
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px">'
       +   '<svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
-      +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has been sent to the managing agent.</div>'
+      +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has been emailed to Park Manor.</div>'
       + '</div>'
       + '<div style="text-align:center;margin-top:8px">'
       +   '<button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
