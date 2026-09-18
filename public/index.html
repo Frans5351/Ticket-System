@@ -6408,6 +6408,10 @@ document.getElementById('tbody').addEventListener('click', function(e){
             <button type="button" onclick="printUnitStatement(_currentUnitId)" title="Open a print-ready statement in the Davies Group layout (print → Save as PDF)" style="padding:7px 12px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">🖨 Statement</button>
           </div>
         </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--mono)">
+          <input id="u-invoice-breakdown" type="checkbox" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">
+          <span>Break invoices into individual line items on the statement (Levies, CSOS, etc.) instead of one “INV…” line</span>
+        </label>
         <div id="u-ledger-wrap" style="overflow-x:auto"></div>
         <!-- guided add-line -->
         <div style="border-top:1px dashed var(--border);padding-top:11px;display:flex;flex-direction:column;gap:9px">
@@ -6852,6 +6856,7 @@ function openUnitModal(id){
   _editLedger = (st.ledger||[]).map(function(l){ return {date:l.date||'', src:l.src||'', desc:l.desc||'', debit:Number(l.debit||0), credit:Number(l.credit||0)}; });
   _editStmtMeta = { ageing: st.ageing||null, asOf: st.asOf||'' };
   var refEl=document.getElementById('u-stmt-ref'); if(refEl) refEl.value = st.ref||'';
+  var brEl=document.getElementById('u-invoice-breakdown'); if(brEl) brEl.checked = !!u.invoiceBreakdown;
   var today = new Date().toISOString().slice(0,10);
   var dEl=document.getElementById('ul-date'); if(dEl) dEl.value = today;
   renderUnitLedger();
@@ -6886,6 +6891,9 @@ async function saveUnitFromModal(){
     tariffs:{ water:_uNum('u-water-tariff'), elec:_uNum('u-elec-tariff') },
     meterReadings: (_editReadings||[]).map(function(r){ return {date:r.date, water:r.water, elec:r.elec}; }),
     statement: _uCollectStatement(prev),
+    invoiceBreakdown: !!(document.getElementById('u-invoice-breakdown') && document.getElementById('u-invoice-breakdown').checked),
+    invoices: prev.invoices,
+    invoiceLines: prev.invoiceLines,
     added: prev.added||Date.now(), updated: Date.now()
   };
   closeUnitModal();
@@ -7119,22 +7127,36 @@ function renderMeters(){
     +'<th style="padding:5px 6px;text-align:right">💧 Reading</th><th style="padding:5px 6px;text-align:right">Usage (kL)</th>'
     +'<th style="padding:5px 6px;text-align:right">⚡ Reading</th><th style="padding:5px 6px;text-align:right">Usage (kWh)</th>'
     +'<th style="padding:5px 6px"></th></tr>';
+  // Each Date / Reading cell is an editable input; editing recomputes usage
+  // (and every following row's usage) automatically via updateMeterReading().
+  var inCss='width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--mono);padding:4px 6px;outline:none';
   var body=R.map(function(r,i){
     var wu=_meterUsage(R,i,'water'), eu=_meterUsage(R,i,'elec');
-    function cell(v){ return v==null?'<span style="color:var(--muted)">·</span>':_uAmt(v); }
     function usg(v){ if(v==null) return '<span style="color:var(--muted)">—</span>'; var neg=v<0; return '<span style="color:'+(neg?'#f0a06f':'var(--text2)')+'">'+_uAmt(v)+'</span>'; }
     return '<tr style="border-top:1px solid var(--border)">'
-      +'<td style="padding:5px 6px;font-family:var(--mono);color:var(--muted);white-space:nowrap">'+escHtml(r.date||'')+'</td>'
-      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+cell(r.water)+'</td>'
+      +'<td style="padding:4px 6px;white-space:nowrap"><input type="date" value="'+escHtml(r.date||'')+'" onchange="updateMeterReading('+i+',\'date\',this.value)" style="'+inCss+';width:150px"></td>'
+      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap"><input type="number" step="0.001" value="'+(r.water==null?'':r.water)+'" placeholder="kL" onchange="updateMeterReading('+i+',\'water\',this.value)" style="'+inCss+';text-align:right;width:110px"></td>'
       +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(wu)+'</td>'
-      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+cell(r.elec)+'</td>'
+      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap"><input type="number" step="0.001" value="'+(r.elec==null?'':r.elec)+'" placeholder="kWh" onchange="updateMeterReading('+i+',\'elec\',this.value)" style="'+inCss+';text-align:right;width:110px"></td>'
       +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(eu)+'</td>'
       +'<td style="padding:5px 6px;text-align:right;white-space:nowrap">'
         +((wu||eu)?'<button type="button" title="Bill this month’s usage to the statement" onclick="billMeterUsage('+i+')" style="background:none;border:1px solid var(--accent-bd);border-radius:6px;color:var(--accent2);cursor:pointer;font-size:10px;font-family:var(--mono);padding:2px 7px;margin-right:4px">Bill</button>':'')
         +'<button type="button" title="Remove reading" onclick="deleteMeterReading('+i+')" style="background:none;border:none;color:#f06f6f;cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></td>'
     +'</tr>';
   }).join('');
-  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>';
+  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>';
+}
+// Edit an existing reading in place. Recomputes usage for this row and every
+// following row (each usage is the difference from the previous reading).
+function updateMeterReading(i, field, value){
+  if(i<0 || i>=_editReadings.length) return;
+  if(field==='date'){
+    _editReadings[i].date = value;
+    _editReadings.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+  } else {
+    _editReadings[i][field] = _mrNum(value);
+  }
+  renderMeters();
 }
 function addMeterReading(){
   var date=(document.getElementById('mr-date')||{}).value||'';
@@ -7349,19 +7371,30 @@ function _syncUnitFromModalIfOpen(id){
   var oe = _uStr('u-email'); if(oe) u.ownerEmail = oe;
   var op = _uStr('u-phone'); if(op) u.ownerPhone = op;
   var st = _uCollectStatement(u); if(st) u.statement = st;
+  var br = document.getElementById('u-invoice-breakdown'); if(br) u.invoiceBreakdown = !!br.checked;
+}
+// The ledger line(s) an invoice posts. With breakdown on, each charge line item
+// becomes its own dated debit ("INV… — Levies"); otherwise it's one "INV…" line.
+function _invoiceLedgerLines(inv, breakdown){
+  if(breakdown && inv.lines && inv.lines.length){
+    return inv.lines.map(function(l){
+      return { date:inv.date, src:'Invoice', desc:inv.no+' — '+(l.account||l.desc||'Charge'), debit:Number(l.total||0), credit:0 };
+    });
+  }
+  return [{ date:inv.date, src:'Invoice', desc:inv.no, debit:inv.total, credit:0 }];
 }
 // Post the invoice as a real charge (debit) on the unit's ledger and record it.
-function _recordInvoiceOnUnit(u, inv){
-  var line = { date:inv.date, src:'Invoice', desc:inv.no, debit:inv.total, credit:0 };
+function _recordInvoiceOnUnit(u, inv, breakdown){
   if(!u.statement) u.statement = { ref:'', asOf:'', ageing:null, ledger:[] };
   if(!Array.isArray(u.statement.ledger)) u.statement.ledger = [];
-  u.statement.ledger.push(line);
+  var lines = _invoiceLedgerLines(inv, breakdown);
+  lines.forEach(function(l){ u.statement.ledger.push(l); });
   u.statement.ledger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
   u.statement.ageing = null; // force recompute from the ledger next time it's shown
   u.invoices = u.invoices || [];
-  u.invoices.push({ no:inv.no, seq:inv.seq, date:inv.date, amount:inv.total, lines:inv.lines, to:(u.ownerEmail||'') });
+  u.invoices.push({ no:inv.no, seq:inv.seq, date:inv.date, amount:inv.total, lines:inv.lines, breakdown:!!breakdown, to:(u.ownerEmail||'') });
   u.updated = Date.now();
-  return line;
+  return lines;
 }
 
 // Lazy-load jsPDF + autotable (same CDN-on-demand pattern as the Excel export).
@@ -7614,10 +7647,11 @@ async function generateInvoice(id){
         ? ('emailed — with a PDF invoice and statement — to ' + (u.ownerName||'the owner') + ' (' + ownerEmail + ')' + (bcInbox?(', cc ' + bcInbox):'') + '.')
         : 'opened for printing.\n\n⚠ No owner email is set, so it will not be emailed.');
   if(!confirm(msg)) return;
-  _recordInvoiceOnUnit(u, inv);
+  var breakdown = !!u.invoiceBreakdown;
+  _recordInvoiceOnUnit(u, inv, breakdown);
   var outstanding = _uLedgerTotal(u.statement.ledger);
   if(id===_currentUnitId){ // reflect on the open modal immediately
-    _editLedger.push({date:inv.date, src:'Invoice', desc:inv.no, debit:inv.total, credit:0});
+    _invoiceLedgerLines(inv, breakdown).forEach(function(l){ _editLedger.push(l); });
     _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
     _editStmtMeta.ageing = null;
     renderUnitLedger();
@@ -7656,7 +7690,7 @@ async function generateAllInvoices(){
     var u = list[i];
     var inv = _buildInvoice(u);
     if(!inv.lines.length || Math.abs(inv.total) < 0.005) continue;
-    _recordInvoiceOnUnit(u, inv);
+    _recordInvoiceOnUnit(u, inv, !!u.invoiceBreakdown);
     var outstanding = _uLedgerTotal(u.statement.ledger);
     if((u.ownerEmail||'').trim()){
       try {
