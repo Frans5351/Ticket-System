@@ -219,11 +219,9 @@ export default async function handler(req) {
     .map((s) => s.trim())
     .filter((s) => looksLikeEmail(bareAddress(s)))
     .forEach((s) => agentSet.add(bareAddress(s).toLowerCase()));
-  // Body Corporate inbox (set in-app) — the Park Manor Gmail account. Copied on
-  // EVERY new-ticket email, including water meter readings. (Water readings go
-  // to this inbox + the managing agent, but NOT the individual trustees — see
-  // the role filter above.)
-  if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
+  // Body Corporate inbox (set in-app) — copied on ordinary new-ticket emails,
+  // but NOT on water meter readings, which go to the managing agent only.
+  if (!isWaterReading && looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
   const agentList = Array.from(agentSet);
   if (agentList.length) {
     const aSubject = isWaterReading

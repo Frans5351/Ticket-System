@@ -6331,7 +6331,6 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
       <button id="units-seed-btn" onclick="seedParkManorUnits()" title="Load the 20 Park Manor units from your levy schedule (owner details you've entered are kept)" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⤓ Load Park Manor units</button>
       <button id="stmts-seed-btn" onclick="seedParkManorStatements()" title="Import the latest levy statements (ledger + ageing) onto the matching units" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">📄 Import statements</button>
-      <button id="invoice-all-btn" onclick="generateAllInvoices()" title="Bill every unit for its current levy charges and email each owner a PDF invoice + statement (monthly run)" style="padding:8px 14px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:20px;color:var(--green);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">🧾 Generate invoices</button>
       <button onclick="openUnitModal(null)" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> Add unit</button>
     </div>
   </div>
@@ -6404,14 +6403,9 @@ document.getElementById('tbody').addEventListener('click', function(e){
           <div style="display:flex;gap:6px;align-items:center">
             <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">Ref</span>
             <input id="u-stmt-ref" type="text" class="ui2" placeholder="e.g. FER001-D1" style="width:150px" oninput="_uLedgerDirty()">
-            <button type="button" onclick="generateInvoice(_currentUnitId)" title="Bill this unit for its current levy charges, post it to the statement, and email the owner a PDF invoice + statement" style="padding:7px 12px;background:var(--green);border:none;border-radius:7px;color:#fff;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">🧾 Generate invoice</button>
             <button type="button" onclick="printUnitStatement(_currentUnitId)" title="Open a print-ready statement in the Davies Group layout (print → Save as PDF)" style="padding:7px 12px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">🖨 Statement</button>
           </div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--mono)">
-          <input id="u-invoice-breakdown" type="checkbox" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">
-          <span>Break invoices into individual line items on the statement (Levies, CSOS, etc.) instead of one “INV…” line</span>
-        </label>
         <div id="u-ledger-wrap" style="overflow-x:auto"></div>
         <!-- guided add-line -->
         <div style="border-top:1px dashed var(--border);padding-top:11px;display:flex;flex-direction:column;gap:9px">
@@ -6856,7 +6850,6 @@ function openUnitModal(id){
   _editLedger = (st.ledger||[]).map(function(l){ return {date:l.date||'', src:l.src||'', desc:l.desc||'', debit:Number(l.debit||0), credit:Number(l.credit||0)}; });
   _editStmtMeta = { ageing: st.ageing||null, asOf: st.asOf||'' };
   var refEl=document.getElementById('u-stmt-ref'); if(refEl) refEl.value = st.ref||'';
-  var brEl=document.getElementById('u-invoice-breakdown'); if(brEl) brEl.checked = !!u.invoiceBreakdown;
   var today = new Date().toISOString().slice(0,10);
   var dEl=document.getElementById('ul-date'); if(dEl) dEl.value = today;
   renderUnitLedger();
@@ -6891,9 +6884,6 @@ async function saveUnitFromModal(){
     tariffs:{ water:_uNum('u-water-tariff'), elec:_uNum('u-elec-tariff') },
     meterReadings: (_editReadings||[]).map(function(r){ return {date:r.date, water:r.water, elec:r.elec}; }),
     statement: _uCollectStatement(prev),
-    invoiceBreakdown: !!(document.getElementById('u-invoice-breakdown') && document.getElementById('u-invoice-breakdown').checked),
-    invoices: prev.invoices,
-    invoiceLines: prev.invoiceLines,
     added: prev.added||Date.now(), updated: Date.now()
   };
   closeUnitModal();
@@ -7127,36 +7117,22 @@ function renderMeters(){
     +'<th style="padding:5px 6px;text-align:right">💧 Reading</th><th style="padding:5px 6px;text-align:right">Usage (kL)</th>'
     +'<th style="padding:5px 6px;text-align:right">⚡ Reading</th><th style="padding:5px 6px;text-align:right">Usage (kWh)</th>'
     +'<th style="padding:5px 6px"></th></tr>';
-  // Each Date / Reading cell is an editable input; editing recomputes usage
-  // (and every following row's usage) automatically via updateMeterReading().
-  var inCss='width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--mono);padding:4px 6px;outline:none';
   var body=R.map(function(r,i){
     var wu=_meterUsage(R,i,'water'), eu=_meterUsage(R,i,'elec');
+    function cell(v){ return v==null?'<span style="color:var(--muted)">·</span>':_uAmt(v); }
     function usg(v){ if(v==null) return '<span style="color:var(--muted)">—</span>'; var neg=v<0; return '<span style="color:'+(neg?'#f0a06f':'var(--text2)')+'">'+_uAmt(v)+'</span>'; }
     return '<tr style="border-top:1px solid var(--border)">'
-      +'<td style="padding:4px 6px;white-space:nowrap"><input type="date" value="'+escHtml(r.date||'')+'" onchange="updateMeterReading('+i+',\'date\',this.value)" style="'+inCss+';width:150px"></td>'
-      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap"><input type="number" step="0.001" value="'+(r.water==null?'':r.water)+'" placeholder="kL" onchange="updateMeterReading('+i+',\'water\',this.value)" style="'+inCss+';text-align:right;width:110px"></td>'
+      +'<td style="padding:5px 6px;font-family:var(--mono);color:var(--muted);white-space:nowrap">'+escHtml(r.date||'')+'</td>'
+      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+cell(r.water)+'</td>'
       +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(wu)+'</td>'
-      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap"><input type="number" step="0.001" value="'+(r.elec==null?'':r.elec)+'" placeholder="kWh" onchange="updateMeterReading('+i+',\'elec\',this.value)" style="'+inCss+';text-align:right;width:110px"></td>'
+      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+cell(r.elec)+'</td>'
       +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(eu)+'</td>'
       +'<td style="padding:5px 6px;text-align:right;white-space:nowrap">'
         +((wu||eu)?'<button type="button" title="Bill this month’s usage to the statement" onclick="billMeterUsage('+i+')" style="background:none;border:1px solid var(--accent-bd);border-radius:6px;color:var(--accent2);cursor:pointer;font-size:10px;font-family:var(--mono);padding:2px 7px;margin-right:4px">Bill</button>':'')
         +'<button type="button" title="Remove reading" onclick="deleteMeterReading('+i+')" style="background:none;border:none;color:#f06f6f;cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></td>'
     +'</tr>';
   }).join('');
-  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>';
-}
-// Edit an existing reading in place. Recomputes usage for this row and every
-// following row (each usage is the difference from the previous reading).
-function updateMeterReading(i, field, value){
-  if(i<0 || i>=_editReadings.length) return;
-  if(field==='date'){
-    _editReadings[i].date = value;
-    _editReadings.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-  } else {
-    _editReadings[i][field] = _mrNum(value);
-  }
-  renderMeters();
+  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
 function addMeterReading(){
   var date=(document.getElementById('mr-date')||{}).value||'';
@@ -7303,409 +7279,6 @@ function printUnitStatement(id){
   w.document.write(html);
   w.document.close();
   setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} }, 350);
-}
-
-// ── Invoice + statement generation ──────────────────────────────────────────
-// Generating an invoice BILLS the unit for the current period's charges: it
-// itemises the charge lines, posts a single debit to the ledger (desc = the
-// invoice number, exactly like the imported Davies "INV…" lines), and produces
-// a proper PDF invoice. Alongside it we produce a PDF STATEMENT — a plain
-// account summary (each invoice/payment as one dated line, ending in the total
-// outstanding). Both PDFs are emailed to the owner. Invoice numbers continue
-// after any existing ones (the app's own invoices AND the imported ledger's
-// INV… descriptions), so they never collide.
-function _pad5(n){ n = String(n); while(n.length < 5) n = '0' + n; return n; }
-function _formatInvoiceNo(seq){ return 'INV' + _pad5(seq); }
-function _invoiceSeqMax(){
-  var max = 0;
-  Object.values(UNITS).forEach(function(u){
-    (u.invoices||[]).forEach(function(inv){
-      var n = Number(inv && inv.seq);
-      if(Number.isFinite(n) && n > max) max = n;
-    });
-    // Also scan ledger descriptions for INV##### so app-issued numbers continue
-    // after the imported Davies history rather than restarting from 1.
-    ((u.statement||{}).ledger||[]).forEach(function(l){
-      var m = /INV0*(\d+)/.exec(String((l&&l.desc)||''));
-      if(m){ var n2 = Number(m[1]); if(Number.isFinite(n2) && n2 > max) max = n2; }
-    });
-  });
-  return max;
-}
-// The charge lines that make up an invoice. Uses the unit's custom invoice
-// lines when set; otherwise derives them from the configured monthly levies.
-function _invoiceLineItems(u){
-  if(Array.isArray(u.invoiceLines) && u.invoiceLines.length){
-    return u.invoiceLines.map(function(l){
-      var amt = Number(l.amount||0);
-      return { account:(l.account||l.desc||'Charge'), desc:(l.desc||l.account||''), qty:1, unit:amt, total:amt };
-    }).filter(function(l){ return Math.abs(l.total) > 0.005; });
-  }
-  var c = u.charges||{}, lines = [];
-  if(Number(c.adminLevy)) lines.push({ account:'Levies',              desc:'Levies',              qty:1, unit:Number(c.adminLevy), total:Number(c.adminLevy) });
-  if(Number(c.maintLevy)) lines.push({ account:'Reserve Fund Levies', desc:'Reserve Fund Levies', qty:1, unit:Number(c.maintLevy), total:Number(c.maintLevy) });
-  if(Number(c.csos))      lines.push({ account:'CSOS Levies',         desc:'CSOS Levies',         qty:1, unit:Number(c.csos),      total:Number(c.csos) });
-  return lines;
-}
-// Build an invoice object for a unit as at `dateStr` (default today).
-function _buildInvoice(u, dateStr){
-  var today = dateStr || new Date().toISOString().slice(0,10);
-  var st = u.statement || {};
-  var lines = _invoiceLineItems(u);
-  var total = lines.reduce(function(s,l){ return s + Number(l.total||0); }, 0);
-  total = Math.round(total*100)/100;
-  var seq = _invoiceSeqMax() + 1;
-  return {
-    no: _formatInvoiceNo(seq), seq: seq,
-    date: today, dueDate: today,
-    lines: lines, total: total,
-    ref: (st.ref||''), to: (u.ownerEmail||'')
-  };
-}
-// Fold any unsaved modal edits (owner fields + ledger) back into UNITS[id] so
-// invoicing always works off the latest data even mid-edit.
-function _syncUnitFromModalIfOpen(id){
-  if(id !== _currentUnitId || !UNITS[id]) return;
-  var u = UNITS[id];
-  var on = _uStr('u-owner'); if(on) u.ownerName = on;
-  var oe = _uStr('u-email'); if(oe) u.ownerEmail = oe;
-  var op = _uStr('u-phone'); if(op) u.ownerPhone = op;
-  var st = _uCollectStatement(u); if(st) u.statement = st;
-  var br = document.getElementById('u-invoice-breakdown'); if(br) u.invoiceBreakdown = !!br.checked;
-}
-// The ledger line(s) an invoice posts. With breakdown on, each charge line item
-// becomes its own dated debit ("INV… — Levies"); otherwise it's one "INV…" line.
-function _invoiceLedgerLines(inv, breakdown){
-  if(breakdown && inv.lines && inv.lines.length){
-    return inv.lines.map(function(l){
-      return { date:inv.date, src:'Invoice', desc:inv.no+' — '+(l.account||l.desc||'Charge'), debit:Number(l.total||0), credit:0 };
-    });
-  }
-  return [{ date:inv.date, src:'Invoice', desc:inv.no, debit:inv.total, credit:0 }];
-}
-// Post the invoice as a real charge (debit) on the unit's ledger and record it.
-function _recordInvoiceOnUnit(u, inv, breakdown){
-  if(!u.statement) u.statement = { ref:'', asOf:'', ageing:null, ledger:[] };
-  if(!Array.isArray(u.statement.ledger)) u.statement.ledger = [];
-  var lines = _invoiceLedgerLines(inv, breakdown);
-  lines.forEach(function(l){ u.statement.ledger.push(l); });
-  u.statement.ledger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-  u.statement.ageing = null; // force recompute from the ledger next time it's shown
-  u.invoices = u.invoices || [];
-  u.invoices.push({ no:inv.no, seq:inv.seq, date:inv.date, amount:inv.total, lines:inv.lines, breakdown:!!breakdown, to:(u.ownerEmail||'') });
-  u.updated = Date.now();
-  return lines;
-}
-
-// Lazy-load jsPDF + autotable (same CDN-on-demand pattern as the Excel export).
-var _pdfLibPromise = null;
-function _ensurePdfLib(){
-  if(window.jspdf && window.jspdf.jsPDF){
-    var probe = new window.jspdf.jsPDF();
-    if(typeof probe.autoTable === 'function') return Promise.resolve();
-  }
-  if(_pdfLibPromise) return _pdfLibPromise;
-  function loadScript(src){
-    return new Promise(function(res, rej){
-      var s = document.createElement('script'); s.src = src;
-      s.onload = res; s.onerror = function(){ rej(new Error('Could not load '+src)); };
-      document.head.appendChild(s);
-    });
-  }
-  var base = 'https://cdnjs.cloudflare.com/ajax/libs/';
-  _pdfLibPromise = loadScript(base+'jspdf/2.5.1/jspdf.umd.min.js')
-    .then(function(){ return loadScript(base+'jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'); });
-  return _pdfLibPromise;
-}
-// Shared PDF letterhead + bill-to block. Returns the Y to continue drawing at.
-function _pdfHeader(doc, u, ref){
-  var M = 40, W = doc.internal.pageSize.getWidth(), y = 50;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(26,26,26);
-  doc.text(PM_STMT.bcName, M, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(85,85,85);
-  doc.text('Reg No: '+PM_STMT.regNo, M, y+15);
-  doc.text('Email: '+PM_STMT.agentEmail, M, y+27);
-  doc.text('Contact No.: '+PM_STMT.agentTel, M, y+39);
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(60,60,60);
-  doc.text('ADDRESS', W-M, y, {align:'right'});
-  doc.setFont('helvetica','normal'); doc.setTextColor(85,85,85);
-  PM_STMT.agent.forEach(function(line,i){ doc.text(String(line), W-M, y+13+(i*12), {align:'right'}); });
-  y += 72;
-  doc.setDrawColor(200); doc.line(M, y, W-M, y); y += 22;
-  var rx = W/2;
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(26,26,26);
-  var nameLines = doc.splitTextToSize(String(u.ownerName||'Owner').toUpperCase(), rx - M - 16);
-  doc.text(nameLines, M, y);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(68,68,68);
-  var info = [];
-  if(u.section!=='' && u.section!=null) info.push('Door No '+u.section);
-  if(ref) info.push('Reference: '+ref);
-  if(u.ownerPhone) info.push('Tel: '+u.ownerPhone);
-  if(u.ownerEmail) info.push('Email: '+u.ownerEmail);
-  info.forEach(function(l,i){ doc.text(String(l), rx, y+(i*13)); });
-  return y + Math.max(nameLines.length*14, info.length*13, 14) + 14;
-}
-// Build the invoice PDF. Returns { base64, filename, doc }.
-async function _invoicePdf(u, inv){
-  await _ensurePdfLib();
-  var doc = new window.jspdf.jsPDF({ unit:'pt', format:'a4' });
-  var M = 40, W = doc.internal.pageSize.getWidth(), rx = W/2;
-  var y = _pdfHeader(doc, u, inv.ref);
-  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(26,26,26);
-  doc.text('INVOICE', M, y+16);
-  doc.autoTable({
-    startY: y, margin:{ left: rx, right: M },
-    head: [['INVOICE NO.','INVOICE DATE','DUE DATE','INVOICE TOTAL']],
-    body: [[inv.no, inv.date, inv.dueDate, _uAmtR(inv.total)]],
-    theme:'grid',
-    styles:{ fontSize:7.5, halign:'center', cellPadding:4, lineColor:[200,200,200], lineWidth:0.5 },
-    headStyles:{ fillColor:[255,255,255], textColor:[90,90,90], fontStyle:'bold' },
-    columnStyles:{ 3:{ halign:'right', fontStyle:'bold' } }
-  });
-  var afterBox = doc.lastAutoTable.finalY;
-  doc.autoTable({
-    startY: Math.max(afterBox, y+26) + 18, margin:{ left:M, right:M },
-    head: [['Account','Description','Qty','Unit Price','Disc','Tax','Total']],
-    body: inv.lines.map(function(l){
-      return [ l.account, l.desc, Number(l.qty||1).toFixed(2), _uAmt(l.unit), '0.00', '0.00', _uAmt(l.total) ];
-    }),
-    theme:'grid',
-    styles:{ fontSize:9, cellPadding:6, textColor:[40,40,40], lineColor:[228,228,228], lineWidth:0.5 },
-    headStyles:{ fillColor:[35,35,35], textColor:[255,255,255], fontStyle:'bold', fontSize:8 },
-    columnStyles:{ 2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'} }
-  });
-  var fy = doc.lastAutoTable.finalY + 28;
-  // Banking details (left)
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(60,60,60);
-  doc.text('BANKING DETAILS', M, fy);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(50,50,50);
-  var bl = [
-    'Bank Name: '+PM_STMT.bankName,
-    'Account Number: '+PM_STMT.bankAcc,
-    'Branch Code: '+PM_STMT.bankBranch,
-    'Branch Name: '+PM_STMT.bankBranchName,
-    'Account Holder: '+PM_STMT.bankHolder,
-    'Account Type: '+PM_STMT.bankType
-  ];
-  if(inv.ref) bl.splice(2,0,'Reference: '+inv.ref);
-  bl.forEach(function(l,i){ doc.text(l, M, fy+14+(i*12)); });
-  // Totals (right)
-  doc.autoTable({
-    startY: fy-6, margin:{ left: rx, right: M },
-    body: [
-      ['Sub-Total excl.', _uAmt(inv.total)],
-      ['Discount excl.', '0.00'],
-      ['Sub-Total excl. (after discount)', _uAmt(inv.total)],
-      ['TOTAL', _uAmtR(inv.total)]
-    ],
-    theme:'grid',
-    styles:{ fontSize:9, cellPadding:5, lineColor:[210,210,210], lineWidth:0.5 },
-    columnStyles:{ 1:{ halign:'right' } },
-    didParseCell: function(d){ if(d.row.index===3){ d.cell.styles.fontStyle='bold'; d.cell.styles.fontSize=11; } }
-  });
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(140,140,140);
-  doc.text('Tax Invoice '+inv.no+'  ·  generated from the Park Manor billing register  ·  '+inv.date, W/2, doc.internal.pageSize.getHeight()-28, {align:'center'});
-  return { base64: doc.output('datauristring').split(',')[1], filename: 'Invoice_'+inv.no+'.pdf', doc: doc };
-}
-// Build the statement PDF (account summary). Returns { base64, filename, doc }.
-async function _statementPdf(u){
-  await _ensurePdfLib();
-  var doc = new window.jspdf.jsPDF({ unit:'pt', format:'a4' });
-  var M = 40, W = doc.internal.pageSize.getWidth(), rx = W/2;
-  var st = u.statement || {}, ledger = (st.ledger||[]).slice();
-  var today = new Date().toISOString().slice(0,10);
-  var cum = _uRunning(ledger), total = cum.length ? cum[cum.length-1] : 0;
-  var ag = _computeAgeing(ledger, today);
-  var y = _pdfHeader(doc, u, st.ref||'');
-  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(26,26,26);
-  doc.text('STATEMENT', M, y+14);
-  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(85,85,85);
-  doc.text('As at '+today, W-M, y+14, {align:'right'});
-  doc.autoTable({
-    startY: y+28, margin:{ left:M, right:M },
-    head: [['Date','Description','Debit','Credit','Balance']],
-    body: ledger.map(function(l,i){
-      return [ l.date||'', (l.desc||l.src||''), (Number(l.debit)?_uAmt(l.debit):''), (Number(l.credit)?_uAmt(l.credit):''), _uAmt(cum[i]) ];
-    }),
-    theme:'grid',
-    styles:{ fontSize:9, cellPadding:5, textColor:[40,40,40], lineColor:[228,228,228], lineWidth:0.5 },
-    headStyles:{ fillColor:[35,35,35], textColor:[255,255,255], fontStyle:'bold', fontSize:8 },
-    columnStyles:{ 2:{halign:'right'},3:{halign:'right'},4:{halign:'right'} }
-  });
-  var fy = doc.lastAutoTable.finalY + 24;
-  doc.autoTable({
-    startY: fy, margin:{ left:M, right:M },
-    head: [['120+ days','90+ days','60+ days','30+ days','Current']],
-    body: [[ _uAmt(ag.d120), _uAmt(ag.d90), _uAmt(ag.d60), _uAmt(ag.d30), _uAmt(ag.current) ]],
-    theme:'grid',
-    styles:{ fontSize:8.5, halign:'right', cellPadding:5, lineColor:[210,210,210], lineWidth:0.5 },
-    headStyles:{ fillColor:[244,244,244], textColor:[85,85,85], fontStyle:'bold', halign:'right' }
-  });
-  var ty = doc.lastAutoTable.finalY + 22;
-  doc.setDrawColor(26,26,26); doc.setLineWidth(1); doc.line(rx, ty-8, W-M, ty-8);
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(85,85,85);
-  doc.text(total < -0.005 ? 'BALANCE (IN CREDIT)' : 'TOTAL OUTSTANDING', rx, ty+8);
-  doc.setFontSize(15); doc.setTextColor(total>0.005?154:10, total>0.005?98:122, total>0.005?0:63);
-  doc.text(_uAmtR(total), W-M, ty+8, {align:'right'});
-  // Banking details
-  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(60,60,60);
-  doc.text('BANKING DETAILS', M, ty+2);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(50,50,50);
-  var bl = ['Bank: '+PM_STMT.bankName, 'Account: '+PM_STMT.bankAcc+' ('+PM_STMT.bankType+')', 'Branch code: '+PM_STMT.bankBranch, 'Holder: '+PM_STMT.bankHolder];
-  if(st.ref) bl.push('Reference: '+st.ref);
-  bl.forEach(function(l,i){ doc.text(l, M, ty+16+(i*12)); });
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(140,140,140);
-  doc.text('Statement  ·  Park Manor billing register  ·  '+today, W/2, doc.internal.pageSize.getHeight()-28, {align:'center'});
-  return { base64: doc.output('datauristring').split(',')[1], filename: 'Statement_'+(st.ref||('Section'+(u.section||''))).replace(/[^A-Za-z0-9_-]/g,'')+'.pdf', doc: doc };
-}
-// Short covering email (the detail lives in the two attached PDFs).
-function _invoiceEmailText(u, inv, outstanding){
-  var L = [];
-  L.push('Dear '+(u.ownerName||'Owner')+',');
-  L.push('');
-  L.push('Please find attached your tax invoice '+inv.no+' for '+(_monthLabel(inv.date)||inv.date)+', together with your latest account statement.');
-  L.push('');
-  L.push('Invoice '+inv.no+' (this period):  '+_uAmtR(inv.total));
-  L.push('Total now due on your account:  '+_uAmtR(outstanding));
-  L.push('');
-  L.push('Banking details for payment:');
-  L.push('  '+PM_STMT.bankName+'  ·  Acc '+PM_STMT.bankAcc+' ('+PM_STMT.bankType+')  ·  Branch '+PM_STMT.bankBranch);
-  L.push('  Account holder: '+PM_STMT.bankHolder);
-  if(inv.ref) L.push('  Payment reference: '+inv.ref);
-  L.push('');
-  L.push('If you have already paid, kindly disregard the balance. For any queries, reply to this email or contact '+PM_STMT.agentEmail+'.');
-  L.push('');
-  L.push(PM_STMT.bcName);
-  L.push('c/o '+PM_STMT.agent.join(', '));
-  return L.join('\n');
-}
-function _invoiceEmailHtml(u, inv, outstanding){
-  var e = escHtml;
-  return '<!doctype html><html><body style="margin:0;padding:0;background:#eef1f5">'
-    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:24px 12px"><tr><td align="center">'
-    + '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:14px;border:1px solid #e4e9ef;overflow:hidden">'
-    + '<tr><td style="padding:22px 28px;border-bottom:3px solid #1fa898"><div style="font-family:Arial,Helvetica,sans-serif;font-size:20px;font-weight:bold;color:#3a4354;letter-spacing:2px">PARK MANOR</div><div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1fa898;font-weight:bold">Body Corporate · Reg '+e(PM_STMT.regNo)+'</div></td></tr>'
-    + '<tr><td style="padding:24px 28px;font-family:Arial,Helvetica,sans-serif;color:#3a4354;font-size:13px;line-height:1.6">'
-    +   'Dear '+e(u.ownerName||'Owner')+',<br><br>'
-    +   'Please find attached your <b>tax invoice '+e(inv.no)+'</b> for '+e(_monthLabel(inv.date)||inv.date)+', together with your latest <b>account statement</b>.'
-    +   '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;border:1px solid #e4e9ef;border-radius:10px;overflow:hidden">'
-    +     '<tr><td style="padding:12px 16px;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#5c6675">Invoice '+e(inv.no)+' (this period)</td><td style="padding:12px 16px;background:#f5f7fa;text-align:right;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:#3a4354">'+_uAmtR(inv.total)+'</td></tr>'
-    +     '<tr><td style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#5c6675">Total now due on your account</td><td style="padding:12px 16px;text-align:right;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:'+(outstanding<-0.005?'#0a7a3f':'#9a6200')+'">'+_uAmtR(outstanding)+'</td></tr>'
-    +   '</table>'
-    +   '<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#3a4354;line-height:1.7;background:#f5f7fa;border:1px solid #e4e9ef;border-radius:9px;padding:14px 16px">'
-    +     '<b>Banking details</b><br>'+e(PM_STMT.bankName)+' · Acc '+e(PM_STMT.bankAcc)+' ('+e(PM_STMT.bankType)+')<br>Branch code '+e(PM_STMT.bankBranch)+' · Holder '+e(PM_STMT.bankHolder)+(inv.ref?('<br>Payment reference: <b>'+e(inv.ref)+'</b>'):'')+'</div>'
-    +   '<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#5c6675;line-height:1.6;margin-top:16px">If you have already paid, kindly disregard the balance. For queries, reply to this email or contact '+e(PM_STMT.agentEmail)+'.</div>'
-    + '</td></tr>'
-    + '<tr><td style="padding:16px 28px;background:#f5f7fa;border-top:1px solid #e4e9ef;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;line-height:1.6">'+e(PM_STMT.bcName)+' · c/o '+e(PM_STMT.agent.join(', '))+'</td></tr>'
-    + '</table></td></tr></table></body></html>';
-}
-// Email the invoice + statement PDFs to the owner (cc the BC inbox).
-async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
-  var bcInbox = (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '';
-  try {
-    var res = await fetch('/api/send-email', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        to: u.ownerEmail,
-        cc: bcInbox || undefined,
-        subject: 'Invoice '+inv.no+' & Statement — '+PM_STMT.bcName+(u.section?(' — Door No '+u.section):''),
-        text: _invoiceEmailText(u, inv, outstanding),
-        html: _invoiceEmailHtml(u, inv, outstanding),
-        fromName: PM_STMT.bcName,
-        replyTo: PM_STMT.agentEmail,
-        attachments: [
-          { name: invPdf.filename, content: invPdf.base64 },
-          { name: stmtPdf.filename, content: stmtPdf.base64 }
-        ]
-      })
-    });
-    var data = {}; try { data = await res.json(); } catch(e){}
-    if(res.ok && data.ok) return { ok:true };
-    return { ok:false, error:(data && data.error) || ('status '+res.status) };
-  } catch(e){ return { ok:false, error:String(e && e.message || e) }; }
-}
-
-// Generate an invoice + statement for a single unit: bill the period's charges,
-// email both PDFs to the owner, and open them for review.
-async function generateInvoice(id){
-  if(!UNITS[id]){ alert('No unit selected.'); return; }
-  _syncUnitFromModalIfOpen(id);
-  var u = UNITS[id];
-  var inv = _buildInvoice(u);
-  if(!inv.lines.length || Math.abs(inv.total) < 0.005){
-    alert('This unit has no charges to invoice yet.\n\nSet the monthly levy amounts (Admin / 10-yr maintenance / CSOS) on the unit first — those become the invoice line items.');
-    return;
-  }
-  var ownerEmail = (u.ownerEmail||'').trim();
-  var bcInbox = (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '';
-  var lineSummary = inv.lines.map(function(l){ return '  • '+l.account+':  '+_uAmtR(l.total); }).join('\n');
-  var msg = 'Generate ' + inv.no + ' for Section ' + (u.section||'') + '?\n\n'
-    + 'This bills the unit for this period:\n' + lineSummary + '\n'
-    + '  ────────────\n  Invoice total:  ' + _uAmtR(inv.total) + '\n\n'
-    + 'It will be posted to the account (statement) and '
-    + (ownerEmail
-        ? ('emailed — with a PDF invoice and statement — to ' + (u.ownerName||'the owner') + ' (' + ownerEmail + ')' + (bcInbox?(', cc ' + bcInbox):'') + '.')
-        : 'opened for printing.\n\n⚠ No owner email is set, so it will not be emailed.');
-  if(!confirm(msg)) return;
-  var breakdown = !!u.invoiceBreakdown;
-  _recordInvoiceOnUnit(u, inv, breakdown);
-  var outstanding = _uLedgerTotal(u.statement.ledger);
-  if(id===_currentUnitId){ // reflect on the open modal immediately
-    _invoiceLedgerLines(inv, breakdown).forEach(function(l){ _editLedger.push(l); });
-    _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-    _editStmtMeta.ageing = null;
-    renderUnitLedger();
-  }
-  await saveUnits();
-  renderUnits();
-  var invPdf, stmtPdf;
-  try {
-    invPdf = await _invoicePdf(u, inv);
-    stmtPdf = await _statementPdf(u);
-  } catch(e){
-    alert(inv.no + ' was posted to the statement, but the PDF could not be built:\n\n' + (e && e.message || e) + '\n\n(The charge is recorded; you can try emailing again after a reload.)');
-    return;
-  }
-  if(ownerEmail){
-    var r = await _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding);
-    if(r.ok) alert('✓ ' + inv.no + ' generated and emailed to ' + ownerEmail + (bcInbox?(' (cc ' + bcInbox + ')'):'') + '.\n\nThe invoice and statement PDFs will open for your records.');
-    else alert(inv.no + ' was posted to the statement, but the email could not be sent:\n\n' + r.error + '\n\nThe PDFs will still open so you can save/send them manually.');
-  }
-  try { window.open(invPdf.doc.output('bloburl'), '_blank'); window.open(stmtPdf.doc.output('bloburl'), '_blank'); } catch(e){}
-}
-
-// Generate invoices + statements for every unit that has charges (monthly run).
-async function generateAllInvoices(){
-  if(!_unitsLoaded){ await loadUnits(); }
-  var list = Object.values(UNITS).filter(function(u){ return _invoiceLineItems(u).length; });
-  if(!list.length){ alert('No units have charges to invoice yet.\n\nSet each unit’s monthly levy amounts first (or use “Load Park Manor units”).'); return; }
-  var withEmail = list.filter(function(u){ return (u.ownerEmail||'').trim(); }).length;
-  if(!confirm('Generate invoices for ' + list.length + ' unit(s), dated today?\n\n'
-      + 'This bills each unit for its current levy charges, posts the invoice to its statement, and emails the invoice + statement PDFs to owners.\n\n'
-      + '• ' + withEmail + ' will be emailed\n'
-      + '• ' + (list.length-withEmail) + ' have no email (recorded only)')) return;
-  try { await _ensurePdfLib(); } catch(e){ alert('Could not load the PDF library:\n\n'+(e&&e.message||e)); return; }
-  var okEmail=0, failEmail=0;
-  for(var i=0;i<list.length;i++){
-    var u = list[i];
-    var inv = _buildInvoice(u);
-    if(!inv.lines.length || Math.abs(inv.total) < 0.005) continue;
-    _recordInvoiceOnUnit(u, inv, !!u.invoiceBreakdown);
-    var outstanding = _uLedgerTotal(u.statement.ledger);
-    if((u.ownerEmail||'').trim()){
-      try {
-        var invPdf = await _invoicePdf(u, inv);
-        var stmtPdf = await _statementPdf(u);
-        var r = await _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding);
-        if(r.ok) okEmail++; else failEmail++;
-      } catch(e){ failEmail++; }
-    }
-  }
-  await saveUnits();
-  renderUnits();
-  if(_currentUnitId && UNITS[_currentUnitId]) openUnitModal(_currentUnitId);
-  alert('Generated ' + list.length + ' invoice(s).\n\nEmailed: ' + okEmail + '   ·   Failed: ' + failEmail + '   ·   No email: ' + (list.length-withEmail)
-    + (failEmail?('\n\nSome emails failed — check that Brevo email is configured and owner addresses are valid.'):''));
 }
 
 // Import the supplied Davies statement snapshot into matching units (by section
@@ -22215,14 +21788,28 @@ async function submitWaterReading(){
   var btn = document.getElementById('pub-submit-btn');
   if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; btn.style.opacity = '0.7'; }
   try {
-    // Water meter readings are NOT logged as tickets — we only email the photo
-    // and reading to the Park Manor inbox + managing agent, so we compress the
-    // photos straight into email attachments and never touch TICKETS/INVOICES.
+    var photoIds = [];
     var notifyAtt = [];
     var NOTIFY_BUDGET = 4200000;  // ~4.2 MB of base64 across all attachments
     var notifyUsed = 0;
     for(var i = 0; i < files.length; i++){
-      var compressed = await publicCompressPhoto(files[i]);
+      var f = files[i];
+      var compressed = await publicCompressPhoto(f);
+      var photoId = 'inv_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '_' + i;
+      var photoRec = {
+        id: photoId,
+        name: compressed.name,
+        type: compressed.type,
+        data: compressed.data,
+        thumb: compressed.thumb || '',
+        docType: 'Supporting Evidence',
+        invCompany: '(water meter reading)',
+        added: Date.now()
+      };
+      INVOICES[photoId] = photoRec;
+      try { await sbUpsert('invoices', photoId, photoRec); }
+      catch(e){ console.warn('water submit: photo save failed', e); }
+      photoIds.push(photoId);
       var attSize = (compressed.data || '').length;
       if(notifyUsed + attSize <= NOTIFY_BUDGET){
         notifyAtt.push({ name: compressed.name, type: compressed.type, dataUrl: compressed.data });
@@ -22232,15 +21819,40 @@ async function submitWaterReading(){
                          sizeMB: (attSize * 0.75 / 1048576).toFixed(1) });
       }
     }
-    // Email only — server routes Water Reading submissions to the Park Manor
-    // inbox + managing agent (never the trustees). We await so we can tell the
-    // resident whether it actually went out.
-    var r = await fetch('/api/send-edit-link', {
+    var ticketId = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    var editToken = generateShareToken();
+    var ticket = {
+      id: ticketId,
+      title: 'Water meter reading',
+      desc: note || '(Photo of meter submitted — see attachment.)',
+      unit: unit,
+      category: 'Water Reading',
+      priority: 'low',
+      status: 'open',
+      reporter: 'Anonymous',
+      reporterEmail: '',
+      reporterPhone: '',
+      createdViaPublicForm: true,
+      reporterEditToken: editToken,
+      dateOpen: new Date().toISOString().split('T')[0],
+      added: Date.now(),
+      updated: Date.now(),
+      ticketNumber: (typeof nextTicketNumber === 'function') ? nextTicketNumber() : undefined,
+      linkedDocIds: photoIds,
+      log: [{type: 'status', text: '+ Water meter reading submitted via public form', ts: Date.now()}]
+    };
+    TICKETS[ticketId] = ticket;
+    await sbUpsert('tickets', ticketId, ticket);
+    try { localStorage.setItem('pm_tickets', JSON.stringify(TICKETS)); } catch(e){}
+    // Notify the managing agent (server routes Water Reading submissions to the
+    // agent only — not the trustees). Fire-and-forget.
+    fetch('/api/send-edit-link', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({
         notifyOnly: true,
         title: 'Water meter reading',
+        ticketNumber: ticket.ticketNumber,
         desc: note || '(Photo of meter submitted — see attachment.)',
         unit: unit,
         reporter: '',
@@ -22250,14 +21862,13 @@ async function submitWaterReading(){
         bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
         attachments: notifyAtt
       })
-    });
-    if(!r.ok) throw new Error('send failed: ' + r.status);
+    }).catch(function(e){ console.warn('water reading notify failed', e); });
 
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px">'
       +   '<svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
-      +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has been emailed to Park Manor.</div>'
+      +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has been sent to the managing agent.</div>'
       + '</div>'
       + '<div style="text-align:center;margin-top:8px">'
       +   '<button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'

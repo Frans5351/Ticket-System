@@ -45,33 +45,14 @@ export default async function handler(req) {
   const to = (body.to || "").toString().trim();
   const subject = (body.subject || "").toString();
   const text = (body.text || "").toString();
-  const html = (body.html || "").toString();
   let from = (body.from || "").toString().trim();
   const fromName = (body.fromName || "").toString().trim();
   const replyTo = (body.replyTo || "").toString().trim();
-  // Optional CC — accepts a single address or an array. Kept to valid emails.
-  const ccRaw = Array.isArray(body.cc) ? body.cc : (body.cc ? [body.cc] : []);
-  const cc = ccRaw.map((s) => String(s || "").trim()).filter(looksLikeEmail);
-  // Optional attachments: [{ name, content(base64, no data: prefix) }]. Capped
-  // to guard the function. Used for PDF invoices/statements.
-  const attRaw = Array.isArray(body.attachments) ? body.attachments.slice(0, 10) : [];
-  const attachments = [];
-  let attBytes = 0;
-  for (const a of attRaw) {
-    const name = (a && a.name ? String(a.name) : "attachment.pdf").slice(0, 200);
-    let content = a && a.content ? String(a.content) : "";
-    const comma = content.indexOf(",");
-    if (content.slice(0, 5) === "data:" && comma >= 0) content = content.slice(comma + 1); // strip data: prefix
-    if (!content) continue;
-    if (attBytes + content.length > 30 * 1024 * 1024) continue; // ~30MB cap
-    attBytes += content.length;
-    attachments.push({ name, content });
-  }
 
   // Validate the essentials.
   if (!looksLikeEmail(to)) return errorResponse(400, "A valid recipient email is required.");
   if (!subject) return errorResponse(400, "A subject is required.");
-  if (!text && !html) return errorResponse(400, "An email body is required.");
+  if (!text) return errorResponse(400, "An email body is required.");
 
   // Brevo can only send from the verified BREVO_FROM_EMAIL. The scheme's own
   // address (which isn't verified there) becomes the display name and the
@@ -86,9 +67,6 @@ export default async function handler(req) {
     to: [to],
     subject: subject,
     text: text,
-    html: html || undefined,
-    cc: cc.length ? cc : undefined,
-    attachments: attachments.length ? attachments : undefined,
     replyTo: effectiveReplyTo || undefined,
     fromName: displayName || undefined,
   });
