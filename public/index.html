@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Park Manor</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- WeconnectU/Davies statement + invoice importer (parser + unit mapper) -->
+<script src="pm-weconnectu.js"></script>
+<script src="pm-mapper.js"></script>
 <script>
 // ── Supabase config ───────────────────────────────────────────────────────
 const SUPA_URL = 'https://spagcmzhlngtqvrydzvi.supabase.co';
@@ -6331,6 +6334,7 @@ document.getElementById('tbody').addEventListener('click', function(e){
     <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
       <button id="units-seed-btn" onclick="seedParkManorUnits()" title="Load the 20 Park Manor units from your levy schedule (owner details you've entered are kept)" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⤓ Load Park Manor units</button>
       <button id="stmts-seed-btn" onclick="seedParkManorStatements()" title="Import the latest levy statements (ledger + ageing) onto the matching units" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">📄 Import statements</button>
+      <button id="wc-import-btn" onclick="openWeconnectImport()" title="Import WeconnectU/Davies invoice & statement PDFs — drop a month's batch, review, then apply to the matching units" style="padding:8px 14px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:20px;color:var(--info);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">📥 Import PDFs</button>
       <button id="invoice-all-btn" onclick="generateAllInvoices()" title="Bill every unit for its current levy charges and email each owner a PDF invoice + statement (monthly run)" style="padding:8px 14px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:20px;color:var(--green);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">🧾 Generate invoices</button>
       <button onclick="openUnitModal(null)" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> Add unit</button>
     </div>
@@ -6339,6 +6343,158 @@ document.getElementById('tbody').addEventListener('click', function(e){
   <div id="units-table-wrap" style="padding:16px 20px;overflow-x:auto"></div>
   <div id="units-empty" style="display:none;padding:50px 20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:13px"></div>
 </div>
+
+<!-- WeconnectU/Davies PDF import modal -->
+<div id="wc-import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:720;align-items:center;justify-content:center" onclick="if(event.target===this)closeWeconnectImport()">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(940px,96vw);max-height:92vh;overflow-y:auto;padding:20px 22px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:700;color:var(--text2)">📥 Import WeconnectU / Davies PDFs</div>
+      <button onclick="closeWeconnectImport()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.6;margin-bottom:12px">Pick a month's invoice, statement and credit-note PDFs (select many at once). Nothing is saved until you review the summary and click <b style="color:var(--text2)">Apply to units</b>. Garages (sections 13+) aren't billed; payments mis-allocated to a garage are moved onto the owner's main unit.</div>
+    <input id="wc-files" type="file" accept="application/pdf,.pdf" multiple onchange="wcFilesChosen()" style="width:100%;box-sizing:border-box;padding:10px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--mono)">
+    <div style="display:flex;gap:8px;align-items:center;margin:12px 0">
+      <button id="wc-parse-btn" onclick="wcParseFiles()" disabled style="padding:9px 16px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:8px;color:var(--info);font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;opacity:.5">Parse files</button>
+      <button id="wc-apply-btn" onclick="wcApplyImport()" disabled style="padding:9px 16px;background:var(--green);border:none;border-radius:8px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;opacity:.5">Apply to units</button>
+      <span id="wc-status" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
+    </div>
+    <div id="wc-preview"></div>
+  </div>
+</div>
+
+<script>
+// ── WeconnectU/Davies PDF importer (UI glue) ────────────────────────────────
+// Parsing + unit-mapping live in pm-weconnectu.js (PMWeconnectU) and
+// pm-mapper.js (PMMapper), both validated offline against the real documents.
+// This block loads pdf.js on demand, extracts text items, runs the parsers +
+// mapper, previews the result, and (on Apply) writes onto the UNITS register.
+var _wcPdfjs = null;
+function wcLoadPdfjs(){
+  if(_wcPdfjs) return Promise.resolve(_wcPdfjs);
+  return new Promise(function(resolve, reject){
+    if(window.pdfjsLib){ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; _wcPdfjs=window.pdfjsLib; return resolve(_wcPdfjs); }
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=function(){ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; _wcPdfjs=window.pdfjsLib; resolve(_wcPdfjs); }catch(e){ reject(e); } };
+    s.onerror=function(){ reject(new Error('Could not load the PDF reader (pdf.js). Check your connection.')); };
+    document.head.appendChild(s);
+  });
+}
+// Extract text items {x,y,str} from one PDF File, matching the offline tool
+// (pages stacked by a fixed vertical offset so later pages sort below).
+async function wcExtractItems(file){
+  var pdfjsLib = await wcLoadPdfjs();
+  var buf = await file.arrayBuffer();
+  var doc = await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  var items=[];
+  for(var p=1;p<=doc.numPages;p++){
+    var tc = await (await doc.getPage(p)).getTextContent();
+    tc.items.forEach(function(it){ if(it.str) items.push({x:it.transform[4], y:it.transform[5]+(p-1)*-2000, str:it.str}); });
+  }
+  return items;
+}
+function openWeconnectImport(){
+  window._wcMap=null; window._wcFileCount=0;
+  var pv=document.getElementById('wc-preview'); if(pv) pv.innerHTML='';
+  var st=document.getElementById('wc-status'); if(st) st.textContent='';
+  var fi=document.getElementById('wc-files'); if(fi) fi.value='';
+  wcSetBtn('wc-parse-btn', false); wcSetBtn('wc-apply-btn', false);
+  document.getElementById('wc-import-modal').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeWeconnectImport(){ document.getElementById('wc-import-modal').style.display='none'; document.body.style.overflow=''; }
+function wcSetBtn(id, on){ var b=document.getElementById(id); if(b){ b.disabled=!on; b.style.opacity=on?'1':'.5'; } }
+function wcFilesChosen(){ var fi=document.getElementById('wc-files'); wcSetBtn('wc-parse-btn', !!(fi && fi.files && fi.files.length)); }
+function _wcEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+async function wcParseFiles(){
+  var fi=document.getElementById('wc-files'); var st=document.getElementById('wc-status');
+  if(!fi || !fi.files || !fi.files.length) return;
+  if(typeof PMWeconnectU==='undefined' || typeof PMMapper==='undefined'){ if(st){ st.textContent='Importer modules not loaded — hard-refresh the page.'; st.style.color='#f0a06f'; } return; }
+  wcSetBtn('wc-parse-btn', false); wcSetBtn('wc-apply-btn', false);
+  var files=Array.prototype.slice.call(fi.files);
+  window._wcFileCount=files.length;
+  var docs=[], errors=[];
+  for(var i=0;i<files.length;i++){
+    var f=files[i];
+    if(st){ st.textContent='Reading '+(i+1)+' of '+files.length+'… '+f.name; st.style.color='var(--muted)'; }
+    try { var items=await wcExtractItems(f); var d=PMWeconnectU.detectAndParse(items, f.name); d._file=f.name; docs.push(d); }
+    catch(e){ errors.push(f.name+': '+(e&&e.message||e)); }
+  }
+  var map = PMMapper.mapDocsToUnits(docs);
+  window._wcMap=map; window._wcDocs=docs;
+  wcRenderPreview(map, docs, errors);
+  if(st){ st.textContent='Parsed '+docs.length+' document(s).'; st.style.color='var(--green)'; }
+  wcSetBtn('wc-parse-btn', true); wcSetBtn('wc-apply-btn', Object.keys(map.units).length>0);
+}
+
+function wcRenderPreview(map, docs, errors){
+  var pv=document.getElementById('wc-preview'); if(!pv) return;
+  var doors=Object.keys(map.units).map(Number).sort(function(a,b){return a-b;});
+  var counts={invoice:0, statement:0, credit_note:0, unknown:0};
+  docs.forEach(function(d){ counts[d.docType]=(counts[d.docType]||0)+1; });
+  var nonRecon=docs.filter(function(d){ return d.docType==='invoice' && d.reconciles===false; });
+  var html='';
+  html+='<div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:8px">'
+      + counts.invoice+' invoice(s), '+counts.statement+' statement(s), '+(counts.credit_note||0)+' credit note(s) → '+doors.length+' unit(s).</div>';
+  if(errors && errors.length) html+='<div style="font-size:11px;font-family:var(--mono);color:#f0a06f;margin-bottom:8px">⚠ Could not read: '+errors.map(_wcEsc).join('; ')+'</div>';
+  if(nonRecon.length) html+='<div style="font-size:11px;font-family:var(--mono);color:#f0a06f;margin-bottom:8px">⚠ Not reconciling: '+nonRecon.map(function(d){return _wcEsc(d.invoiceNo);}).join(', ')+'</div>';
+  if(map.flags && map.flags.length){
+    html+='<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+       + '<div style="font-size:10px;font-family:var(--mono);color:#f0a06f;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Review before applying</div>';
+    map.flags.forEach(function(f){ html+='<div style="font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.5">• '+_wcEsc(f)+'</div>'; });
+    html+='</div>';
+  }
+  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:10px;text-transform:uppercase">'
+     + '<th style="padding:5px 6px">Unit</th><th style="padding:5px 6px">Owner</th><th style="padding:5px 6px;text-align:right">Invoices</th><th style="padding:5px 6px;text-align:right">Readings</th><th style="padding:5px 6px;text-align:right">Latest levy</th><th style="padding:5px 6px;text-align:right">Statement bal.</th></tr></thead><tbody>';
+  doors.forEach(function(d){
+    var u=map.units[d]; var c=u.charges||{};
+    var levy=(c.levies||0)+(c.csos||0)+(c.reserve_fund||0);
+    var bal=u.statement && u.statement.ledger && u.statement.ledger.length ? u.statement.ledger[u.statement.ledger.length-1].cumulative : null;
+    html+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px;font-family:var(--mono);color:var(--accent2)">'+d+'</td>'
+       + '<td style="padding:6px;color:var(--text2)">'+_wcEsc(u.owner||'')+'</td>'
+       + '<td style="padding:6px;text-align:right;font-family:var(--mono)">'+u.invoices.length+'</td>'
+       + '<td style="padding:6px;text-align:right;font-family:var(--mono)">'+u.meterReadings.length+'</td>'
+       + '<td style="padding:6px;text-align:right;font-family:var(--mono)">'+(levy?('R '+levy.toFixed(2)):'—')+'</td>'
+       + '<td style="padding:6px;text-align:right;font-family:var(--mono);color:'+(bal>0.005?'#f0a06f':(bal<-0.005?'var(--green)':'var(--muted)'))+'">'+(bal==null?'—':('R '+bal.toFixed(2)))+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  pv.innerHTML=html;
+}
+
+async function wcApplyImport(){
+  var map=window._wcMap; if(!map) return;
+  var applied=0;
+  Object.keys(map.units).forEach(function(door){
+    var src=map.units[door]; var id='unit_'+door; var u=UNITS[id];
+    if(!u){ u=UNITS[id]={ id:id, section:Number(door), type:(Number(door)>12?'store':'house'), houseNo:String(door), area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, meterReadings:[], added:Date.now() }; }
+    if(src.owner) u.ownerName=src.owner;
+    if(src.email) u.ownerEmail=src.email;
+    if(src.tel) u.ownerPhone=src.tel;
+    if(src.reference) u.daviesRef=src.reference;
+    if(src.charges && Object.keys(src.charges).length){
+      u.charges=u.charges||{};
+      if(src.charges.levies!=null) u.charges.adminLevy=src.charges.levies;
+      if(src.charges.reserve_fund!=null) u.charges.maintLevy=src.charges.reserve_fund;
+      if(src.charges.csos!=null) u.charges.csos=src.charges.csos;
+      u.importedCharges=src.charges;
+    }
+    if(src.meterReadings && src.meterReadings.length){
+      var byDate={}; (u.meterReadings||[]).forEach(function(r){ byDate[r.date]=r; });
+      src.meterReadings.forEach(function(r){ byDate[r.date]={date:r.date, water:r.water, elec:r.elec}; });
+      u.meterReadings=Object.keys(byDate).sort().map(function(k){ return byDate[k]; });
+    }
+    if(src.invoices && src.invoices.length) u.importedInvoices=src.invoices;
+    if(src.creditNotes && src.creditNotes.length) u.creditNotes=src.creditNotes;
+    if(src.statement) u.statement=src.statement;
+    applied++;
+  });
+  try { if(typeof saveUnits==='function') await saveUnits(); } catch(e){ console.warn('wcApplyImport save', e); }
+  if(typeof renderUnits==='function') renderUnits();
+  closeWeconnectImport();
+  try { if(typeof toast==='function') toast('Imported '+applied+' unit(s) from '+(window._wcFileCount||0)+' file(s).'); else alert('Imported '+applied+' unit(s) from '+(window._wcFileCount||0)+' file(s).'); } catch(e){}
+}
+</script>
 
 <!-- Unit add/edit modal -->
 <div id="unit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:700;align-items:center;justify-content:center" onclick="if(event.target===this)closeUnitModal()">
