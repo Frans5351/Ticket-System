@@ -8104,14 +8104,44 @@ function blApplySeedToSchedule(u, s){
   blSyncLegacyCharges(u);
 }
 // Is a line billable in month `ym` (YYYY-MM)?
-function blLineActiveIn(l, ym){
+function blLineActiveIn(l, ym, u){
   if(l.active === false) return false;
   if(l.from && ym < l.from) return false;
   if(l.to && ym > l.to) return false;
-  if(l.kind === 'instalment' && Number(l.of) && Number(l.paid || 0) >= Number(l.of)) return false;
+  if(l.kind === 'instalment' && Number(l.of) && blInstalmentBilled(u, l).n >= Number(l.of)) return false;
   return true;
 }
-function blInstalmentNext(l){ return Math.min(Number(l.paid || 0) + 1, Number(l.of) || 1); }
+// How far an instalment plan has got, worked out from the documents on file
+// rather than a counter: the highest "payment n of N" already on an imported
+// Davies invoice or an invoice issued here (fully credited ones don't count).
+// Deleting a test draft or crediting a test invoice therefore puts the plan
+// back where it was. `paid` on the line is only a fallback for older data.
+function blInstalmentBase(desc){ return String(desc || '').replace(/\s*[-–]?\s*payment\s+\d+\s+of\s+\d+\s*$/i, '').trim().toLowerCase(); }
+function blInstalmentBilled(u, l){
+  var base = blInstalmentBase(l.desc), best = { n:0, docs:[] };
+  if(!u){ return { n:Number(l.paid || 0), docs:[] }; }
+  var seen = function(n, no){ if(n > best.n) best.n = n; best.docs.push(no + ' (' + n + ')'); };
+  (u.importedInvoices || []).forEach(function(inv){
+    (inv.lines || []).forEach(function(x){
+      var d = x.description || x.desc || '', m = /payment\s+(\d+)\s+of\s+(\d+)\s*$/i.exec(d);
+      if(!m) return;
+      if(blInstalmentBase(d).indexOf(base) >= 0 || base.indexOf(blInstalmentBase(d.replace(/^.*?Recovered\s+/i, ''))) >= 0) seen(Number(m[1]), inv.invoiceNo);
+    });
+  });
+  (u.invoices || []).forEach(function(inv){
+    if(inv.status === 'draft') return;
+    if(blCreditedAgainst(u, inv.no) >= Number(inv.total || 0) - 0.005 && Number(inv.total || 0) > 0) return;
+    (inv.lines || []).forEach(function(x){
+      var n = x.inst ? Number(x.inst.n) : 0;
+      if(!n){ var m = /payment\s+(\d+)\s+of\s+(\d+)\s*$/i.exec(x.desc || ''); if(m) n = Number(m[1]); }
+      if(!n) return;
+      if(x.lineId === l.id || blInstalmentBase(x.desc) === base) seen(n, inv.no);
+    });
+  });
+  if(!best.docs.length && Number(l.paid || 0) > 0) best.n = Number(l.paid || 0);
+  return best;
+}
+function blInstalmentNext(l, u){ return Math.min(blInstalmentBilled(u, l).n + 1, Number(l.of) || 1); }
 function blInstalmentDesc(l, n){ return (l.desc || '').replace(/\s*[-–]?\s*payment\s+\d+\s+of\s+\d+\s*$/i, '') + ' payment ' + n + ' of ' + (Number(l.of) || 1); }
 
 // ── Readings & usage ────────────────────────────────────────────────────────
@@ -8167,10 +8197,10 @@ function blBuildInvoiceLines(u, ctx){
   if(eUsage != null && eUsage > 1500 && !(lastEu > 0 && eUsage <= 3 * lastEu)) warnings.push('Electricity usage of ' + eUsage + ' kWh in a month is unusually high — double-check the reading before sending.');
   var era = blTariffFor((reading && reading.date) || ctx.date || ym + '-01');
   blSchedule(u).forEach(function(l){
-    if(!blLineActiveIn(l, ym)) return;
+    if(!blLineActiveIn(l, ym, u)){ if(l.kind === 'instalment' && l.active !== false && blInstalmentBilled(u, l).n >= Number(l.of || 1)) warnings.push('“' + (l.desc || '') + '” has had all ' + (l.of || 1) + ' instalments billed, so it is left off.'); return; }
     var out = { lineId:l.id, kind:l.kind, account:l.account || '', desc:l.desc || '', qty:1, unit:0, total:0 };
     if(l.kind === 'fixed'){ out.unit = out.total = Math.round(Number(l.amount || 0) * 100) / 100; }
-    else if(l.kind === 'instalment'){ var n = blInstalmentNext(l); out.desc = blInstalmentDesc(l, n); out.inst = { n:n, of:Number(l.of) || 1 }; out.unit = out.total = Math.round(Number(l.amount || 0) * 100) / 100; }
+    else if(l.kind === 'instalment'){ var n = blInstalmentNext(l, u); out.desc = blInstalmentDesc(l, n); out.inst = { n:n, of:Number(l.of) || 1 }; out.unit = out.total = Math.round(Number(l.amount || 0) * 100) / 100; }
     else if(l.kind === 'water'){
       if(wUsage == null){ warnings.push('No water reading captured — the water line is left off.'); return; }
       out.total = out.unit = blCalcWater(Math.max(0, wUsage), era); out.meter = { prev:prevW.water, curr:reading.water, usage:wUsage }; out.period = wPeriod;
@@ -8597,7 +8627,7 @@ function blLineLabel(l){ return l.desc || l.account || (BL_LINE_KINDS[l.kind] ||
 function blLineSub(l){
   var p = [];
   if(l.account && l.account !== l.desc) p.push(l.account);
-  if(l.kind === 'instalment') p.push('payment ' + blInstalmentNext(l) + ' of ' + (l.of || 1) + ' next' + (Number(l.paid || 0) >= Number(l.of || 1) ? ' · finished' : ''));
+  if(l.kind === 'instalment'){ var b = blInstalmentBilled(blUnitFromSheet(), l); p.push(b.n >= Number(l.of || 1) ? 'all ' + (l.of || 1) + ' billed — finished' : 'payment ' + Math.min(b.n + 1, Number(l.of || 1)) + ' of ' + (l.of || 1) + ' next'); if(b.docs.length) p.push('billed on ' + b.docs.join(', ')); }
   if(l.kind === 'water' || l.kind === 'elec' || l.kind === 'sewer') p.push('worked out from readings' + (l.lastAmount ? ' · last ' + blMoney(l.lastAmount) : ''));
   if(l.from) p.push('from ' + blMonthName(l.from)); if(l.to) p.push('until ' + blMonthName(l.to));
   if(l.source) p.push('from ' + l.source);
@@ -8708,10 +8738,10 @@ function blNextInvoicePreview(u){
   var prevW = lastW ? blLastReading(u, 'water', blReadingDate(lastW, 'water')) : null, prevE = lastE ? blLastReading(u, 'elec', blReadingDate(lastE, 'elec')) : null;
   var era = blTariffFor(month + '-01');
   blSchedule(u).forEach(function(l){
-    if(!blLineActiveIn(l, month)) return;
+    if(!blLineActiveIn(l, month, u)) return;
     var o = { account:l.account, desc:l.desc, total:0 };
     if(l.kind === 'fixed'){ o.total = Number(l.amount) || 0; if(!o.total) return; }
-    else if(l.kind === 'instalment'){ o.total = Number(l.amount) || 0; o.desc = blInstalmentDesc(l, blInstalmentNext(l)); }
+    else if(l.kind === 'instalment'){ o.total = Number(l.amount) || 0; o.desc = blInstalmentDesc(l, blInstalmentNext(l, u)); }
     else if(l.kind === 'water' || l.kind === 'sewer'){
       if(lastW && prevW){ var wu = Math.max(0, lastW.water - prevW.water); o.total = l.kind === 'water' ? blCalcWater(wu, era) : blCalcSewer(wu, era); o.est = true; o.desc = (l.kind === 'water' ? 'Water' : 'Sewerage') + ' (if usage repeats: ' + blRound3(wu) + ' kL)'; }
       else { o.pending = true; pending = true; }
@@ -8742,9 +8772,9 @@ async function blInvoiceFromModal(){
 // ── Charges tab ─────────────────────────────────────────────────────────────
 function renderUnitCharges(){
   var el = blEl('u-charges'); if(!el || !BL.open) return;
-  var L = _editLines || [], garage = blUnitGarage(), month = blSuggestMonth();
+  var L = _editLines || [], garage = blUnitGarage(), month = blSuggestMonth(), su = blUnitFromSheet();
   var fixedTotal = 0, metered = 0, inst = 0;
-  L.forEach(function(l){ if(!blLineActiveIn(l, month)) return; if(l.kind === 'fixed') fixedTotal += Number(l.amount) || 0; else if(l.kind === 'instalment'){ fixedTotal += Number(l.amount) || 0; inst++; } else metered++; });
+  L.forEach(function(l){ if(!blLineActiveIn(l, month, su)) return; if(l.kind === 'fixed') fixedTotal += Number(l.amount) || 0; else if(l.kind === 'instalment'){ fixedTotal += Number(l.amount) || 0; inst++; } else metered++; });
   var h = '';
   if(garage) h += '<div class="bl-note info"><span class="ic">🅿️</span><span>Garages aren’t invoiced on their own. Put the garage levy on the owner’s main unit as a fixed line instead.</span></div>';
   var src = null; L.forEach(function(l){ if(l.source && /^INV/.test(l.source)) src = l.source; });
@@ -8756,9 +8786,9 @@ function renderUnitCharges(){
   if(!L.length) h += '<div class="bl-empty" style="margin:0;border:none;padding:14px 8px"><div class="big">📋</div><h3>No charge lines yet</h3><p>Import the latest Davies invoice to learn them automatically, or add them one by one.</p></div>';
   h += L.map(function(l, i){
     if(_slEditing === l.id) return blSlForm(l);
-    var on = blLineActiveIn(l, month);
+    var on = blLineActiveIn(l, month, su);
     return '<div class="bl-sl' + (on ? '' : ' off') + '" onclick="blSlEdit(\'' + l.id + '\')"><div class="bl-lic">' + blLineKindIcon(l.kind) + '</div>'
-      + '<div class="bl-ltx"><b>' + blEsc(blLineLabel(l)) + (l.active === false ? '<span class="tag">paused</span>' : (!on ? '<span class="tag">not this month</span>' : '')) + '</b><small>' + blEsc(blLineSub(l)) + '</small></div>'
+      + '<div class="bl-ltx"><b>' + blEsc(blLineLabel(l)) + (l.active === false ? '<span class="tag">paused</span>' : (!on ? '<span class="tag">' + (l.kind === 'instalment' ? 'finished' : 'not this month') + '</span>' : '')) + '</b><small>' + blEsc(blLineSub(l)) + '</small></div>'
       + '<div class="bl-lam"><b>' + ((l.kind === 'fixed' || l.kind === 'instalment') ? blMoney(l.amount) : 'metered') + '</b><small>' + (l.kind === 'instalment' ? '× ' + (l.of || 1) : (l.kind === 'fixed' ? 'per month' : 'by tariff')) + '</small></div></div>';
   }).join('');
   h += '</div>';
@@ -8776,7 +8806,8 @@ function blSlForm(l){
     + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">Account (as printed)</label><input id="sl-account" class="bl-in" type="text" value="' + blEsc(l.account || '') + '" placeholder="e.g. Levies"></div>'
     + '<div class="bl-f"><label class="bl-lbl">Description</label><input id="sl-desc" class="bl-in" type="text" value="' + blEsc(l.desc || '') + '" placeholder="e.g. Levies"></div></div>'
     + (money ? '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">' + (l.kind === 'instalment' ? 'Amount per instalment (R)' : 'Amount per month (R)') + '</label><input id="sl-amount" class="bl-in" type="number" inputmode="decimal" step="0.01" value="' + (l.amount === '' ? '' : Number(l.amount || 0)) + '" placeholder="0.00"></div>'
-        + (l.kind === 'instalment' ? '<div class="bl-f"><label class="bl-lbl">Instalments · already billed</label><div style="display:flex;gap:8px"><input id="sl-of" class="bl-in" type="number" inputmode="numeric" min="1" value="' + (l.of || 3) + '" aria-label="Number of instalments"><input id="sl-paid" class="bl-in" type="number" inputmode="numeric" min="0" value="' + (l.paid || 0) + '" aria-label="Already billed"></div></div>' : '<div></div>') + '</div>'
+        + (l.kind === 'instalment' ? '<div class="bl-f"><label class="bl-lbl">Number of instalments</label><input id="sl-of" class="bl-in" type="number" inputmode="numeric" min="1" value="' + (l.of || 3) + '"></div>' : '<div></div>') + '</div>'
+        + (l.kind === 'instalment' && !isNew ? '<div class="bl-calc">' + (function(){ var b = blInstalmentBilled(blUnitFromSheet(), l); return b.docs.length ? 'Billed so far: <b>' + blEsc(b.docs.join(', ')) + '</b> — next is payment ' + Math.min(b.n + 1, Number(l.of || 1)) + ' of ' + (l.of || 1) + '. Counted from the invoices on file, so deleting or crediting a test invoice winds it back.' : 'Nothing billed yet — the next invoice carries payment 1 of ' + (l.of || 1) + '.'; })() + '</div>' : '')
         : '<div class="bl-calc">Worked out each month from the meter readings and the tariff in force — nothing to type here.</div>')
     + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">From month (optional)</label><input id="sl-from" class="bl-in" type="month" value="' + blEsc(l.from || '') + '"></div><div class="bl-f"><label class="bl-lbl">Until month (optional)</label><input id="sl-to" class="bl-in" type="month" value="' + blEsc(l.to || '') + '"></div></div>'
     + (isNew ? '' : '<label class="bl-check"><input id="sl-active" type="checkbox" ' + (l.active !== false ? 'checked' : '') + '><span>Active — include on invoices</span></label>')
@@ -9076,7 +9107,7 @@ function blDraftSetReading(k, v){
   if(!d.reading.date) d.reading.date = blLastOfMonth(blAddMonths(d.month, -1));
   blDraftRebuild(true); d.touched = true; renderInvoiceSheet();
 }
-function blDraftHasMetered(){ var u = blDraftUnit(); return blSchedule(u).some(function(l){ return /^(water|sewer|elec)$/.test(l.kind) && blLineActiveIn(l, INV.d.month); }); }
+function blDraftHasMetered(){ var u = blDraftUnit(); return blSchedule(u).some(function(l){ return /^(water|sewer|elec)$/.test(l.kind) && blLineActiveIn(l, INV.d.month, u); }); }
 
 // ── Rendering ───────────────────────────────────────────────────────────────
 function renderInvoiceSheet(){
@@ -9346,7 +9377,7 @@ function blRunStep(n){
 }
 // Step 1 — month & dates
 function blRunRenderMonth(){
-  var houses = blRunHouses(), noSched = houses.filter(function(u){ return !blSchedule(u).some(function(l){ return blLineActiveIn(l, RUN.month); }); });
+  var houses = blRunHouses(), noSched = houses.filter(function(u){ return !blSchedule(u).some(function(l){ return blLineActiveIn(l, RUN.month, u); }); });
   var existing = houses.filter(function(u){ return (u.importedInvoices || []).some(function(i){ return String(i.date || '').slice(0, 7) === RUN.month; }) || blFinals(u).some(function(i){ return i.month === RUN.month; }); });
   var drafts = houses.filter(function(u){ return blDrafts(u).some(function(d){ return d.month === RUN.month; }); });
   var h = '<div class="bl-card2"><div class="bl-h"><span>Billing month</span></div><div class="bl-grid g3">'
@@ -9371,7 +9402,7 @@ function blRunRenderReadings(){
     + '<div class="bl-hint" style="margin-top:10px">Type the <b>current</b> meter value — usage is the difference from the previous reading. Leave a meter blank to skip that line for the house this month.</div></div>';
   h += '<div class="bl-rdcards">' + houses.map(function(u){
     var r = RUN.readings[u.id] || {}, pw = blLastReading(u, 'water', RUN.rdate), pe = blLastReading(u, 'elec', RUN.rdate);
-    var metered = blSchedule(u).filter(function(l){ return /^(water|sewer|elec)$/.test(l.kind) && blLineActiveIn(l, RUN.month); });
+    var metered = blSchedule(u).filter(function(l){ return /^(water|sewer|elec)$/.test(l.kind) && blLineActiveIn(l, RUN.month, u); });
     var wu = (r.water != null && pw) ? blRound3(r.water - pw.water) : null, eu = (r.elec != null && pe) ? blRound3(r.elec - pe.elec) : null;
     return '<div class="bl-rdcard"><div class="top"><b>Section ' + u.section + '</b><small>' + blEsc(blNice(u.ownerName || 'no owner')) + '</small></div>'
       + (metered.length ? '<div class="bl-rdgrid"><div class="bl-f"><label class="bl-lbl">💧 Water kL</label><input type="number" inputmode="decimal" step="0.0001" class="bl-in" value="' + (r.water == null ? '' : r.water) + '" placeholder="' + (pw ? 'prev ' + pw.water : 'first') + '" onchange="blRunSetReading(\'' + u.id + '\',\'water\',this.value)">'
@@ -9390,7 +9421,7 @@ function blRunSetReading(uid, k, v){ RUN.readings[uid] = RUN.readings[uid] || { 
 async function blRunBuildDrafts(){
   var houses = blRunHouses(), runId = 'run_' + RUN.month, n = 0;
   houses.forEach(function(u){
-    if(!blSchedule(u).some(function(l){ return blLineActiveIn(l, RUN.month); })) return;
+    if(!blSchedule(u).some(function(l){ return blLineActiveIn(l, RUN.month, u); })) return;
     var r = RUN.readings[u.id]; var reading = (r && (r.water != null || r.elec != null)) ? { date:r.date || RUN.rdate, water:r.water == null ? null : r.water, elec:r.elec == null ? null : r.elec } : null;
     var existing = blDrafts(u).filter(function(d){ return d.month === RUN.month; })[0];
     if(existing){
@@ -9571,7 +9602,7 @@ async function blTariffCheckUi(){
 // Fixed monthly total straight off the schedule (register column + tiles).
 function unitTotal(u){
   var ym = blSuggestMonth(), t = 0;
-  blSchedule(u).forEach(function(l){ if((l.kind === 'fixed' || l.kind === 'instalment') && blLineActiveIn(l, ym)) t += Number(l.amount) || 0; });
+  blSchedule(u).forEach(function(l){ if((l.kind === 'fixed' || l.kind === 'instalment') && blLineActiveIn(l, ym, u)) t += Number(l.amount) || 0; });
   return Math.round(t * 100) / 100;
 }
 // Menu dispatcher (adds the new entries).

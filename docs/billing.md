@@ -31,6 +31,13 @@ lifecycle, monthly run, settings) plus the pure importer modules
   statements stay continuous. Prefix/padding are settings.
 - Anomalous municipal readings are billed as they come; corrections are credit
   notes later (that is how Davies handled door 9's solar credits).
+- **Instalments** ("Backdate 2026 payment n of N") count from the documents on
+  file — the highest *n* on an imported Davies invoice or an issued (not fully
+  credited) app invoice — never from a stored counter. Deleting a test draft or
+  crediting a test invoice winds the plan back by itself. The current plan
+  recovers the fixed water/sanitation charges missed July–October 2026 over
+  three months from November (trustees' decision of 30 Oct 2026; split kept on
+  Azure's historic ratio, not PQ).
 
 ## Data (all under `settings.units` → `UNITS[unit_N]`, plus two settings keys)
 
