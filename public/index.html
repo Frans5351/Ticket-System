@@ -6673,6 +6673,23 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
   #units-summary,#units-table-wrap{padding-left:12px;padding-right:12px}
   .bl-tile.hero .v{font-size:26px}
 }
+
+/* View-only Billing access (body.bl-ro): hide every control that writes or sends */
+body.bl-ro #panel-billing .bl-head-actions,
+body.bl-ro #panel-billing .bl-quick,
+body.bl-ro #bl-menu,
+body.bl-ro #unit-delete-btn,
+body.bl-ro #unit-modal .bl-sf .bl-btn.pri,
+body.bl-ro #unit-modal .bl-act.pri,
+body.bl-ro #unit-modal #ul-form,
+body.bl-ro #unit-modal #ul-toggle,
+body.bl-ro #unit-modal #ul-collapsed-hint,
+body.bl-ro #unit-modal [onclick*="addMeterReading"],
+body.bl-ro #unit-modal [onclick*="billMeterUsage"],
+body.bl-ro #unit-modal [onclick*="blGoField"],
+body.bl-ro #unit-modal .bl-banner .bl-btn{display:none!important}
+body.bl-ro #unit-modal [onclick*="deleteLedgerLine"]{display:none!important}
+body.bl-ro #unit-modal .bl-in:disabled{opacity:1;-webkit-text-fill-color:currentColor;background:transparent}
 </style>
 
 
@@ -7056,6 +7073,33 @@ function blToast(msg, kind){
   host.appendChild(d);
   setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, kind === 'err' ? 5200 : 3200);
 }
+// ── Per-user Billing access ─────────────────────────────────────────────────
+// userObj.billing: '' (no access) | 'view' (read-only) | 'edit'. Admins are always full access.
+var BL_RO = false;
+function blRO(){ return BL_RO === true; }
+function blRoWarn(){ try { blToast('Billing is view-only for your login.', 'err'); } catch(e){} }
+function syncBillingChecks(){
+  var on = document.getElementById('usr-billing-on'), row = document.getElementById('usr-billing-view-row');
+  if(row) row.style.display = (on && on.checked) ? '' : 'none';
+}
+function applyBillingAccess(userObj){
+  var tab = document.querySelector('.tabs .tab[data-tab="billing"]');
+  var role = userObj ? userObj.role : 'guest';
+  var lvl = userObj ? userObj.billing : '';
+  var granted = (role === 'trustee' || role === 'management' || role === 'viewer') && (lvl === 'view' || lvl === 'edit');
+  BL_RO = (role === 'admin') ? false : (granted ? lvl !== 'edit' : true);
+  document.body.classList.toggle('bl-ro', BL_RO);
+  if(tab && role !== 'admin') tab.style.display = granted ? 'inline-flex' : 'none';
+  if(typeof updateNavUI === 'function') updateNavUI();
+}
+function blApplyRO(){
+  var m = blEl('unit-modal'); if(!m) return;
+  m.querySelectorAll('.bl-body input, .bl-body select, .bl-body textarea').forEach(function(el){ if(BL_RO) el.setAttribute('disabled', ''); else el.removeAttribute('disabled'); });
+}
+(function(){
+  var o = openUnitModal;
+  openUnitModal = function(){ var r = o.apply(this, arguments); blApplyRO(); return r; };
+})();
 document.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
   if(_blDlg){ blDialogDismiss(); return; }
@@ -7293,7 +7337,7 @@ function blExportCsv(){
   blToast('Register exported', 'ok');
 }
 
-async function seedParkManorUnits(){
+async function seedParkManorUnits(){ if(blRO()){ blRoWarn(); return; }
   if(Object.keys(UNITS).length){
     var ok = await blConfirm('Reload units from the schedule?',
       '<p>This loads sections 1–20 and their levy amounts from the levy schedule (effective 1 Jun 2026).</p><p class="mut">Existing units are kept; sections with the same number get the schedule values. Owner details, statements and readings are preserved.</p>', 'Reload units');
@@ -7320,7 +7364,7 @@ async function seedParkManorUnits(){
 // Import the supplied Davies statement snapshot into matching units (by section
 // = Door No). Owner name / email / phone are filled only where blank so manual
 // edits are preserved; the statement (ledger + ageing snapshot) is (re)loaded.
-async function seedParkManorStatements(){
+async function seedParkManorStatements(){ if(blRO()){ blRoWarn(); return; }
   if(typeof PARK_MANOR_STATEMENTS_SEED === 'undefined'){ blToast('Statement snapshot not found.', 'err'); return; }
   var keys = Object.keys(PARK_MANOR_STATEMENTS_SEED);
   var ok = await blConfirm('Load statement snapshot?',
@@ -7528,7 +7572,7 @@ function renderUnitOverview(){
   }
   el.innerHTML = h;
 }
-async function blInvoiceFromModal(){
+async function blInvoiceFromModal(){ if(blRO()){ blRoWarn(); return; }
   if(!_currentUnitId || !UNITS[_currentUnitId]){ blToast('Save the unit first, then generate its invoice.', 'err'); return; }
   if(blIsDirty()){
     var ok = await blConfirm('Save your changes first?', '<p>The invoice is built from the saved levy amounts, so your edits need saving before it runs.</p>', 'Save & continue');
@@ -7573,7 +7617,7 @@ function renderLineChips(){
     return '<button type="button" class="bl-chip' + (t.key === _lineType ? ' on' : '') + '" onclick="setLineType(\'' + t.key + '\')">' + t.label + '</button>';
   }).join('');
 }
-function addLedgerLine(){
+function addLedgerLine(){ if(blRO()){ blRoWarn(); return; }
   var t = _lineTypeDef(_lineType);
   var date = (blEl('ul-date') || {}).value || '';
   var descEl = blEl('ul-desc'), desc = (descEl ? descEl.value : '').trim();
@@ -7592,7 +7636,7 @@ function addLedgerLine(){
   renderUnitLedger();
   blToast((t.side === 'credit' ? 'Payment / credit' : 'Charge') + ' of ' + _uAmtR(Math.abs(amt)) + ' added', 'ok');
 }
-function deleteLedgerLine(i){
+function deleteLedgerLine(i){ if(blRO()){ blRoWarn(); return; }
   if(i < 0 || i >= _editLedger.length) return;
   _editLedger.splice(i, 1);
   _editStmtMeta.ageing = null;
@@ -7654,7 +7698,7 @@ function renderMeters(){
   wrap.innerHTML = cards + tbl;
   blRefreshUnitView();
 }
-function addMeterReading(){
+function addMeterReading(){ if(blRO()){ blRoWarn(); return; }
   var date = (blEl('mr-date') || {}).value || '';
   var water = _mrNum((blEl('mr-water') || {}).value), elec = _mrNum((blEl('mr-elec') || {}).value);
   if(!date){ blToast('Choose the reading date.', 'err'); return; }
@@ -7667,7 +7711,7 @@ function addMeterReading(){
   renderMeters();
   blToast('Reading added', 'ok');
 }
-function billMeterUsage(i){
+function billMeterUsage(i){ if(blRO()){ blRoWarn(); return; }
   var R = _editReadings; if(i < 0 || i >= R.length) return;
   var wt = parseFloat((blEl('u-water-tariff') || {}).value) || 0, et = parseFloat((blEl('u-elec-tariff') || {}).value) || 0;
   var month = _monthLabel(R[i].date), wu = _meterUsage(R, i, 'water'), eu = _meterUsage(R, i, 'elec'), added = [];
@@ -7750,7 +7794,7 @@ async function requestCloseUnitModal(){
   }
   closeUnitModal();
 }
-async function saveUnitFromModal(opts){
+async function saveUnitFromModal(opts){ if(blRO()){ blRoWarn(); return; }
   opts = opts || {};
   var section = _uNum('u-section');
   if(!section){ setUnitTab('details'); blToast('Enter the section number first.', 'err'); var s = blEl('u-section'); if(s) s.focus(); return false; }
@@ -7777,7 +7821,7 @@ async function saveUnitFromModal(opts){
   blToast('Section ' + section + ' saved', 'ok');
   return true;
 }
-async function deleteUnit(id){
+async function deleteUnit(id){ if(blRO()){ blRoWarn(); return; }
   if(!id || !UNITS[id]) return;
   var u = UNITS[id];
   var ok = await blConfirm('Delete Section ' + (u.section || '') + '?',
@@ -7805,7 +7849,7 @@ document.addEventListener('change', function(e){
 // ═══ Invoicing flows (single + monthly run) ═════════════════════════════════
 // Generate an invoice + statement for one unit: bill the period's charges, post
 // them to the statement, email both PDFs to the owner, and offer them for review.
-async function generateInvoice(id){
+async function generateInvoice(id){ if(blRO()){ blRoWarn(); return; }
   if(!id || !UNITS[id]){ blToast('Save the unit first, then generate its invoice.', 'err'); return; }
   _syncUnitFromModalIfOpen(id);
   var u = UNITS[id];
@@ -7871,7 +7915,7 @@ async function generateInvoice(id){
 
 // Generate invoices + statements for every billable house (monthly run).
 // Garages (sections 13+) are never billed on their own.
-async function generateAllInvoices(){
+async function generateAllInvoices(){ if(blRO()){ blRoWarn(); return; }
   if(!_unitsLoaded){ await loadUnits(); }
   var all = Object.values(UNITS);
   var garages = all.filter(blIsGarage);
@@ -7934,7 +7978,7 @@ function wcStep(n){
   var body = document.querySelector('#wc-import-modal .bl-body'); if(body) body.scrollTop = 0;
 }
 function wcSetBtn(id, on){ var b = blEl(id); if(b) b.disabled = !on; }
-function openWeconnectImport(){
+function openWeconnectImport(){ if(blRO()){ blRoWarn(); return; }
   window._wcMap = null; window._wcDocs = null; window._wcFileCount = 0;
   var fi = blEl('wc-files'); if(fi) fi.value = '';
   blEl('wc-preview').innerHTML = ''; blEl('wc-status').textContent = ''; blEl('wc-foot-msg').textContent = '';
@@ -8043,7 +8087,7 @@ function wcRenderPreview(map, docs, errors){
   pv.innerHTML = h;
 }
 
-async function wcApplyImport(){
+async function wcApplyImport(){ if(blRO()){ blRoWarn(); return; }
   var map = window._wcMap; if(!map) return;
   var applied = 0;
   Object.keys(map.units).forEach(function(door){
@@ -9596,6 +9640,14 @@ async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer"><input type="checkbox" name="usr-tab" value="suppliers" style="accent-color:var(--accent)"> Suppliers</label>
         </div>
       </div>
+      <!-- Billing tab access (trustee / management / viewer; admins always have it) -->
+      <div id="usr-billing-section" style="display:none">
+        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:6px">Billing tab <span style="color:var(--muted);font-style:italic">— levies, statements and owner details</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <label style="display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer"><input id="usr-billing-on" type="checkbox" onchange="syncBillingChecks()" style="accent-color:var(--accent)"> Can open the Billing tab</label>
+          <label id="usr-billing-view-row" style="display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer;margin-left:22px"><input id="usr-billing-view" type="checkbox" checked style="accent-color:var(--accent)"> View only (can't edit, import or send invoices)</label>
+        </div>
+      </div>
       <!-- Ticket image permissions (resident only) -->
       <div id="usr-img-perms-section" style="display:none">
         <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:6px">Ticket image permissions</div>
@@ -10102,6 +10154,7 @@ function doLogout(){
   _currentRole='guest';
   _currentUserObj=null;
   document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display='none'; });
+  if(typeof applyBillingAccess==='function') applyBillingAccess(null);
   document.getElementById('login-btn').style.display='';
   document.getElementById('logout-btn').style.display='none';
   var __pb=document.getElementById('pwd-btn'); if(__pb) __pb.style.display='none';
@@ -19762,6 +19815,10 @@ function openUserModal(userId){
   // Set tab checkboxes
   var chks = document.querySelectorAll('input[name="usr-tab"]');
   chks.forEach(function(c){ c.checked = (u.tabs||[]).includes(c.value); });
+  var _bOn = document.getElementById('usr-billing-on'), _bV = document.getElementById('usr-billing-view');
+  if(_bOn){ _bOn.checked = (u.billing === 'view' || u.billing === 'edit'); }
+  if(_bV){ _bV.checked = (u.billing !== 'edit'); }
+  if(typeof syncBillingChecks==='function') syncBillingChecks();
   // Set can-add-images checkbox (default true if undefined for backward compat)
   document.getElementById('usr-can-add-images').checked = u.canAddImages !== false;
   // Chair flag — only meaningful for admin/trustee; the checkbox is hidden
@@ -19867,6 +19924,8 @@ function updateRoleUI(){
   // Show tab section only for viewer
   var tabSection = document.getElementById('usr-tabs-section');
   if(tabSection) tabSection.style.display = role==='viewer' ? '' : 'none';  // resident has fixed tabs
+  var billSection = document.getElementById('usr-billing-section');
+  if(billSection) billSection.style.display = (role==='viewer' || role==='trustee' || role==='management') ? '' : 'none';
   // Units section: resident or viewer (used to scope ticket visibility).
   // Admin/trustee/management see everything anyway so units don't matter.
   var unitsSection = document.getElementById('usr-units-section');
@@ -19947,6 +20006,8 @@ async function saveUser(){
     name: name, role: role,
     email: uEmail,
     tabs: role==='viewer' ? tabs : (isResRole(role) ? ['tickets'] : []),
+    billing: ((role==='viewer' || role==='trustee' || role==='management') && document.getElementById('usr-billing-on') && document.getElementById('usr-billing-on').checked)
+      ? (document.getElementById('usr-billing-view').checked ? 'view' : 'edit') : '',
     canAddImages: canAddImages,
     units: units,
     supplierId: role==='supplier' ? supplierId : (prev.supplierId && role!=='supplier' ? undefined : prev.supplierId),
@@ -19995,6 +20056,7 @@ function applyUserSession(userObj){
     _currentRole = 'guest';
     _currentUserObj = null;
     document.querySelectorAll('.admin-only').forEach(function(el){ el.style.display='none'; });
+    if(typeof applyBillingAccess==='function') applyBillingAccess(null);
     // Hide settings buttons too (no user → not admin)
     var sBtn1g = document.getElementById('settings-btn-header');
     var sBtn2g = document.getElementById('settings-btn-toolbar');
@@ -20077,6 +20139,10 @@ function applyUserSession(userObj){
     if(spTab) spTab.style.display = 'inline-flex';
     updateSupplierPortalBadge();
   }
+
+  // Per-user Billing access (set on the Users page). Admins always have it;
+  // other staff roles only when an admin has switched it on for them.
+  if(typeof applyBillingAccess==='function') applyBillingAccess(userObj);
 
   // Update logout button label
   var logoutBtn = document.getElementById('logout-btn');

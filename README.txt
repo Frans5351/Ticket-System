@@ -23,3 +23,14 @@ BEHAVIOUR FIXES
 
 Tested headlessly at 320 / 375 px phone, tablet and desktop widths, light and dark themes: no horizontal
 overflow, all tap targets >= 44px, 0 issues.
+
+PER-USER BILLING ACCESS (new)
+- Users page > edit a user (Trustee, Management or Viewer) > "Billing tab" section:
+    [ ] Can open the Billing tab
+        [x] View only (can't edit, import or send invoices)   <- ticked by default
+  Admins always have Billing. Owner / Tenant / Supplier logins can't be given it.
+- View only: Billing tab shows the register, balances, statements and invoices, but all
+  add / edit / import / generate / delete / CSV controls are hidden and the fields are locked.
+- Untick "View only" to give full edit rights. Takes effect the next time that person logs in.
+- To set up Amir: create (or edit) his user as Viewer or Trustee, tick "Can open the Billing tab".
+- Note: like the rest of the app, this controls what the interface shows. It isn't a database-level lock.
