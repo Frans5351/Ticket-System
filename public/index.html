@@ -6310,57 +6310,477 @@ document.getElementById('tbody').addEventListener('click', function(e){
 </div>
 
 
-<style>
-  #panel-billing .ul,#unit-modal .ul{font-size:10px;color:#5a7fa8;font-family:var(--mono);margin-bottom:3px}
-  #panel-billing .ui,#unit-modal .ui{width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;outline:none;box-sizing:border-box;font-family:var(--sans)}
-  #unit-modal .ui2{width:100%;padding:7px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:12px;outline:none;box-sizing:border-box;font-family:var(--mono)}
-  #units-table-wrap th{white-space:nowrap}
-  /* Insulate the billing table from the global (transactions) table CSS:
-     the app-wide rules make thead sticky (top:48px) and, on mobile, turn every
-     table into a transaction-shaped card grid. Both break this register. */
-  #units-table-wrap table{display:table!important}
-  #units-table-wrap thead{position:static!important;display:table-header-group!important;top:auto!important}
-  #units-table-wrap tbody{display:table-row-group!important}
-  #units-table-wrap tr{display:table-row!important}
-  #units-table-wrap th,#units-table-wrap td{display:table-cell!important;width:auto!important}
+<style id="bl-css">
+/* ═══ Billing UI — mobile-first. Everything is scoped to the billing surfaces
+   so it can't leak into the rest of the app. ═══════════════════════════════ */
+#panel-billing,#unit-modal,#wc-import-modal,#bl-dialog,#bl-menu,#bl-toast{
+  --bl-owe:#f0a06f;--bl-owe-bg:rgba(240,160,111,.12);--bl-owe-bd:rgba(240,160,111,.40);
+  --bl-a1:#e6b34a;--bl-a2:#e8873a;--bl-a3:#e05c4a;--bl-a4:#b32d3a;
+}
+body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#bl-dialog,#bl-menu,#bl-toast){
+  --bl-owe:#b4570f;--bl-owe-bg:rgba(180,87,15,.09);--bl-owe-bd:rgba(180,87,15,.35);
+}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── Buttons ── */
+.bl-btn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 14px var(--sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .12s,border-color .12s,transform .06s}
+.bl-btn:hover{background:var(--surface2)}
+.bl-btn:active{transform:scale(.97)}
+.bl-btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.bl-btn.pri:hover{filter:brightness(1.08);background:var(--accent)}
+.bl-btn.ok{background:var(--green);border-color:var(--green);color:#fff}
+.bl-btn.ok:hover{filter:brightness(1.06);background:var(--green)}
+.bl-btn.dng{background:var(--red-bg,rgba(240,111,111,.1));border-color:var(--red-bd,rgba(240,111,111,.35));color:var(--red)}
+.bl-btn.sm{min-height:36px;padding:0 12px;font-size:13px;border-radius:10px}
+.bl-btn.blk{width:100%}
+.bl-btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none}
+.bl-ibtn{flex:0 0 auto;width:44px;height:44px;border-radius:12px;border:1px solid var(--border2);background:var(--surface2);color:var(--text2);display:inline-flex;align-items:center;justify-content:center;font-size:17px;text-decoration:none;cursor:pointer;padding:0}
+.bl-ibtn:hover{background:var(--surface)}
+.bl-ibtn.off{opacity:.35;pointer-events:none}
+.bl-only-wide{display:none!important}
+@media(min-width:900px){.bl-only-wide{display:inline-flex!important}.bl-only-narrow{display:none!important}}
+
+/* ── Panel header ── */
+.bl-head{padding:16px 16px 6px;display:flex;align-items:center;gap:10px}
+.bl-ttl{flex:1;min-width:0}
+.bl-ttl h2{font:700 20px/1.2 var(--sans);color:var(--text2);letter-spacing:-.2px}
+.bl-ttl p{font:400 12px var(--sans);color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl-head-actions{display:flex;gap:8px;align-items:center;flex:0 0 auto}
+.bl-quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 16px 0}
+.bl-quick .bl-btn{min-height:48px}
+@media(min-width:900px){.bl-quick{display:none}}
+
+/* ── Summary tiles ── */
+#units-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 16px}
+@media(min-width:760px){#units-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bl-tile{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 16px;min-width:0}
+.bl-tile.hero{grid-column:span 2}
+@media(min-width:760px){.bl-tile.hero{grid-column:span 1}}
+.bl-tile .k{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.bl-tile .v{font:700 22px/1.2 var(--sans);color:var(--text2);margin-top:4px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bl-tile.hero .v{font-size:30px}
+.bl-tile .s{font:400 12px var(--sans);color:var(--muted);margin-top:4px}
+.bl-tile.owe{border-color:var(--bl-owe-bd);background:linear-gradient(180deg,var(--bl-owe-bg),transparent 70%),var(--surface)}
+.bl-tile.owe .v{color:var(--bl-owe)}
+.bl-tile.ok .v{color:var(--green)}
+
+/* ── Search / filters (sticky) ── */
+.bl-filterbar{position:sticky;top:var(--bl-stick,0px);z-index:30;background:var(--bg);padding:10px 16px 8px;border-bottom:1px solid var(--border)}
+.bl-search{position:relative}
+#panel-billing .bl-search input{width:100%;height:46px;padding:0 44px 0 42px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none}
+.bl-search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+.bl-search .ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.55;font-size:15px}
+.bl-search .x{position:absolute;right:3px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:none;background:none;color:var(--muted);font-size:16px;cursor:pointer;display:none}
+.bl-search.has .x{display:block}
+.bl-chips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.bl-chips::-webkit-scrollbar{display:none}
+.bl-chip{flex:0 0 auto;height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 13px var(--sans);display:inline-flex;align-items:center;gap:7px;cursor:pointer;scroll-snap-align:start;white-space:nowrap}
+.bl-chip .n{font:600 11px var(--mono);color:var(--muted);background:var(--surface2);border-radius:999px;padding:1px 7px}
+.bl-chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.bl-chip.on .n{background:rgba(255,255,255,.22);color:#fff}
+@media(min-width:900px){
+  .bl-filterbar{display:flex;align-items:center;gap:16px}
+  .bl-search{width:320px;flex:0 0 auto}
+  .bl-chips{padding:0;flex:1}
+}
+.bl-listbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 2px;font:500 12px var(--sans);color:var(--muted)}
+.bl-listbar label{display:flex;align-items:center;gap:8px}
+.bl-listbar select{height:38px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text);font:500 14px var(--sans);padding:0 10px;outline:none}
+
+/* ── Unit cards (phones & tablets) ── */
+#units-table-wrap{padding:8px 16px 8px}
+.bl-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media(min-width:620px){.bl-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.bl-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:12px;transition:border-color .12s,background .12s;-webkit-tap-highlight-color:transparent}
+.bl-card:hover{border-color:var(--accent-bd)}
+.bl-card:active{background:var(--surface2)}
+.bl-card.owing{box-shadow:inset 4px 0 0 var(--bl-owe)}
+.bl-card-top{display:flex;gap:12px;align-items:center}
+.bl-sec{flex:0 0 46px;height:46px;border-radius:13px;background:var(--accent-bg);border:1px solid var(--accent-bd);color:var(--accent2);font:700 18px var(--sans);display:flex;align-items:center;justify-content:center}
+.bl-sec.store{background:var(--surface2);border-color:var(--border2);color:var(--muted)}
+.bl-who{flex:1;min-width:0}
+.bl-name{font:600 15px/1.3 var(--sans);color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-card .bl-name,.bl-uc .bl-name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.bl-name.missing{color:var(--muted);font-style:italic;font-weight:500}
+.bl-meta{font:400 12px var(--sans);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.bl-bal{text-align:right;flex:0 0 auto}
+.bl-bal b{display:block;font:700 16px var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bl-bal small{display:block;font:500 11px var(--sans);color:var(--muted);margin-top:1px}
+.bl-bal.owe b{color:var(--bl-owe)}.bl-bal.cr b{color:var(--green)}.bl-bal.zero b,.bl-bal.none b{color:var(--muted)}
+.bl-age{display:flex;height:6px;border-radius:99px;overflow:hidden;background:var(--surface2);gap:2px}
+.bl-age i{display:block;height:100%;min-width:3px}
+.bl-agelegend{display:flex;gap:4px 12px;flex-wrap:wrap;font:500 11px var(--sans);color:var(--muted);margin-top:7px}
+.bl-agelegend span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--c)}
+.bl-card-foot{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding-top:10px}
+.bl-foot-meta{flex:1;min-width:0;font:400 12px/1.45 var(--sans);color:var(--muted)}
+.bl-foot-meta b{color:var(--text2);font-weight:600}
+.bl-tag{display:inline-block;font:600 10px var(--sans);letter-spacing:.3px;text-transform:uppercase;padding:2px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);border:1px solid var(--border2);margin-left:6px;vertical-align:1px}
+.bl-tag.warn{background:var(--bl-owe-bg);color:var(--bl-owe);border-color:var(--bl-owe-bd)}
+
+/* ── Unit table (desktop) ── */
+.bl-tbl{display:none}
+@media(min-width:900px){.bl-tbl{display:block}.bl-cards{display:none}}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb tbody{display:table-row-group!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb tr{display:table-row!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb th,
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
+:is(#panel-billing,#unit-modal,#wc-import-modal) .bl-tb .r{text-align:right!important}
+.bl-tb tbody tr.row{cursor:pointer}
+.bl-tb tbody tr.row:hover td{background:var(--surface)}
+.bl-tb tfoot td{font-weight:700}
+.bl-tbwrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.bl-tb .mono{font-variant-numeric:tabular-nums;white-space:nowrap}
+.bl-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font:700 12px var(--sans);white-space:nowrap}
+.bl-pill.owe{background:var(--bl-owe-bg);color:var(--bl-owe);border:1px solid var(--bl-owe-bd)}
+.bl-pill.cr{background:var(--green-bg,rgba(74,222,158,.12));color:var(--green);border:1px solid var(--green-bd,rgba(74,222,158,.35))}
+.bl-pill.zero,.bl-pill.none{background:var(--surface2);color:var(--muted);border:1px solid var(--border2)}
+.bl-foot-note{padding:6px 16px 16px;font:400 12px var(--sans);color:var(--muted);text-align:center}
+
+/* ── Empty state ── */
+.bl-empty{margin:24px 16px;padding:28px 18px;border:1px dashed var(--border2);border-radius:18px;background:var(--surface);text-align:center}
+.bl-empty .big{font-size:38px}
+.bl-empty h3{font:700 18px var(--sans);color:var(--text2);margin:8px 0 6px}
+.bl-empty p{font:400 14px/1.5 var(--sans);color:var(--muted);max-width:420px;margin:0 auto 16px}
+.bl-empty .stack{display:flex;flex-direction:column;gap:10px;max-width:340px;margin:0 auto}
+
+/* ── Bottom sheet menu ── */
+#bl-menu{display:none;position:fixed;inset:0;z-index:650}
+#bl-menu.open{display:block}
+.bl-menu-back{position:absolute;inset:0;background:rgba(0,0,0,.5)}
+.bl-menu-panel{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:8px 12px calc(14px + env(safe-area-inset-bottom,0px));max-height:86vh;overflow-y:auto;animation:bl-up .2s ease-out;border-top:1px solid var(--border)}
+.bl-grab{width:40px;height:4px;border-radius:99px;background:var(--border2);margin:4px auto 10px}
+.bl-menu-h{font:700 12px var(--sans);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:2px 12px 6px}
+.bl-mi{width:100%;display:flex;gap:14px;align-items:center;text-align:left;padding:10px 12px;min-height:62px;border:none;background:none;border-radius:14px;cursor:pointer;color:var(--text2)}
+.bl-mi:hover,.bl-mi:active{background:var(--surface2)}
+.bl-mi .i{flex:0 0 42px;height:42px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:20px}
+.bl-mi b{display:block;font:600 15px var(--sans)}
+.bl-mi small{display:block;font:400 12px/1.35 var(--sans);color:var(--muted);margin-top:1px}
+@media(min-width:900px){
+  .bl-menu-back{background:transparent}
+  .bl-menu-panel{left:auto;right:24px;bottom:auto;top:var(--bl-menu-top,120px);width:380px;border-radius:16px;border:1px solid var(--border);box-shadow:0 18px 50px rgba(0,0,0,.4);animation:none}
+  .bl-grab{display:none}
+}
+
+/* ── Dialogs / toasts ── */
+#bl-dialog{display:none;position:fixed;inset:0;z-index:900;align-items:flex-end;justify-content:center}
+#bl-dialog.open{display:flex}
+.bl-dlg-back{position:absolute;inset:0;background:rgba(0,0,0,.62)}
+.bl-dlg-card{position:relative;background:var(--surface);width:100%;max-height:90vh;overflow-y:auto;border-radius:22px 22px 0 0;padding:10px 20px calc(18px + env(safe-area-inset-bottom,0px));animation:bl-up .2s ease-out;border-top:1px solid var(--border)}
+.bl-dlg-title{font:700 18px/1.3 var(--sans);color:var(--text2);margin:6px 0 8px}
+.bl-dlg-body{font:400 14px/1.55 var(--sans);color:var(--text2)}
+.bl-dlg-body p+p{margin-top:8px}
+.bl-dlg-body .mut{color:var(--muted)}
+.bl-dlg-body ul{padding:0;list-style:none;margin:10px 0;border-bottom:1px solid var(--border)}
+.bl-dlg-body li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--border)}
+.bl-dlg-body li b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.bl-dlg-body .warn{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--bl-owe-bg);border:1px solid var(--bl-owe-bd)}
+.bl-dlg-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.bl-dlg-actions .bl-btn{min-height:50px;font-size:15px}
+.bl-prog{height:8px;border-radius:99px;background:var(--surface2);overflow:hidden;margin:16px 0 8px}
+.bl-prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+@media(min-width:620px){
+  #bl-dialog{align-items:center}
+  .bl-dlg-card{width:min(480px,92vw);border-radius:18px;border:1px solid var(--border);padding-top:20px}
+  .bl-dlg-actions{flex-direction:row-reverse}
+  .bl-dlg-actions .bl-btn{flex:1}
+  .bl-dlg-card .bl-grab{display:none}
+}
+#bl-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:950;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(92vw,440px)}
+@media(max-width:768px){#bl-toast{bottom:calc(88px + env(safe-area-inset-bottom,0px))}}
+.bl-toast-i{pointer-events:auto;background:var(--text2);color:var(--bg);padding:12px 16px;border-radius:12px;font:600 14px/1.35 var(--sans);box-shadow:0 8px 28px rgba(0,0,0,.35);animation:bl-up .18s ease-out;max-width:100%}
+.bl-toast-i.err{background:var(--red);color:#fff}
+.bl-toast-i.ok{background:var(--green);color:#06210f}
+
+/* ── Full-screen sheets (unit editor + importer) ── */
+#unit-modal,#wc-import-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
+#unit-modal{z-index:700}
+#wc-import-modal{z-index:720}
+.bl-sheet{background:var(--surface);width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;animation:bl-up .22s ease-out}
+@keyframes bl-up{from{transform:translateY(22px);opacity:0}to{transform:none;opacity:1}}
+@media(min-width:768px){
+  #unit-modal,#wc-import-modal{align-items:center}
+  .bl-sheet{width:min(900px,94vw);height:min(90vh,920px);border-radius:20px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,.5)}
+}
+@media(prefers-reduced-motion:reduce){.bl-sheet,.bl-dlg-card,.bl-menu-panel,.bl-toast-i{animation:none!important}}
+.bl-sh{display:flex;align-items:center;gap:6px;padding:8px 10px 8px 6px;padding-top:calc(8px + env(safe-area-inset-top,0px));border-bottom:1px solid var(--border);background:var(--surface);flex:0 0 auto}
+.bl-back{flex:0 0 44px;width:44px;height:44px;border-radius:12px;border:none;background:none;color:var(--text2);font-size:24px;cursor:pointer;line-height:1}
+.bl-back:hover{background:var(--surface2)}
+@media(min-width:768px){#unit-modal .bl-back{order:3;font-size:0}#unit-modal .bl-back::before{content:'✕';font-size:19px}}
+.bl-sh-t{flex:1;min-width:0}
+.bl-sh-t b{display:block;font:700 16px/1.25 var(--sans);color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-sh-t span{display:block;font:400 12px var(--sans);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-sh-t span.owe{color:var(--bl-owe)}.bl-sh-t span.cr{color:var(--green)}
+.bl-tabs{display:flex;gap:2px;overflow-x:auto;padding:0 6px;border-bottom:1px solid var(--border);background:var(--surface);flex:0 0 auto;scrollbar-width:none}
+.bl-tabs::-webkit-scrollbar{display:none}
+.bl-tab{flex:1 0 auto;min-height:48px;padding:0 14px;border:none;background:none;color:var(--muted);font:600 14px var(--sans);cursor:pointer;border-bottom:3px solid transparent;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.bl-tab.on{color:var(--accent2);border-bottom-color:var(--accent)}
+.bl-tab .n{font:600 11px var(--mono);background:var(--surface2);color:var(--muted);border-radius:99px;padding:1px 7px}
+.bl-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px;background:var(--bg)}
+.bl-pane{display:none;flex-direction:column;gap:14px;max-width:760px;margin:0 auto}
+.bl-pane.on{display:flex}
+.bl-card2{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;min-width:0}
+.bl-h{font:700 11px var(--sans);letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bl-h a,.bl-h button.lnk{font:600 13px var(--sans);letter-spacing:0;text-transform:none;color:var(--accent2);background:none;border:none;cursor:pointer;padding:13px 8px;margin:-13px -8px;text-decoration:none;min-height:44px}
+.bl-sf{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--border);background:var(--surface)}
+.bl-dirty{flex:1;min-width:0;font:500 12px var(--sans);color:var(--muted);display:flex;align-items:center;gap:7px}
+.bl-dirty.on{color:var(--bl-owe)}
+.bl-dirty.on::before{content:'';flex:0 0 8px;height:8px;border-radius:50%;background:var(--bl-owe)}
+.bl-sf .bl-btn.pri{min-width:46%}
+#wc-foot-msg{display:none}
+@media(min-width:768px){#wc-foot-msg{display:flex}}
+#wc-import-modal .bl-sf{justify-content:space-between}
+#wc-import-modal .bl-sf .bl-btn.ok{min-width:0;flex:1 1 auto}
+@media(min-width:768px){#wc-import-modal .bl-sf .bl-btn.ok{flex:0 0 auto;min-width:200px}}
+@media(min-width:768px){.bl-sf .bl-btn.pri{min-width:160px}}
+
+/* ── Form fields ── */
+.bl-f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.bl-lbl{font:600 12px var(--sans);color:var(--muted)}
+:is(#unit-modal,#panel-billing,#wc-import-modal) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
+:is(#unit-modal,#panel-billing,#wc-import-modal) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
+:is(#unit-modal,#panel-billing,#wc-import-modal) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+:is(#unit-modal,#panel-billing,#wc-import-modal) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.bl-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.bl-grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.bl-grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:420px){.bl-grid.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.bl-grid.g3>.span3{grid-column:span 2}}
+.bl-check{display:flex;gap:12px;align-items:flex-start;cursor:pointer;font:400 13px/1.45 var(--sans);color:var(--text2);padding:4px 0}
+.bl-check input{width:22px;height:22px;accent-color:var(--accent);flex:0 0 auto;margin-top:1px}
+.bl-total{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font:600 14px var(--sans);color:var(--muted)}
+.bl-total b{font:700 18px var(--sans);color:var(--text2);font-variant-numeric:tabular-nums}
+
+/* ── Overview ── */
+.bl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.bl-hero .k{font:600 12px var(--sans);color:var(--muted)}
+.bl-hero .v{font:700 32px/1.1 var(--sans);font-variant-numeric:tabular-nums;margin-top:4px;color:var(--text2)}
+.bl-hero.owe .v{color:var(--bl-owe)}.bl-hero.cr .v{color:var(--green)}
+.bl-hero .s{font:400 12px var(--sans);color:var(--muted);margin-top:6px}
+.bl-ages{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:14px}
+.bl-ages div{background:var(--surface2);border-radius:10px;padding:8px 2px;text-align:center;min-width:0}
+.bl-ages small{display:block;font:600 10px var(--sans);color:var(--muted);text-transform:uppercase}
+.bl-ages b{display:block;font:600 clamp(10px,2.9vw,13px) var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--muted)}
+.bl-ages div.has b{color:var(--text2)}
+.bl-ages div.neg b{color:var(--green)}
+.bl-ages div.pos b{color:var(--bl-owe)}
+.bl-acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(min-width:620px){.bl-acts{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.bl-act{min-height:68px;border-radius:14px;border:1px solid var(--border);background:var(--surface);color:var(--text2);font:600 14px var(--sans);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:10px 14px;cursor:pointer;text-decoration:none;text-align:left}
+.bl-act:hover{background:var(--surface2)}
+.bl-act .ic{font-size:20px;line-height:1.1}
+.bl-act{min-width:0}
+.bl-act small{font:400 11px var(--sans);color:var(--muted);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-act.pri{background:var(--accent);color:#fff;border-color:var(--accent);grid-column:1/-1;flex-direction:row;align-items:center;gap:12px;min-height:60px}
+.bl-act.pri small{color:rgba(255,255,255,.82);display:block}
+.bl-act.pri div{display:flex;flex-direction:column}
+.bl-act.off{opacity:.4;pointer-events:none}
+.bl-kv{display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--border);font:400 14px var(--sans)}
+.bl-kv:first-of-type{border-top:none}
+.bl-kv span{color:var(--muted);flex:0 0 auto}
+.bl-kv b,.bl-kv a{font-weight:600;color:var(--text2);font-variant-numeric:tabular-nums;text-align:right;word-break:break-word;text-decoration:none;min-width:0}
+.bl-kv a{color:var(--accent2)}
+.bl-note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--bl-owe-bg);border:1px solid var(--bl-owe-bd);color:var(--text2);font:400 13px/1.45 var(--sans)}
+.bl-note.info{background:var(--info-bg,var(--accent-bg));border-color:var(--info-bd,var(--accent-bd))}
+.bl-note button{margin-left:auto;flex:0 0 auto}
+.bl-note .ic{font-size:18px;line-height:1.2}
+
+/* ── Statement ledger ── */
+.bl-lh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.bl-lh small{display:block;font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.bl-lh b{font:700 20px var(--sans);font-variant-numeric:tabular-nums}
+.bl-lr{border-top:1px solid var(--border);padding:12px 2px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.bl-lr:first-of-type{border-top:none}
+.bl-lr-main{display:flex;gap:12px;align-items:center}
+.bl-lic{flex:0 0 38px;height:38px;border-radius:11px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:17px}
+.bl-ltx{flex:1;min-width:0}
+.bl-ltx b{display:block;font:600 14px/1.3 var(--sans);color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-ltx small{display:block;font:400 12px var(--sans);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.bl-lam{text-align:right;flex:0 0 auto}
+.bl-lam b{display:block;font:700 14px var(--sans);font-variant-numeric:tabular-nums;color:var(--text2);white-space:nowrap}
+.bl-lam small{display:block;font:400 11px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.bl-lam.cr b{color:var(--green)}
+.bl-lr-more{display:none;margin-top:10px;padding:12px;border-radius:12px;background:var(--surface2);font:400 13px/1.55 var(--sans);color:var(--text2);word-break:break-word}
+.bl-lr.open .bl-lr-more{display:block}
+.bl-lr-more .row{display:flex;justify-content:space-between;gap:10px;padding:2px 0}
+.bl-lr-more .row span{color:var(--muted)}
+.bl-lr-more .bl-btn{margin-top:10px}
+.bl-ledger-cards{display:block}.bl-ledger-tbl{display:none}
+@media(min-width:768px){.bl-ledger-cards{display:none}.bl-ledger-tbl{display:block;overflow-x:auto}}
+.bl-addform{display:none;flex-direction:column;gap:12px}
+.bl-addform.open{display:flex}
+.bl-types{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.bl-types::-webkit-scrollbar{display:none}
+.bl-hint{font:400 12px/1.45 var(--sans);color:var(--muted)}
+
+/* ── Invoices ── */
+.bl-inv{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.bl-inv-h{display:flex;gap:12px;align-items:center;padding:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.bl-inv-h .bl-lic{flex:0 0 42px;height:42px}
+.bl-inv-h .bl-ltx small{white-space:normal}
+.bl-inv-b{display:none;padding:0 14px 14px;border-top:1px solid var(--border)}
+.bl-inv.open .bl-inv-b{display:block}
+.bl-inv.open .chev{transform:rotate(90deg)}
+.chev{color:var(--muted);transition:transform .15s;flex:0 0 auto;font-size:14px}
+.bl-il{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--border);font:400 13px/1.4 var(--sans);color:var(--text2)}
+.bl-il:last-of-type{border-bottom:none}
+.bl-il i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.bl-il b{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ── Meters ── */
+.bl-mc{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.bl-mc-h{display:flex;gap:10px;align-items:center}
+.bl-mc-h .bl-in{flex:1}
+.bl-use{font:500 12px var(--sans);color:var(--muted);margin-top:2px}
+.bl-use b{color:var(--text2);font-variant-numeric:tabular-nums}
+.bl-use.neg b{color:var(--bl-owe)}
+.bl-meter-cards{display:flex;flex-direction:column;gap:10px}.bl-meter-tbl{display:none}
+@media(min-width:768px){.bl-meter-cards{display:none}.bl-meter-tbl{display:block;overflow-x:auto}}
+
+/* ── Importer ── */
+.bl-steps{display:flex;gap:6px;padding:12px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex:0 0 auto}
+.bl-step{flex:1;display:flex;align-items:center;gap:8px;font:600 12px var(--sans);color:var(--muted);min-width:0}
+.bl-step i{flex:0 0 24px;width:24px;height:24px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:inline-flex;align-items:center;justify-content:center;font:700 12px var(--sans);font-style:normal}
+.bl-step span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl-step.on{color:var(--text2)}
+.bl-step.on i{background:var(--accent);border-color:var(--accent);color:#fff}
+.bl-step.done i{background:var(--green);border-color:var(--green);color:#fff}
+.bl-drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:34px 16px;border:2px dashed var(--border2);border-radius:20px;background:var(--surface);cursor:pointer;color:var(--text2)}
+.bl-drop.hot{border-color:var(--accent);background:var(--accent-bg)}
+.bl-drop .big{font-size:38px;line-height:1}
+.bl-drop b{font:700 16px var(--sans)}
+.bl-drop small{font:400 12px/1.45 var(--sans);color:var(--muted);max-width:340px}
+.bl-drop input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.bl-chipsrow{display:flex;gap:8px;flex-wrap:wrap}
+.bl-stat{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:var(--surface);border:1px solid var(--border);font:600 13px var(--sans);color:var(--text2)}
+.bl-stat b{font-variant-numeric:tabular-nums}
+.bl-flags{border-radius:14px;border:1px solid var(--bl-owe-bd);background:var(--surface);box-shadow:inset 4px 0 0 var(--bl-owe);padding:0;overflow:hidden}
+.bl-flags summary{list-style:none;cursor:pointer;padding:12px 14px;font:700 13px var(--sans);color:var(--text2);display:flex;align-items:center;gap:8px;min-height:44px}
+.bl-flags summary::-webkit-details-marker{display:none}
+.bl-flags ul{padding:0 14px 12px 32px;font:400 13px/1.5 var(--sans);color:var(--text2)}
+.bl-flags li{margin-top:6px}
+.bl-ucards{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+@media(min-width:700px){.bl-ucards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.bl-uc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center}
+.bl-uc .bl-sec{flex:0 0 42px;height:42px;font-size:16px}
+.bl-uc .bl-who{flex:1;min-width:0}
+
+/* tiny phones */
+@media(max-width:360px){
+  .bl-head{padding:14px 12px 4px}.bl-filterbar,.bl-listbar{padding-left:12px;padding-right:12px}
+  #units-summary,#units-table-wrap{padding-left:12px;padding-right:12px}
+  .bl-tile.hero .v{font-size:26px}
+}
 </style>
 
-<!-- BILLING PANEL (Levies) — Phase 1: Units register -->
+
+<!-- BILLING PANEL (Levies) -->
 <div class="panel" id="panel-billing">
-  <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);position:sticky;top:0;z-index:10">
-    <div style="font-size:13px;font-weight:600;color:var(--text2);white-space:nowrap">🧾 Levies &amp; Billing</div>
-    <span style="font-size:10px;color:#5a7fa8;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border);padding:2px 9px;border-radius:20px">Phase 1 · Units register · runs alongside your current billing</span>
-    <input id="units-search" type="text" placeholder="Search units / owners…" style="flex:1;min-width:140px;padding:7px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:9px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none" oninput="renderUnits()">
-    <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
-      <button id="units-seed-btn" onclick="seedParkManorUnits()" title="Load the 20 Park Manor units from your levy schedule (owner details you've entered are kept)" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⤓ Load Park Manor units</button>
-      <button id="stmts-seed-btn" onclick="seedParkManorStatements()" title="Import the latest levy statements (ledger + ageing) onto the matching units" style="padding:8px 14px;background:var(--surface);border:1px solid var(--accent-bd);border-radius:20px;color:var(--accent2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">📄 Import statements</button>
-      <button id="wc-import-btn" onclick="openWeconnectImport()" title="Import WeconnectU/Davies invoice & statement PDFs — drop a month's batch, review, then apply to the matching units" style="padding:8px 14px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:20px;color:var(--info);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">📥 Import PDFs</button>
-      <button id="invoice-all-btn" onclick="generateAllInvoices()" title="Bill every unit for its current levy charges and email each owner a PDF invoice + statement (monthly run)" style="padding:8px 14px;background:var(--green-bg);border:1px solid var(--green-bd);border-radius:20px;color:var(--green);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">🧾 Generate invoices</button>
-      <button onclick="openUnitModal(null)" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> Add unit</button>
+  <div class="bl-head">
+    <div class="bl-ttl">
+      <h2>Levies &amp; Billing</h2>
+      <p id="bl-sub">Loading…</p>
+    </div>
+    <div class="bl-head-actions">
+      <button id="wc-import-btn" class="bl-btn bl-only-wide" onclick="openWeconnectImport()" title="Import Davies / WeconnectU invoice, statement and credit-note PDFs">📥 Import PDFs</button>
+      <button id="invoice-all-btn" class="bl-btn bl-only-wide" onclick="generateAllInvoices()" title="Bill every house its monthly levy and email each owner an invoice + statement">🧾 Generate invoices</button>
+      <button class="bl-btn pri" onclick="openUnitModal(null)">＋ Add unit</button>
+      <button class="bl-btn" aria-label="More billing actions" onclick="blOpenMenu()" style="width:44px;padding:0;font-size:20px;line-height:1">⋯</button>
     </div>
   </div>
-  <div id="units-summary" style="padding:14px 20px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px"></div>
-  <div id="units-table-wrap" style="padding:16px 20px;overflow-x:auto"></div>
-  <div id="units-empty" style="display:none;padding:50px 20px;text-align:center;color:var(--muted);font-family:var(--mono);font-size:13px"></div>
+  <div class="bl-quick">
+    <button class="bl-btn" onclick="openWeconnectImport()">📥 Import PDFs</button>
+    <button class="bl-btn ok" onclick="generateAllInvoices()">🧾 Generate invoices</button>
+  </div>
+  <div id="units-summary"></div>
+  <div class="bl-filterbar">
+    <div class="bl-search" id="bl-search">
+      <span class="ic">🔍</span>
+      <input id="units-search" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="Search unit, owner, email, reference…" oninput="renderUnits()">
+      <button class="x" aria-label="Clear search" onclick="blClearSearch()">✕</button>
+    </div>
+    <div class="bl-chips" id="bl-chips" role="tablist" aria-label="Filter units"></div>
+  </div>
+  <div class="bl-listbar">
+    <span id="bl-count"></span>
+    <label>Sort
+      <select id="bl-sort" onchange="blSetSort(this.value)" aria-label="Sort units">
+        <option value="section">Unit number</option>
+        <option value="balance">Highest balance owing</option>
+        <option value="owner">Owner name</option>
+        <option value="levy">Monthly levy</option>
+      </select>
+    </label>
+  </div>
+  <div id="units-table-wrap"></div>
+  <div id="units-empty" style="display:none"></div>
+  <div class="bl-foot-note" id="bl-pqnote"></div>
 </div>
 
-<!-- WeconnectU/Davies PDF import modal -->
-<div id="wc-import-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:720;align-items:center;justify-content:center" onclick="if(event.target===this)closeWeconnectImport()">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(940px,96vw);max-height:92vh;overflow-y:auto;padding:20px 22px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div style="font-size:16px;font-weight:700;color:var(--text2)">📥 Import WeconnectU / Davies PDFs</div>
-      <button onclick="closeWeconnectImport()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1">✕</button>
-    </div>
-    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.6;margin-bottom:12px">Pick a month's invoice, statement and credit-note PDFs (select many at once). Nothing is saved until you review the summary and click <b style="color:var(--text2)">Apply to units</b>. Garages (sections 13+) aren't billed; payments mis-allocated to a garage are moved onto the owner's main unit.</div>
-    <input id="wc-files" type="file" accept="application/pdf,.pdf" multiple onchange="wcFilesChosen()" style="width:100%;box-sizing:border-box;padding:10px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-family:var(--mono)">
-    <div style="display:flex;gap:8px;align-items:center;margin:12px 0">
-      <button id="wc-parse-btn" onclick="wcParseFiles()" disabled style="padding:9px 16px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:8px;color:var(--info);font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;opacity:.5">Parse files</button>
-      <button id="wc-apply-btn" onclick="wcApplyImport()" disabled style="padding:9px 16px;background:var(--green);border:none;border-radius:8px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;opacity:.5">Apply to units</button>
-      <span id="wc-status" style="font-size:11px;font-family:var(--mono);color:var(--muted)"></span>
-    </div>
-    <div id="wc-preview"></div>
+<!-- Actions menu (bottom sheet on phones, dropdown on desktop) -->
+<div id="bl-menu" role="dialog" aria-label="Billing actions">
+  <div class="bl-menu-back" onclick="blCloseMenu()"></div>
+  <div class="bl-menu-panel">
+    <div class="bl-grab"></div>
+    <div class="bl-menu-h">Billing actions</div>
+    <button class="bl-mi" onclick="blMenuDo('wc')"><span class="i">📥</span><span><b>Import PDFs</b><small>Load a month’s Davies / WeconnectU invoices, statements and credit notes</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('inv')"><span class="i">🧾</span><span><b>Generate invoices</b><small>Bill every house its monthly levy and email owners the invoice + statement</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('csv')"><span class="i">⬇️</span><span><b>Export register (CSV)</b><small>Owners, levies and balances — opens in Excel or Sheets</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('stmts')" id="stmts-seed-btn"><span class="i">📄</span><span><b>Load statement snapshot</b><small>Re-load the 14 Sep 2026 Davies statements onto the matching units</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('seed')" id="units-seed-btn"><span class="i">🏠</span><span><b id="bl-seed-title">Load Park Manor units</b><small>Set up sections 1–20 and their levies from the levy schedule</small></span></button>
   </div>
 </div>
+
+<!-- Dialog + toast host -->
+<div id="bl-dialog" role="dialog" aria-modal="true" aria-labelledby="bl-dlg-title">
+  <div class="bl-dlg-back" onclick="blDialogDismiss()"></div>
+  <div class="bl-dlg-card">
+    <div class="bl-grab"></div>
+    <div class="bl-dlg-title" id="bl-dlg-title"></div>
+    <div class="bl-dlg-body" id="bl-dlg-body"></div>
+    <div class="bl-dlg-actions" id="bl-dlg-actions"></div>
+  </div>
+</div>
+<div id="bl-toast" aria-live="polite"></div>
+
+<!-- WeconnectU/Davies PDF import -->
+<div id="wc-import-modal" onclick="if(event.target===this)closeWeconnectImport()">
+  <div class="bl-sheet" role="dialog" aria-modal="true" aria-label="Import Davies PDFs">
+    <div class="bl-sh">
+      <button class="bl-back" aria-label="Close" onclick="closeWeconnectImport()">✕</button>
+      <div class="bl-sh-t"><b>Import Davies PDFs</b><span>Invoices, statements &amp; credit notes</span></div>
+    </div>
+    <div class="bl-steps" id="wc-steps">
+      <div class="bl-step on" data-s="1"><i>1</i><span>Choose files</span></div>
+      <div class="bl-step" data-s="2"><i>2</i><span>Review</span></div>
+      <div class="bl-step" data-s="3"><i>3</i><span>Apply</span></div>
+    </div>
+    <div class="bl-body">
+      <div class="bl-pane on" id="wc-sec-choose">
+        <label class="bl-drop" id="wc-drop" for="wc-files">
+          <span class="big">📄</span>
+          <b id="wc-drop-title">Tap to choose PDFs</b>
+          <small id="wc-drop-sub">Select a month’s invoices, statements and credit notes — as many as you like at once. You can also drag &amp; drop them here.</small>
+          <input id="wc-files" type="file" accept="application/pdf,.pdf" multiple onchange="wcFilesChosen()">
+        </label>
+        <div class="bl-note info"><span class="ic">ℹ️</span><span>Nothing is saved until you review the summary and tap <b>Apply</b>. Garages (sections 13+) aren’t billed — payments mis-allocated to a garage are moved onto the owner’s main unit.</span></div>
+      </div>
+      <div class="bl-pane" id="wc-sec-review">
+        <div id="wc-status" class="bl-hint"></div>
+        <div class="bl-prog" id="wc-prog" style="display:none"><i id="wc-prog-bar"></i></div>
+        <div id="wc-preview" style="display:flex;flex-direction:column;gap:14px"></div>
+      </div>
+    </div>
+    <div class="bl-sf">
+      <button class="bl-btn" id="wc-back-btn" onclick="wcBack()" style="display:none">← Back</button>
+      <span class="bl-dirty" id="wc-foot-msg"></span>
+      <button class="bl-btn ok" id="wc-apply-btn" onclick="wcApplyImport()" disabled style="display:none">Apply to units</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 // ── WeconnectU/Davies PDF importer (UI glue) ────────────────────────────────
@@ -6393,222 +6813,1272 @@ async function wcExtractItems(file){
   }
   return items;
 }
-function openWeconnectImport(){
-  window._wcMap=null; window._wcFileCount=0;
-  var pv=document.getElementById('wc-preview'); if(pv) pv.innerHTML='';
-  var st=document.getElementById('wc-status'); if(st) st.textContent='';
-  var fi=document.getElementById('wc-files'); if(fi) fi.value='';
-  wcSetBtn('wc-parse-btn', false); wcSetBtn('wc-apply-btn', false);
-  document.getElementById('wc-import-modal').style.display='flex';
-  document.body.style.overflow='hidden';
-}
-function closeWeconnectImport(){ document.getElementById('wc-import-modal').style.display='none'; document.body.style.overflow=''; }
-function wcSetBtn(id, on){ var b=document.getElementById(id); if(b){ b.disabled=!on; b.style.opacity=on?'1':'.5'; } }
-function wcFilesChosen(){ var fi=document.getElementById('wc-files'); wcSetBtn('wc-parse-btn', !!(fi && fi.files && fi.files.length)); }
-function _wcEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-async function wcParseFiles(){
-  var fi=document.getElementById('wc-files'); var st=document.getElementById('wc-status');
-  if(!fi || !fi.files || !fi.files.length) return;
-  if(typeof PMWeconnectU==='undefined' || typeof PMMapper==='undefined'){ if(st){ st.textContent='Importer modules not loaded — hard-refresh the page.'; st.style.color='#f0a06f'; } return; }
-  wcSetBtn('wc-parse-btn', false); wcSetBtn('wc-apply-btn', false);
-  var files=Array.prototype.slice.call(fi.files);
-  window._wcFileCount=files.length;
-  var docs=[], errors=[];
-  for(var i=0;i<files.length;i++){
-    var f=files[i];
-    if(st){ st.textContent='Reading '+(i+1)+' of '+files.length+'… '+f.name; st.style.color='var(--muted)'; }
-    try { var items=await wcExtractItems(f); var d=PMWeconnectU.detectAndParse(items, f.name); d._file=f.name; docs.push(d); }
-    catch(e){ errors.push(f.name+': '+(e&&e.message||e)); }
-  }
-  var map = PMMapper.mapDocsToUnits(docs);
-  window._wcMap=map; window._wcDocs=docs;
-  wcRenderPreview(map, docs, errors);
-  if(st){ st.textContent='Parsed '+docs.length+' document(s).'; st.style.color='var(--green)'; }
-  wcSetBtn('wc-parse-btn', true); wcSetBtn('wc-apply-btn', Object.keys(map.units).length>0);
-}
 
-function wcRenderPreview(map, docs, errors){
-  var pv=document.getElementById('wc-preview'); if(!pv) return;
-  var doors=Object.keys(map.units).map(Number).sort(function(a,b){return a-b;});
-  var counts={invoice:0, statement:0, credit_note:0, unknown:0};
-  docs.forEach(function(d){ counts[d.docType]=(counts[d.docType]||0)+1; });
-  var nonRecon=docs.filter(function(d){ return d.docType==='invoice' && d.reconciles===false; });
-  var html='';
-  html+='<div style="font-size:11px;font-family:var(--mono);color:var(--muted);margin-bottom:8px">'
-      + counts.invoice+' invoice(s), '+counts.statement+' statement(s), '+(counts.credit_note||0)+' credit note(s) → '+doors.length+' unit(s).</div>';
-  if(errors && errors.length) html+='<div style="font-size:11px;font-family:var(--mono);color:#f0a06f;margin-bottom:8px">⚠ Could not read: '+errors.map(_wcEsc).join('; ')+'</div>';
-  if(nonRecon.length) html+='<div style="font-size:11px;font-family:var(--mono);color:#f0a06f;margin-bottom:8px">⚠ Not reconciling: '+nonRecon.map(function(d){return _wcEsc(d.invoiceNo);}).join(', ')+'</div>';
-  if(map.flags && map.flags.length){
-    html+='<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 12px;margin-bottom:10px">'
-       + '<div style="font-size:10px;font-family:var(--mono);color:#f0a06f;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Review before applying</div>';
-    map.flags.forEach(function(f){ html+='<div style="font-size:11px;font-family:var(--mono);color:var(--text2);line-height:1.5">• '+_wcEsc(f)+'</div>'; });
-    html+='</div>';
-  }
-  html+='<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:10px;text-transform:uppercase">'
-     + '<th style="padding:5px 6px">Unit</th><th style="padding:5px 6px">Owner</th><th style="padding:5px 6px;text-align:right">Invoices</th><th style="padding:5px 6px;text-align:right">Readings</th><th style="padding:5px 6px;text-align:right">Latest levy</th><th style="padding:5px 6px;text-align:right">Statement bal.</th></tr></thead><tbody>';
-  doors.forEach(function(d){
-    var u=map.units[d]; var c=u.charges||{};
-    var levy=(c.levies||0)+(c.csos||0)+(c.reserve_fund||0);
-    var bal=u.statement && u.statement.ledger && u.statement.ledger.length ? u.statement.ledger[u.statement.ledger.length-1].cumulative : null;
-    html+='<tr style="border-top:1px solid var(--border)"><td style="padding:6px;font-family:var(--mono);color:var(--accent2)">'+d+'</td>'
-       + '<td style="padding:6px;color:var(--text2)">'+_wcEsc(u.owner||'')+'</td>'
-       + '<td style="padding:6px;text-align:right;font-family:var(--mono)">'+u.invoices.length+'</td>'
-       + '<td style="padding:6px;text-align:right;font-family:var(--mono)">'+u.meterReadings.length+'</td>'
-       + '<td style="padding:6px;text-align:right;font-family:var(--mono)">'+(levy?('R '+levy.toFixed(2)):'—')+'</td>'
-       + '<td style="padding:6px;text-align:right;font-family:var(--mono);color:'+(bal>0.005?'#f0a06f':(bal<-0.005?'var(--green)':'var(--muted)'))+'">'+(bal==null?'—':('R '+bal.toFixed(2)))+'</td></tr>';
-  });
-  html+='</tbody></table>';
-  pv.innerHTML=html;
-}
 
-async function wcApplyImport(){
-  var map=window._wcMap; if(!map) return;
-  var applied=0;
-  Object.keys(map.units).forEach(function(door){
-    var src=map.units[door]; var id='unit_'+door; var u=UNITS[id];
-    if(!u){ u=UNITS[id]={ id:id, section:Number(door), type:(Number(door)>12?'store':'house'), houseNo:String(door), area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, meterReadings:[], added:Date.now() }; }
-    if(src.owner) u.ownerName=src.owner;
-    if(src.email) u.ownerEmail=src.email;
-    if(src.tel) u.ownerPhone=src.tel;
-    if(src.reference) u.daviesRef=src.reference;
-    if(src.charges && Object.keys(src.charges).length){
-      u.charges=u.charges||{};
-      if(src.charges.levies!=null) u.charges.adminLevy=src.charges.levies;
-      if(src.charges.reserve_fund!=null) u.charges.maintLevy=src.charges.reserve_fund;
-      if(src.charges.csos!=null) u.charges.csos=src.charges.csos;
-      u.importedCharges=src.charges;
-    }
-    if(src.meterReadings && src.meterReadings.length){
-      var byDate={}; (u.meterReadings||[]).forEach(function(r){ byDate[r.date]=r; });
-      src.meterReadings.forEach(function(r){ byDate[r.date]={date:r.date, water:r.water, elec:r.elec}; });
-      u.meterReadings=Object.keys(byDate).sort().map(function(k){ return byDate[k]; });
-    }
-    if(src.invoices && src.invoices.length) u.importedInvoices=src.invoices;
-    if(src.creditNotes && src.creditNotes.length) u.creditNotes=src.creditNotes;
-    if(src.statement) u.statement=src.statement;
-    applied++;
-  });
-  try { if(typeof saveUnits==='function') await saveUnits(); } catch(e){ console.warn('wcApplyImport save', e); }
-  if(typeof renderUnits==='function') renderUnits();
-  closeWeconnectImport();
-  try { if(typeof toast==='function') toast('Imported '+applied+' unit(s) from '+(window._wcFileCount||0)+' file(s).'); else alert('Imported '+applied+' unit(s) from '+(window._wcFileCount||0)+' file(s).'); } catch(e){}
-}
 </script>
 
-<!-- Unit add/edit modal -->
-<div id="unit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:700;align-items:center;justify-content:center" onclick="if(event.target===this)closeUnitModal()">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;width:min(760px,96vw);max-height:92vh;overflow-y:auto">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface)">
-      <div id="unit-modal-title" style="font-size:14px;font-weight:600;color:var(--text2)">Add unit</div>
-      <div style="display:flex;gap:8px">
-        <button id="unit-delete-btn" onclick="deleteUnit(_currentUnitId)" style="display:none;padding:5px 12px;border-radius:6px;background:var(--red-bg);border:1px solid var(--red-bd);color:#f06f6f;font-size:11px;cursor:pointer;font-family:var(--mono)">🗑 Delete</button>
-        <button onclick="closeUnitModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 8px">✕</button>
-      </div>
+<!-- Unit editor (full-screen sheet on phones, centred dialog on desktop) -->
+<div id="unit-modal" onclick="if(event.target===this)requestCloseUnitModal()">
+  <div class="bl-sheet" role="dialog" aria-modal="true" aria-labelledby="unit-modal-title">
+    <div class="bl-sh">
+      <button class="bl-back" aria-label="Close unit" onclick="requestCloseUnitModal()">←</button>
+      <div class="bl-sh-t"><b id="unit-modal-title">Add unit</b><span id="unit-modal-sub"></span></div>
     </div>
-    <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:10px">
-        <div style="flex:1">
-          <div class="ul">Section #</div>
-          <input id="u-section" type="number" class="ui" placeholder="e.g. 1">
-        </div>
-        <div style="flex:1">
-          <div class="ul">Type</div>
-          <select id="u-type" class="ui">
-            <option value="house">House</option>
-            <option value="store">Store / Garage</option>
-          </select>
-        </div>
-        <div style="flex:1">
-          <div class="ul">House #</div>
-          <input id="u-house" type="text" class="ui" placeholder="e.g. 1">
-        </div>
-      </div>
-      <div style="display:flex;gap:10px">
-        <div style="flex:1">
-          <div class="ul">Area (m²)</div>
-          <input id="u-area" type="number" step="0.01" class="ui" placeholder="e.g. 137">
-        </div>
-        <div style="flex:1">
-          <div class="ul">Participation Quota (PQ %)</div>
-          <input id="u-pq" type="number" step="0.0001" class="ui" placeholder="e.g. 10.8385">
-        </div>
-      </div>
-      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
-        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">👤 Owner</div>
-        <div><div class="ul">Owner name</div><input id="u-owner" type="text" class="ui2" placeholder="Registered owner"></div>
-        <div style="display:flex;gap:10px">
-          <div style="flex:1"><div class="ul">Email</div><input id="u-email" type="email" class="ui2" placeholder="owner@email.com"></div>
-          <div style="flex:1"><div class="ul">Phone</div><input id="u-phone" type="tel" class="ui2" placeholder="082 …"></div>
-        </div>
-      </div>
-      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
-        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">💳 Monthly levy lines (R)</div>
-        <div style="display:flex;gap:10px">
-          <div style="flex:1"><div class="ul">Admin levy</div><input id="u-admin" type="number" step="0.01" class="ui2" placeholder="0.00"></div>
-          <div style="flex:1"><div class="ul">10-yr maintenance</div><input id="u-maint" type="number" step="0.01" class="ui2" placeholder="0.00"></div>
-          <div style="flex:1"><div class="ul">CSOS levy</div><input id="u-csos" type="number" step="0.01" class="ui2" placeholder="0.00"></div>
-        </div>
-        <div id="u-total-preview" style="font-size:11px;color:var(--muted);font-family:var(--mono);text-align:right">Monthly total: —</div>
-      </div>
-      <div><div class="ul">Notes</div><input id="u-notes" type="text" class="ui" placeholder="optional"></div>
+    <div class="bl-tabs" id="u-tabs" role="tablist">
+      <button class="bl-tab on" data-tab="overview" role="tab" onclick="setUnitTab('overview')">Overview</button>
+      <button class="bl-tab" data-tab="statement" role="tab" onclick="setUnitTab('statement')">Statement <span class="n" id="u-n-statement">0</span></button>
+      <button class="bl-tab" data-tab="invoices" role="tab" onclick="setUnitTab('invoices')">Invoices <span class="n" id="u-n-invoices">0</span></button>
+      <button class="bl-tab" data-tab="meters" role="tab" onclick="setUnitTab('meters')">Meters <span class="n" id="u-n-meters">0</span></button>
+      <button class="bl-tab" data-tab="details" role="tab" onclick="setUnitTab('details')">Details</button>
+    </div>
 
-      <!-- ── Levy statement / ledger (Phase 2) ─────────────────────────────── -->
-      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">📄 Levy statement</div>
-          <div style="display:flex;gap:6px;align-items:center">
-            <span style="font-size:9px;color:var(--muted);font-family:var(--mono)">Ref</span>
-            <input id="u-stmt-ref" type="text" class="ui2" placeholder="e.g. FER001-D1" style="width:150px" oninput="_uLedgerDirty()">
-            <button type="button" onclick="generateInvoice(_currentUnitId)" title="Bill this unit for its current levy charges, post it to the statement, and email the owner a PDF invoice + statement" style="padding:7px 12px;background:var(--green);border:none;border-radius:7px;color:#fff;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">🧾 Generate invoice</button>
-            <button type="button" onclick="printUnitStatement(_currentUnitId)" title="Open a print-ready statement in the Davies Group layout (print → Save as PDF)" style="padding:7px 12px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:11px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">🖨 Statement</button>
-          </div>
+    <div class="bl-body" id="u-body">
+
+      <!-- Overview -->
+      <div class="bl-pane on" data-pane="overview" id="u-overview"></div>
+
+      <!-- Statement -->
+      <div class="bl-pane" data-pane="statement">
+        <div class="bl-card2">
+          <div class="bl-f"><label class="bl-lbl" for="u-stmt-ref">Statement reference</label><input id="u-stmt-ref" type="text" class="bl-in" placeholder="e.g. FER001-D1" autocapitalize="characters" oninput="_uLedgerDirty()"></div>
+          <label class="bl-check" style="margin-top:12px"><input id="u-invoice-breakdown" type="checkbox"><span>Show invoices as separate line items on the statement (Levies, CSOS, …) instead of one “INV…” line</span></label>
+          <button type="button" class="bl-btn blk" style="margin-top:10px" onclick="printUnitStatement(_currentUnitId)">🖨️ Print / save statement as PDF</button>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text2);font-family:var(--mono)">
-          <input id="u-invoice-breakdown" type="checkbox" style="width:15px;height:15px;accent-color:var(--green);cursor:pointer">
-          <span>Break invoices into individual line items on the statement (Levies, CSOS, etc.) instead of one “INV…” line</span>
-        </label>
-        <div id="u-ledger-wrap" style="overflow-x:auto"></div>
-        <!-- guided add-line -->
-        <div style="border-top:1px dashed var(--border);padding-top:11px;display:flex;flex-direction:column;gap:9px">
-          <div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Add a line</div>
-          <div id="ul-type-chips" style="display:flex;gap:5px;flex-wrap:wrap"></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div><div class="ul">Date</div><input id="ul-date" type="date" class="ui2" style="width:150px" onchange="_ulSyncDesc()"></div>
-            <div style="flex:1;min-width:150px"><div class="ul" id="ul-desc-lbl">Description</div><input id="ul-desc" type="text" class="ui2" placeholder="Description"></div>
-            <div><div class="ul" id="ul-amt-lbl">Charge (R)</div><input id="ul-amt" type="number" step="0.01" class="ui2" placeholder="0.00" style="width:120px"></div>
-            <button type="button" onclick="addLedgerLine()" style="padding:9px 16px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">＋ Add</button>
+
+        <div class="bl-card2">
+          <div class="bl-h"><span>Add a line</span><button type="button" class="lnk" id="ul-toggle" onclick="blToggleAddLine()">Show form</button></div>
+          <div class="bl-addform" id="ul-form">
+            <div class="bl-types" id="ul-type-chips"></div>
+            <div class="bl-grid g2">
+              <div class="bl-f"><label class="bl-lbl" for="ul-date">Date</label><input id="ul-date" type="date" class="bl-in" onchange="_ulSyncDesc()"></div>
+              <div class="bl-f"><label class="bl-lbl" id="ul-amt-lbl" for="ul-amt">Charge (R)</label><input id="ul-amt" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="0.00"></div>
+            </div>
+            <div class="bl-f"><label class="bl-lbl" id="ul-desc-lbl" for="ul-desc">Description</label><input id="ul-desc" type="text" class="bl-in" placeholder="Description"></div>
+            <div class="bl-hint" id="ul-hint"></div>
+            <button type="button" class="bl-btn pri blk" onclick="addLedgerLine()">＋ Add to statement</button>
           </div>
-          <div id="ul-hint" style="font-size:9px;color:var(--muted);font-family:var(--mono);line-height:1.5"></div>
+          <div class="bl-hint" id="ul-collapsed-hint">Record a payment, charge or credit note. The balance updates straight away.</div>
         </div>
+
+        <div class="bl-card2" id="u-ledger-card"><div id="u-ledger-wrap"></div></div>
       </div>
 
-      <!-- ── Meter readings (Phase 2) ──────────────────────────────────────── -->
-      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2);display:flex;flex-direction:column;gap:10px">
-        <div style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">🔢 Meter readings</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <div style="flex:1;min-width:120px"><div class="ul">💧 Water meter #</div><input id="u-water" type="text" class="ui2" placeholder="optional"></div>
-          <div style="flex:1;min-width:120px"><div class="ul">Water tariff (R/kL)</div><input id="u-water-tariff" type="number" step="0.01" class="ui2" placeholder="e.g. 35.00"></div>
-          <div style="flex:1;min-width:120px"><div class="ul">⚡ Electricity meter #</div><input id="u-elec" type="text" class="ui2" placeholder="optional"></div>
-          <div style="flex:1;min-width:120px"><div class="ul">Elec tariff (R/kWh)</div><input id="u-elec-tariff" type="number" step="0.01" class="ui2" placeholder="e.g. 2.80"></div>
+      <!-- Invoices -->
+      <div class="bl-pane" data-pane="invoices" id="u-invoices"></div>
+
+      <!-- Meters -->
+      <div class="bl-pane" data-pane="meters">
+        <div class="bl-card2">
+          <div class="bl-h"><span>Meters &amp; tariffs</span></div>
+          <div class="bl-grid g2">
+            <div class="bl-f"><label class="bl-lbl" for="u-water">💧 Water meter #</label><input id="u-water" type="text" class="bl-in" placeholder="optional"></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-water-tariff">Water tariff (R/kL)</label><input id="u-water-tariff" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="e.g. 35.00"></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-elec">⚡ Electricity meter #</label><input id="u-elec" type="text" class="bl-in" placeholder="optional"></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-elec-tariff">Elec tariff (R/kWh)</label><input id="u-elec-tariff" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="e.g. 2.80"></div>
+          </div>
         </div>
-        <div id="u-meters-wrap" style="overflow-x:auto"></div>
-        <!-- capture a month's readings -->
-        <div style="border-top:1px dashed var(--border);padding-top:11px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-          <div><div class="ul">Reading date</div><input id="mr-date" type="date" class="ui2" style="width:150px"></div>
-          <div><div class="ul">💧 Water reading</div><input id="mr-water" type="number" step="0.001" class="ui2" placeholder="kL" style="width:120px"></div>
-          <div><div class="ul">⚡ Elec reading</div><input id="mr-elec" type="number" step="0.001" class="ui2" placeholder="kWh" style="width:120px"></div>
-          <button type="button" onclick="addMeterReading()" style="padding:9px 16px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer;white-space:nowrap">＋ Add reading</button>
+        <div class="bl-card2">
+          <div class="bl-h"><span>Capture a reading</span></div>
+          <div class="bl-grid g3">
+            <div class="bl-f span3"><label class="bl-lbl" for="mr-date">Reading date</label><input id="mr-date" type="date" class="bl-in"></div>
+            <div class="bl-f"><label class="bl-lbl" for="mr-water">💧 Water (kL)</label><input id="mr-water" type="number" inputmode="decimal" step="0.001" class="bl-in" placeholder="cumulative"></div>
+            <div class="bl-f"><label class="bl-lbl" for="mr-elec">⚡ Electricity (kWh)</label><input id="mr-elec" type="number" inputmode="decimal" step="0.001" class="bl-in" placeholder="cumulative"></div>
+          </div>
+          <button type="button" class="bl-btn pri blk" style="margin-top:12px" onclick="addMeterReading()">＋ Add reading</button>
+          <div class="bl-hint" style="margin-top:10px">Enter the cumulative meter value each month — usage is the difference from the previous reading. With a tariff set, tap <b>Bill usage</b> on a month to post it to the statement.</div>
         </div>
-        <div style="font-size:9px;color:var(--muted);font-family:var(--mono);line-height:1.5">Enter the cumulative meter value each month — usage is the difference from the previous reading. Set a tariff to turn a month's usage into a charge on the statement with “Bill usage”. Readings are saved with the unit.</div>
+        <div id="u-meters-wrap"></div>
+      </div>
+
+      <!-- Details -->
+      <div class="bl-pane" data-pane="details">
+        <div class="bl-card2">
+          <div class="bl-h"><span>Unit</span></div>
+          <div class="bl-grid g3">
+            <div class="bl-f"><label class="bl-lbl" for="u-section">Section #</label><input id="u-section" type="number" inputmode="numeric" class="bl-in" placeholder="e.g. 1"></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-house">House #</label><input id="u-house" type="text" class="bl-in" placeholder="e.g. 1"></div>
+            <div class="bl-f span3"><label class="bl-lbl" for="u-type">Type</label>
+              <select id="u-type" class="bl-in"><option value="house">House</option><option value="store">Store / Garage (not billed)</option></select></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-area">Area (m²)</label><input id="u-area" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="e.g. 137"></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-pq">Participation quota (%)</label><input id="u-pq" type="number" inputmode="decimal" step="0.0001" class="bl-in" placeholder="e.g. 10.8385"></div>
+          </div>
+        </div>
+        <div class="bl-card2">
+          <div class="bl-h"><span>👤 Owner</span></div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="bl-f"><label class="bl-lbl" for="u-owner">Owner name</label><input id="u-owner" type="text" class="bl-in" placeholder="Registered owner" autocomplete="off"></div>
+            <div class="bl-grid g2">
+              <div class="bl-f"><label class="bl-lbl" for="u-email">Email</label><input id="u-email" type="email" inputmode="email" autocapitalize="none" class="bl-in" placeholder="owner@email.com"></div>
+              <div class="bl-f"><label class="bl-lbl" for="u-phone">Phone</label><input id="u-phone" type="tel" inputmode="tel" class="bl-in" placeholder="082 …"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bl-card2">
+          <div class="bl-h"><span>💳 Monthly levy lines (R)</span></div>
+          <div class="bl-grid g3">
+            <div class="bl-f"><label class="bl-lbl" for="u-admin">Admin levy</label><input id="u-admin" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="0.00"></div>
+            <div class="bl-f"><label class="bl-lbl" for="u-maint">10-yr maintenance</label><input id="u-maint" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="0.00"></div>
+            <div class="bl-f span3"><label class="bl-lbl" for="u-csos">CSOS levy</label><input id="u-csos" type="number" inputmode="decimal" step="0.01" class="bl-in" placeholder="0.00"></div>
+          </div>
+          <div class="bl-total"><span>Monthly total</span><b id="u-total-preview">—</b></div>
+        </div>
+        <div class="bl-card2">
+          <div class="bl-f"><label class="bl-lbl" for="u-notes">Notes</label><input id="u-notes" type="text" class="bl-in" placeholder="optional"></div>
+        </div>
+        <button id="unit-delete-btn" type="button" class="bl-btn dng blk" style="display:none" onclick="deleteUnit(_currentUnitId)">🗑 Delete this unit</button>
       </div>
     </div>
-    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;background:var(--surface2);position:sticky;bottom:0">
-      <button onclick="closeUnitModal()" style="padding:8px 16px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--muted);font-size:12px;font-family:var(--mono);cursor:pointer">Cancel</button>
-      <button onclick="saveUnitFromModal()" style="padding:8px 20px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-size:12px;font-family:var(--mono);font-weight:600;cursor:pointer">💾 Save unit</button>
+
+    <div class="bl-sf">
+      <span class="bl-dirty" id="u-dirty">No changes</span>
+      <button class="bl-btn" id="u-cancel" onclick="requestCloseUnitModal()">Close</button>
+      <button class="bl-btn pri" onclick="saveUnitFromModal()">💾 Save unit</button>
     </div>
   </div>
 </div>
+
+<script id="bl-ui">
+// ═══ Billing UI kit — dialogs, toasts, menu, Back-button handling ═══════════
+// Everything the redesigned Billing page needs that isn't specific to units.
+// Native alert()/confirm() are replaced by bottom-sheet dialogs that are big
+// enough to tap on a phone, and the Android/iOS Back gesture closes whatever
+// sheet is on top instead of leaving the app.
+var BL = { filter:'all', sort:'section', open:false, tab:'overview', snap:'', ledgerNewest:true, navUnit:false, navMenu:false, navImport:false };
+(function(){ try { var p = JSON.parse(sessionStorage.getItem('bl_prefs') || '{}'); if(p.filter) BL.filter = p.filter; if(p.sort) BL.sort = p.sort; } catch(e){} })();
+function blSavePrefs(){ try { sessionStorage.setItem('bl_prefs', JSON.stringify({ filter:BL.filter, sort:BL.sort })); } catch(e){} }
+function blEl(id){ return document.getElementById(id); }
+function blEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function blMoney(n){ n = Number(n || 0); return (n < -0.005 ? '−' : '') + 'R ' + _uAmt(Math.abs(n)); }
+var _BL_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function blDate(iso, withYear){
+  var m = /^(\d{4})-(\d\d)-(\d\d)/.exec(iso || ''); if(!m) return iso || '';
+  var s = Number(m[3]) + ' ' + _BL_MON[Number(m[2]) - 1];
+  return (withYear || Number(m[1]) !== new Date().getFullYear()) ? s + ' ' + m[1] : s;
+}
+// ALL-CAPS names from the Davies exports read better in Title Case (display only).
+function blNice(s){
+  s = String(s == null ? '' : s); if(!s || /[a-z]/.test(s)) return s;
+  return s.toLowerCase().replace(/(^|[\s\-\/(&.'])([a-z])/g, function(m, p, c){ return p + c.toUpperCase(); })
+    .replace(/\bMc([a-z])/g, function(m, c){ return 'Mc' + c.toUpperCase(); });
+}
+// 27728925264 -> 072 892 5264 (display only)
+function blPhone(p){
+  var d = String(p || '').replace(/\D/g, '');
+  if(/^27\d{9}$/.test(d)) d = '0' + d.slice(2);
+  return /^0\d{9}$/.test(d) ? d.slice(0, 3) + ' ' + d.slice(3, 6) + ' ' + d.slice(6) : String(p || '');
+}
+// Keep the sticky search bar clear of the app's own sticky header.
+function blStick(){
+  var h = document.querySelector('.header'), p = blEl('panel-billing'); if(!h || !p) return;
+  var px = h.offsetHeight || 0;
+  p.style.setProperty('--bl-stick', px + 'px');
+  var m = blEl('bl-menu'); if(m) m.style.setProperty('--bl-menu-top', (px + 64) + 'px');
+}
+window.addEventListener('resize', function(){ blStick(); });
+
+// ── Back-button stack ───────────────────────────────────────────────────────
+// Each open layer (menu, dialog, sheet) pushes one history entry. Closing a
+// layer from the UI pops it with history.back(); pressing Back closes the top
+// layer. Pushes wait for any in-flight pop so the two can't cross.
+var BLNAV = { stack:[], ignore:0, after:[], timer:null };
+function blNavFlush(){ var q = BLNAV.after.splice(0); q.forEach(function(f){ f(); }); }
+function blNavPush(fn){
+  BLNAV.stack.push(fn);
+  var go = function(){ try { history.pushState({ bl:1 }, ''); } catch(e){} };
+  if(BLNAV.ignore > 0) BLNAV.after.push(go); else go();
+}
+function blNavPop(){
+  if(!BLNAV.stack.length) return;
+  BLNAV.stack.pop(); BLNAV.ignore++;
+  try { history.back(); } catch(e){ BLNAV.ignore--; return; }
+  clearTimeout(BLNAV.timer);
+  BLNAV.timer = setTimeout(function(){ if(BLNAV.ignore > 0){ BLNAV.ignore = 0; blNavFlush(); } }, 700);
+}
+window.addEventListener('popstate', function(){
+  if(BLNAV.ignore > 0){ BLNAV.ignore--; if(BLNAV.ignore === 0){ clearTimeout(BLNAV.timer); blNavFlush(); } return; }
+  var fn = BLNAV.stack.pop(); if(fn) fn();
+});
+
+// ── Dialogs ─────────────────────────────────────────────────────────────────
+var _blDlg = null;
+function blDialog(o){
+  if(_blDlg) _blDlgFinish(_blDlg.cancel);
+  return new Promise(function(resolve){
+    _blDlg = { resolve:resolve, cancel:('cancel' in o) ? o.cancel : null, dismissible:o.dismissible !== false, nav:true };
+    blEl('bl-dlg-title').textContent = o.title || '';
+    blEl('bl-dlg-body').innerHTML = o.body || '';
+    var acts = blEl('bl-dlg-actions'); acts.innerHTML = '';
+    (o.buttons || []).forEach(function(b){
+      var btn = document.createElement('button'); btn.type = 'button';
+      btn.className = 'bl-btn' + (b.kind ? ' ' + b.kind : ''); btn.textContent = b.label;
+      btn.onclick = function(){
+        if(b.onClick){ try { b.onClick(); } catch(e){ console.warn(e); } }
+        if(!b.keep) _blDlgFinish(b.value === undefined ? null : b.value);
+      };
+      acts.appendChild(btn);
+    });
+    acts.style.display = (o.buttons && o.buttons.length) ? '' : 'none';
+    blEl('bl-dialog').classList.add('open');
+    blNavPush(function(){ if(_blDlg) _blDlg.nav = false; _blDlgFinish(_blDlg ? _blDlg.cancel : null); });
+  });
+}
+function _blDlgFinish(val){
+  var d = _blDlg; if(!d) return; _blDlg = null;
+  blEl('bl-dialog').classList.remove('open');
+  if(d.nav) blNavPop();
+  d.resolve(val);
+}
+function blDialogDismiss(){ if(_blDlg && _blDlg.dismissible) _blDlgFinish(_blDlg.cancel); }
+function blDialogClose(){ if(_blDlg) _blDlgFinish(null); }
+function blConfirm(title, body, okLabel, opts){
+  opts = opts || {};
+  return blDialog({ title:title, body:body, cancel:false, buttons:[
+    { label:okLabel || 'Confirm', kind: opts.danger ? 'dng' : (opts.kind || 'pri'), value:true },
+    { label:opts.cancelLabel || 'Cancel', value:false }
+  ]}).then(function(v){ return v === true; });
+}
+function blAlert(title, body, label){
+  return blDialog({ title:title, body:body, cancel:null, buttons:[{ label:label || 'OK', kind:'pri', value:true }] });
+}
+// Non-dismissible progress dialog; drive it with blProgress(done, total, text).
+function blProgressOpen(title, text){
+  blDialog({ title:title, body:'<div class="mut" id="bl-prog-t">' + blEsc(text || '') + '</div><div class="bl-prog"><i id="bl-prog-i"></i></div>', dismissible:false, buttons:[] });
+}
+function blProgress(done, total, text){
+  var i = blEl('bl-prog-i'), t = blEl('bl-prog-t');
+  if(i) i.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
+  if(t && text != null) t.textContent = text;
+}
+function blToast(msg, kind){
+  var host = blEl('bl-toast'); if(!host) return;
+  var d = document.createElement('div'); d.className = 'bl-toast-i' + (kind ? ' ' + kind : ''); d.textContent = msg;
+  host.appendChild(d);
+  setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, kind === 'err' ? 5200 : 3200);
+}
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Escape') return;
+  if(_blDlg){ blDialogDismiss(); return; }
+  var menu = blEl('bl-menu');
+  if(menu && menu.classList.contains('open')){ blCloseMenu(); return; }
+  var wc = blEl('wc-import-modal');
+  if(wc && wc.style.display === 'flex'){ closeWeconnectImport(); return; }
+  if(BL.open) requestCloseUnitModal();
+});
+
+// ── Actions menu ────────────────────────────────────────────────────────────
+function blOpenMenu(){
+  blStick();
+  var m = blEl('bl-menu'); if(!m || m.classList.contains('open')) return;
+  var t = blEl('bl-seed-title'); if(t) t.textContent = Object.keys(UNITS).length ? 'Reload units from schedule' : 'Load Park Manor units';
+  m.classList.add('open'); BL.navMenu = true;
+  blNavPush(function(){ BL.navMenu = false; m.classList.remove('open'); });
+}
+function blCloseMenu(){
+  var m = blEl('bl-menu'); if(!m || !m.classList.contains('open')) return;
+  m.classList.remove('open');
+  if(BL.navMenu){ BL.navMenu = false; blNavPop(); }
+}
+function blMenuDo(k){
+  blCloseMenu();
+  var fn = { wc:openWeconnectImport, inv:generateAllInvoices, csv:blExportCsv, stmts:seedParkManorStatements, seed:seedParkManorUnits }[k];
+  setTimeout(function(){ if(fn) fn(); }, 90);
+}
+
+// ═══ Billing register — summary, filters, unit cards / table ════════════════
+function blIsGarage(u){ return !!u && (u.type === 'store' || Number(u.section) > 12); }
+function blHasStmt(u){ return !!(u && u.statement && (u.statement.ledger || []).length); }
+function blStatus(u){
+  if(!blHasStmt(u)) return 'none';
+  var b = unitBalance(u);
+  return b > 0.005 ? 'owing' : (b < -0.005 ? 'credit' : 'settled');
+}
+function blAgeingFor(u){ var st = u.statement || {}; return st.ageing || _computeAgeing(st.ledger || [], st.asOf); }
+function blLastPayment(u){
+  var L = (u.statement && u.statement.ledger) || [];
+  for(var i = L.length - 1; i >= 0; i--){
+    var l = L[i];
+    if(Number(l.credit) > 0.005 && /payment|pmt|bank|eft|deposit/i.test((l.desc || '') + ' ' + (l.src || ''))) return { date:l.date, amt:Number(l.credit) };
+  }
+  return null;
+}
+function blAsOf(list){
+  var best = '';
+  list.forEach(function(u){
+    var st = u.statement; if(!st) return;
+    var d = st.asOf || ((st.ledger || []).length ? st.ledger[st.ledger.length - 1].date : '');
+    if(d > best) best = d;
+  });
+  return best;
+}
+function blSetFilter(k){ BL.filter = k; blSavePrefs(); renderUnits(); var c = blEl('bl-chips'); if(c) c.scrollLeft = 0; }
+function blSetSort(k){ BL.sort = k; blSavePrefs(); renderUnits(); }
+function blClearSearch(){ var s = blEl('units-search'); if(s){ s.value = ''; s.focus(); } renderUnits(); }
+function blSortUnits(list){
+  var s = BL.sort, cmp;
+  if(s === 'balance') cmp = function(a, b){ return unitBalance(b) - unitBalance(a) || (a.section || 0) - (b.section || 0); };
+  else if(s === 'owner') cmp = function(a, b){ return (a.ownerName || '~').localeCompare(b.ownerName || '~'); };
+  else if(s === 'levy') cmp = function(a, b){ return unitTotal(b) - unitTotal(a) || (a.section || 0) - (b.section || 0); };
+  else cmp = function(a, b){ return (a.section || 0) - (b.section || 0); };
+  return list.slice().sort(cmp);
+}
+
+function blBalHtml(u){
+  var st = blStatus(u), b = unitBalance(u);
+  if(st === 'owing')   return '<div class="bl-bal owe"><b>' + blMoney(b) + '</b><small>owing</small></div>';
+  if(st === 'credit')  return '<div class="bl-bal cr"><b>' + blMoney(-b) + '</b><small>in credit</small></div>';
+  if(st === 'settled') return '<div class="bl-bal zero"><b>R 0.00</b><small>settled</small></div>';
+  return '<div class="bl-bal none"><b>—</b><small>no statement</small></div>';
+}
+function blAgeBar(u){
+  var ag = blAgeingFor(u);
+  var parts = [['Current', ag.current, 'var(--accent)'], ['30+', ag.d30, 'var(--bl-a1)'], ['60+', ag.d60, 'var(--bl-a2)'], ['90+', ag.d90, 'var(--bl-a3)'], ['120+', ag.d120, 'var(--bl-a4)']]
+    .filter(function(p){ return Number(p[1]) > 0.005; });
+  if(!parts.length) return '';
+  return '<div><div class="bl-age">' + parts.map(function(p){ return '<i style="flex:' + p[1] + ';background:' + p[2] + '"></i>'; }).join('') + '</div>'
+    + '<div class="bl-agelegend">' + parts.map(function(p){ return '<span style="--c:' + p[2] + '">' + p[0] + ' ' + blMoney(p[1]) + '</span>'; }).join('') + '</div></div>';
+}
+function blUnitMeta(u){
+  var m = [];
+  m.push(u.type === 'store' ? 'Garage / store' : 'House ' + (u.houseNo || u.section));
+  if(u.area) m.push(u.area + ' m²');
+  var ref = (u.statement && u.statement.ref) || u.daviesRef; if(ref) m.push(ref);
+  return m.join(' · ');
+}
+function blCardHtml(u){
+  var st = blStatus(u), garage = blIsGarage(u), lp = blLastPayment(u), id = blEsc(u.id);
+  var warn = [];
+  if(!garage && !u.ownerEmail) warn.push('no email');
+  if(!u.ownerName) warn.push('no owner');
+  var line1 = garage ? 'Billed on the owner’s main unit'
+    : ('Levy <b>' + blMoney(unitTotal(u)) + '</b>/mo' + (lp ? ' · paid ' + blDate(lp.date) : ''));
+  var phone = (u.ownerPhone || '').replace(/[^\d+]/g, '');
+  return '<div class="bl-card' + (st === 'owing' ? ' owing' : '') + '" role="button" tabindex="0" onclick="openUnitModal(\'' + id + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openUnitModal(\'' + id + '\')}">'
+    + '<div class="bl-card-top"><div class="bl-sec' + (garage ? ' store' : '') + '">' + blEsc(u.section) + '</div>'
+    + '<div class="bl-who"><div class="bl-name' + (u.ownerName ? '' : ' missing') + '">' + (u.ownerName ? blEsc(blNice(u.ownerName)) : 'No owner set') + '</div><div class="bl-meta">' + blEsc(blUnitMeta(u)) + '</div></div>'
+    + blBalHtml(u) + '</div>'
+    + (st === 'owing' ? blAgeBar(u) : '')
+    + '<div class="bl-card-foot"><div class="bl-foot-meta">' + line1
+    + (warn.length ? '<div><span class="bl-tag warn">⚠ ' + warn.join(' · ') + '</span></div>' : '') + '</div>'
+    + (phone ? '<a class="bl-ibtn" href="tel:' + blEsc(phone) + '" aria-label="Call ' + blEsc(u.ownerName || 'owner') + '" onclick="event.stopPropagation()">📞</a>' : '')
+    + (u.ownerEmail ? '<a class="bl-ibtn" href="mailto:' + blEsc(u.ownerEmail) + '" aria-label="Email owner" onclick="event.stopPropagation()">✉️</a>' : '')
+    + (blHasStmt(u) ? '<button type="button" class="bl-ibtn" aria-label="Open statement" onclick="event.stopPropagation();printUnitStatement(\'' + id + '\')">🖨️</button>' : '')
+    + '</div></div>';
+}
+function blPillHtml(u){
+  var st = blStatus(u), b = unitBalance(u);
+  if(st === 'owing') return '<span class="bl-pill owe">' + blMoney(b) + '</span>';
+  if(st === 'credit') return '<span class="bl-pill cr">' + blMoney(-b) + ' cr</span>';
+  if(st === 'settled') return '<span class="bl-pill zero">Settled</span>';
+  return '<span class="bl-pill none">—</span>';
+}
+function blTableHtml(rows, totals){
+  var head = '<thead><tr><th>Unit</th><th>Owner</th><th class="r">Monthly levy</th><th>Last payment</th><th class="r">Balance</th><th></th></tr></thead>';
+  var body = rows.map(function(u){
+    var lp = blLastPayment(u), garage = blIsGarage(u), id = blEsc(u.id);
+    return '<tr class="row" onclick="openUnitModal(\'' + id + '\')">'
+      + '<td><div style="display:flex;align-items:center;gap:12px"><div class="bl-sec' + (garage ? ' store' : '') + '" style="flex-basis:38px;height:38px;font-size:15px;border-radius:11px">' + blEsc(u.section) + '</div>'
+      + '<div><div style="font-weight:600;color:var(--text2)">' + (garage ? 'Garage' : 'House ' + blEsc(u.houseNo || u.section)) + '</div><div class="bl-meta" style="margin:0">' + (u.area ? u.area + ' m²' : '') + '</div></div></div></td>'
+      + '<td><div class="bl-name' + (u.ownerName ? '' : ' missing') + '" style="max-width:300px">' + (u.ownerName ? blEsc(blNice(u.ownerName)) : 'No owner set') + '</div><div class="bl-meta" style="margin:0">' + blEsc(u.ownerEmail || (garage ? '' : 'no email')) + '</div></td>'
+      + '<td class="r mono">' + (garage ? '<span style="color:var(--muted)">on owner’s unit</span>' : blMoney(unitTotal(u))) + '</td>'
+      + '<td class="mono" style="color:var(--muted)">' + (lp ? blMoney(lp.amt) + ' · ' + blDate(lp.date) : '—') + '</td>'
+      + '<td class="r">' + blPillHtml(u) + '</td>'
+      + '<td style="color:var(--muted);text-align:right;width:28px">›</td></tr>';
+  }).join('');
+  var foot = '<tfoot><tr><td colspan="2" style="color:var(--muted);font-weight:600">Total · ' + rows.length + ' unit' + (rows.length === 1 ? '' : 's') + '</td>'
+    + '<td class="r mono">' + blMoney(totals.levy) + '</td><td></td><td class="r mono" style="color:' + (totals.owing > 0.005 ? 'var(--bl-owe)' : 'var(--muted)') + '">' + (totals.hasStmts ? blMoney(totals.owing) : '—') + '</td><td></td></tr></tfoot>';
+  return '<div class="bl-tbwrap"><table class="bl-tb">' + head + '<tbody>' + body + '</tbody>' + foot + '</table></div>';
+}
+
+function renderUnits(){
+  var wrap = blEl('units-table-wrap'), summary = blEl('units-summary'), empty = blEl('units-empty');
+  if(!wrap) return;
+  blStick();
+  var all = Object.values(UNITS).sort(function(a, b){ return (a.section || 0) - (b.section || 0); });
+  var sub = blEl('bl-sub');
+  var chips = blEl('bl-chips'), note = blEl('bl-pqnote'), count = blEl('bl-count');
+  var sortSel = blEl('bl-sort'); if(sortSel) sortSel.value = BL.sort;
+  var seedT = blEl('bl-seed-title'); if(seedT) seedT.textContent = all.length ? 'Reload units from schedule' : 'Load Park Manor units';
+
+  if(!all.length){
+    wrap.innerHTML = ''; if(summary) summary.innerHTML = ''; if(chips) chips.innerHTML = ''; if(note) note.textContent = ''; if(count) count.textContent = '';
+    if(sub) sub.textContent = 'No units yet';
+    if(empty){
+      empty.style.display = 'block';
+      empty.innerHTML = '<div class="bl-empty"><div class="big">🏢</div><h3>Set up your units</h3>'
+        + '<p>Start with the Park Manor schedule (sections 1–20 and their levies), then import your Davies PDFs to bring in owners, invoices and statements.</p>'
+        + '<div class="stack"><button class="bl-btn pri blk" onclick="seedParkManorUnits()">⤓ Load Park Manor units</button>'
+        + '<button class="bl-btn blk" onclick="openWeconnectImport()">📥 Import Davies PDFs</button>'
+        + '<button class="bl-btn blk" onclick="openUnitModal(null)">＋ Add a unit manually</button></div></div>';
+    }
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+
+  var houses = all.filter(function(u){ return !blIsGarage(u); });
+  var withStmt = all.filter(blHasStmt);
+  var owingList = all.filter(function(u){ return blStatus(u) === 'owing'; });
+  var creditList = all.filter(function(u){ return blStatus(u) === 'credit'; });
+  var settledList = all.filter(function(u){ return blStatus(u) === 'settled'; });
+  var garages = all.filter(blIsGarage);
+  var arrears = owingList.reduce(function(s, u){ return s + unitBalance(u); }, 0);
+  var credits = creditList.reduce(function(s, u){ return s - unitBalance(u); }, 0);
+  var levies = houses.reduce(function(s, u){ return s + unitTotal(u); }, 0);
+  var asOf = blAsOf(all);
+  if(sub) sub.textContent = asOf ? 'As at ' + blDate(asOf, true) + ' · ' + all.length + ' units' : all.length + ' units · no statements yet';
+
+  if(summary) summary.innerHTML =
+      (withStmt.length
+        ? '<div class="bl-tile hero ' + (arrears > 0.005 ? 'owe' : 'ok') + '"><div class="k">Outstanding</div><div class="v">' + blMoney(arrears) + '</div><div class="s">'
+          + (owingList.length ? owingList.length + ' of ' + withStmt.length + ' accounts owing' : 'All ' + withStmt.length + ' accounts up to date') + '</div></div>'
+        : '<div class="bl-tile hero"><div class="k">Outstanding</div><div class="v">—</div><div class="s">Import statements to see balances</div></div>')
+    + '<div class="bl-tile' + (credits > 0.005 ? ' ok' : '') + '"><div class="k">In credit</div><div class="v">' + blMoney(credits) + '</div><div class="s">' + creditList.length + ' account' + (creditList.length === 1 ? '' : 's') + '</div></div>'
+    + '<div class="bl-tile"><div class="k">Monthly levies</div><div class="v">' + blMoney(levies) + '</div><div class="s">' + houses.length + ' billed houses</div></div>';
+
+  // Filter chips (hide empty ones, but never the active one)
+  var defs = [['all', 'All', all.length], ['owing', 'Owing', owingList.length], ['credit', 'In credit', creditList.length], ['settled', 'Settled', settledList.length], ['garage', 'Garages', garages.length]];
+  if(BL.filter !== 'all' && !defs.some(function(d){ return d[0] === BL.filter && d[2] > 0; })) BL.filter = 'all';
+  if(chips) chips.innerHTML = defs.filter(function(d){ return d[0] === 'all' || d[2] > 0; }).map(function(d){
+    return '<button type="button" class="bl-chip' + (BL.filter === d[0] ? ' on' : '') + '" role="tab" aria-selected="' + (BL.filter === d[0]) + '" onclick="blSetFilter(\'' + d[0] + '\')">' + d[1] + ' <span class="n">' + d[2] + '</span></button>';
+  }).join('');
+
+  var q = ((blEl('units-search') || {}).value || '').toLowerCase().trim();
+  var sb = blEl('bl-search'); if(sb) sb.classList.toggle('has', !!q);
+  var rows = all.filter(function(u){
+    if(BL.filter === 'owing' && blStatus(u) !== 'owing') return false;
+    if(BL.filter === 'credit' && blStatus(u) !== 'credit') return false;
+    if(BL.filter === 'settled' && blStatus(u) !== 'settled') return false;
+    if(BL.filter === 'garage' && !blIsGarage(u)) return false;
+    if(!q) return true;
+    return (String(u.section) + ' house ' + (u.houseNo || '') + ' ' + (u.ownerName || '') + ' ' + (u.ownerEmail || '') + ' ' + (u.ownerPhone || '') + ' '
+      + ((u.statement && u.statement.ref) || '') + ' ' + (u.daviesRef || '')).toLowerCase().indexOf(q) >= 0;
+  });
+  rows = blSortUnits(rows);
+  if(count) count.textContent = rows.length === all.length ? all.length + ' units' : 'Showing ' + rows.length + ' of ' + all.length;
+
+  if(!rows.length){
+    wrap.innerHTML = '<div class="bl-empty" style="margin:8px 0"><div class="big">🔎</div><h3>No units match</h3><p>Try a different search or filter.</p>'
+      + '<button class="bl-btn" onclick="var s=document.getElementById(\'units-search\');s.value=\'\';blSetFilter(\'all\')">Clear search &amp; filters</button></div>';
+  } else {
+    var totals = { levy: rows.filter(function(u){ return !blIsGarage(u); }).reduce(function(s, u){ return s + unitTotal(u); }, 0),
+                   owing: rows.reduce(function(s, u){ var b = unitBalance(u); return s + (b > 0.005 ? b : 0); }, 0), hasStmts: withStmt.length > 0 };
+    wrap.innerHTML = '<div class="bl-cards">' + rows.map(blCardHtml).join('') + '</div><div class="bl-tbl">' + blTableHtml(rows, totals) + '</div>';
+  }
+  var totPQ = all.reduce(function(s, u){ return s + Number(u.pq || 0); }, 0);
+  if(note) note.innerHTML = Math.abs(totPQ - 100) < 0.05 ? 'Participation quotas total ' + totPQ.toFixed(4) + '% ✓' : '<span style="color:var(--bl-owe)">⚠ Participation quotas total ' + totPQ.toFixed(4) + '% — should be 100%</span>';
+}
+
+async function openBillingTab(){
+  if(!_unitsLoaded){ await loadUnits(); }
+  blStick();
+  renderUnits();
+}
+
+function blExportCsv(){
+  var all = Object.values(UNITS).sort(function(a, b){ return (a.section || 0) - (b.section || 0); });
+  if(!all.length){ blToast('No units to export yet.', 'err'); return; }
+  var rows = [['Section', 'Type', 'House', 'Owner', 'Email', 'Phone', 'Reference', 'Admin levy', '10-yr maintenance', 'CSOS', 'Monthly total', 'Balance', 'Last payment date', 'Last payment amount']];
+  all.forEach(function(u){
+    var c = u.charges || {}, lp = blLastPayment(u);
+    rows.push([u.section, u.type, u.houseNo, u.ownerName, u.ownerEmail, u.ownerPhone, (u.statement && u.statement.ref) || u.daviesRef || '',
+      Number(c.adminLevy || 0).toFixed(2), Number(c.maintLevy || 0).toFixed(2), Number(c.csos || 0).toFixed(2), unitTotal(u).toFixed(2),
+      blHasStmt(u) ? unitBalance(u).toFixed(2) : '', lp ? lp.date : '', lp ? lp.amt.toFixed(2) : '']);
+  });
+  var csv = '﻿' + rows.map(function(r){ return r.map(function(v){ v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(','); }).join('\r\n');
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = 'park-manor-units-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  blToast('Register exported', 'ok');
+}
+
+async function seedParkManorUnits(){
+  if(Object.keys(UNITS).length){
+    var ok = await blConfirm('Reload units from the schedule?',
+      '<p>This loads sections 1–20 and their levy amounts from the levy schedule (effective 1 Jun 2026).</p><p class="mut">Existing units are kept; sections with the same number get the schedule values. Owner details, statements and readings are preserved.</p>', 'Reload units');
+    if(!ok) return;
+  }
+  PARK_MANOR_UNITS_SEED.forEach(function(s){
+    var id = 'unit_' + s.section, prev = UNITS[id] || {};
+    UNITS[id] = {
+      id:id, section:s.section, type:s.type, houseNo:s.houseNo, area:s.area, pq:s.pq,
+      ownerName: prev.ownerName || '', ownerEmail: prev.ownerEmail || '', ownerPhone: prev.ownerPhone || '',
+      charges: { adminLevy:s.adminLevy, maintLevy:s.maintLevy, csos:s.csos },
+      waterMeter: prev.waterMeter || '', elecMeter: prev.elecMeter || '', notes: prev.notes || '',
+      tariffs: prev.tariffs || {}, meterReadings: prev.meterReadings || [], statement: prev.statement,
+      importedInvoices: prev.importedInvoices, importedCharges: prev.importedCharges, creditNotes: prev.creditNotes, daviesRef: prev.daviesRef,
+      invoices: prev.invoices, invoiceLines: prev.invoiceLines, invoiceBreakdown: prev.invoiceBreakdown,
+      added: prev.added || Date.now(), updated: Date.now()
+    };
+  });
+  await saveUnits();
+  renderUnits();
+  blToast('Loaded ' + PARK_MANOR_UNITS_SEED.length + ' units from the schedule', 'ok');
+}
+
+// Import the supplied Davies statement snapshot into matching units (by section
+// = Door No). Owner name / email / phone are filled only where blank so manual
+// edits are preserved; the statement (ledger + ageing snapshot) is (re)loaded.
+async function seedParkManorStatements(){
+  if(typeof PARK_MANOR_STATEMENTS_SEED === 'undefined'){ blToast('Statement snapshot not found.', 'err'); return; }
+  var keys = Object.keys(PARK_MANOR_STATEMENTS_SEED);
+  var ok = await blConfirm('Load statement snapshot?',
+    '<p>This loads each ledger and ageing for <b>' + keys.length + ' units</b> as at 14 Sep 2026, replacing their current statements.</p><p class="mut">Owner name / email / phone are only filled where blank. Levy amounts and everything else are untouched.</p>', 'Load statements');
+  if(!ok) return;
+  if(!_unitsLoaded){ await loadUnits(); }
+  var applied = 0;
+  keys.forEach(function(sec){
+    var s = PARK_MANOR_STATEMENTS_SEED[sec], id = 'unit_' + sec, u = UNITS[id];
+    if(!u){ u = UNITS[id] = { id:id, section:Number(sec), type:(Number(sec) > 12 ? 'store' : 'house'), houseNo:'', area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, waterMeter:'', elecMeter:'', notes:'', added:Date.now() }; }
+    if(!u.ownerName && s.owner) u.ownerName = s.owner;
+    if(!u.ownerEmail && s.email) u.ownerEmail = s.email;
+    if(!u.ownerPhone && s.tel) u.ownerPhone = s.tel;
+    u.statement = { ref:s.ref, asOf:'2026-09-14', ageing:s.ageing, ledger:s.ledger.map(function(l){ return { date:l.date, src:l.src, desc:l.desc, debit:l.debit, credit:l.credit }; }) };
+    u.updated = Date.now(); applied++;
+  });
+  await saveUnits();
+  renderUnits();
+  blToast('Loaded statements for ' + applied + ' units', 'ok');
+}
+
+// ═══ Unit sheet — tabs, overview, statement, invoices, meters ═══════════════
+var BL_FIELDS = ['u-section','u-type','u-house','u-area','u-pq','u-owner','u-email','u-phone','u-admin','u-maint','u-csos','u-water','u-elec','u-notes','u-stmt-ref','u-water-tariff','u-elec-tariff'];
+function blSnapshot(){
+  return JSON.stringify({ f:BL_FIELDS.map(function(id){ var e = blEl(id); return e ? e.value : ''; }),
+    c:!!(blEl('u-invoice-breakdown') && blEl('u-invoice-breakdown').checked), l:_editLedger, r:_editReadings });
+}
+function blIsDirty(){ return !!(BL.open && BL.snap && blSnapshot() !== BL.snap); }
+function blUpdateDirty(){
+  var el = blEl('u-dirty'); if(!el) return;
+  var d = blIsDirty();
+  el.classList.toggle('on', d); el.textContent = d ? 'Unsaved changes' : 'No changes';
+  var c = blEl('u-cancel'); if(c) c.textContent = d ? 'Cancel' : 'Close';
+}
+function _uTotalPreview(){
+  var el = blEl('u-total-preview');
+  if(el) el.textContent = blMoney(_uNum('u-admin') + _uNum('u-maint') + _uNum('u-csos'));
+}
+
+function blLineInfo(l){
+  var desc = l.desc || '', src = l.src || '', both = desc + ' ' + src;
+  var shortSrc = src.replace(/FIRST NATIONAL BANK.*/i, 'FNB');
+  if(/^INV\d+/i.test(desc) || /^invoice$/i.test(src)) return { ic:'🧾', title:desc || 'Invoice', sub:'Invoice' };
+  if(/credit note|^CRN/i.test(both)) return { ic:'↩️', title:desc || 'Credit note', sub:'Credit note' };
+  if(Number(l.credit) > 0.005 && /payment|pmt|bank|eft|deposit/i.test(both)) return { ic:'💰', title:'Payment', sub:(shortSrc || '') + (desc ? (shortSrc ? ' · ' : '') + desc.replace(/\s*-\s*"Payment - Thank you"/i, '') : '') };
+  if(/journal|take-on|balance b\/f/i.test(both)) return { ic:'📒', title:/balance b\/f/i.test(desc) ? 'Balance brought forward' : 'Journal', sub:desc };
+  if(/water/i.test(both)) return { ic:'💧', title:desc || 'Water', sub:shortSrc };
+  if(/electric/i.test(both)) return { ic:'⚡', title:desc || 'Electricity', sub:shortSrc };
+  return { ic:Number(l.credit) > 0 ? '➖' : '➕', title:desc || (Number(l.credit) > 0 ? 'Credit' : 'Charge'), sub:shortSrc };
+}
+function blLedgerRow(l, i, bal, expandable){
+  var k = blLineInfo(l), dr = Number(l.debit || 0), cr = Number(l.credit || 0);
+  var amt = cr > 0.005 ? '−' + _uAmtR(cr) : _uAmtR(dr);
+  var h = '<div class="bl-lr" ' + (expandable ? 'onclick="this.classList.toggle(\'open\')" ' : '') + 'data-i="' + i + '">'
+    + '<div class="bl-lr-main"><div class="bl-lic">' + k.ic + '</div>'
+    + '<div class="bl-ltx"><b>' + blEsc(k.title) + '</b><small>' + blEsc(blDate(l.date) + (k.sub ? ' · ' + k.sub : '')) + '</small></div>'
+    + '<div class="bl-lam' + (cr > 0.005 ? ' cr' : '') + '"><b>' + amt + '</b><small>Bal ' + blMoney(bal) + '</small></div></div>';
+  if(expandable){
+    h += '<div class="bl-lr-more">'
+      + '<div class="row"><span>Date</span><b>' + blEsc(blDate(l.date, true)) + '</b></div>'
+      + (l.src ? '<div class="row"><span>Source</span><b style="text-align:right">' + blEsc(l.src) + '</b></div>' : '')
+      + (l.desc ? '<div class="row"><span>Description</span><b style="text-align:right;max-width:70%">' + blEsc(l.desc) + '</b></div>' : '')
+      + '<div class="row"><span>Debit</span><b>' + (dr ? _uAmtR(dr) : '—') + '</b></div>'
+      + '<div class="row"><span>Credit</span><b>' + (cr ? _uAmtR(cr) : '—') + '</b></div>'
+      + '<div class="row"><span>Balance after</span><b>' + blMoney(bal) + '</b></div>'
+      + '<button type="button" class="bl-btn dng sm" onclick="event.stopPropagation();deleteLedgerLine(' + i + ')">🗑 Remove this line</button></div>';
+  }
+  return h + '</div>';
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────────
+function setUnitTab(k, quiet){
+  BL.tab = k;
+  document.querySelectorAll('#u-tabs .bl-tab').forEach(function(b){
+    var on = b.dataset.tab === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
+    if(on && !quiet && b.scrollIntoView) { try { b.scrollIntoView({ inline:'center', block:'nearest' }); } catch(e){} }
+  });
+  document.querySelectorAll('#u-body .bl-pane').forEach(function(p){ p.classList.toggle('on', p.dataset.pane === k); });
+  if(k === 'overview') renderUnitOverview();
+  if(k === 'invoices') renderUnitInvoices();
+  var body = blEl('u-body'); if(body && !quiet) body.scrollTop = 0;
+}
+function blGoField(tab, id){
+  setUnitTab(tab);
+  setTimeout(function(){ var e = blEl(id); if(e){ e.focus(); try { e.scrollIntoView({ block:'center' }); } catch(x){} } }, 60);
+}
+function blToggleAddLine(force){
+  var f = blEl('ul-form'); if(!f) return;
+  var open = typeof force === 'boolean' ? force : !f.classList.contains('open');
+  f.classList.toggle('open', open);
+  var t = blEl('ul-toggle'); if(t) t.textContent = open ? 'Hide form' : 'Show form';
+  var h = blEl('ul-collapsed-hint'); if(h) h.style.display = open ? 'none' : '';
+  if(open){ var a = blEl('ul-amt'); if(a && window.matchMedia('(min-width:768px)').matches) a.focus(); }
+}
+function blToggleLedgerSort(){ BL.ledgerNewest = !BL.ledgerNewest; renderUnitLedger(); }
+
+// ── Header / counts ─────────────────────────────────────────────────────────
+function blInvoiceItems(){
+  var u = (_currentUnitId && UNITS[_currentUnitId]) || {}, items = [];
+  (u.importedInvoices || []).forEach(function(i){
+    items.push({ kind:'imp', no:i.invoiceNo, date:i.date, due:i.due, total:Number(i.total || 0), ok:i.reconciles !== false,
+      lines:(i.lines || []).map(function(l){ return { d:l.desc, a:Number(l.amount || 0), meter:l.meter, period:l.period }; }) });
+  });
+  (u.invoices || []).forEach(function(i){
+    items.push({ kind:'app', no:i.no, date:i.date, total:Number(i.amount || 0), ok:true,
+      lines:(i.lines || []).map(function(l){ return { d:l.account || l.desc, a:Number(l.total || 0) }; }) });
+  });
+  (u.creditNotes || []).forEach(function(c){
+    items.push({ kind:'crn', no:c.creditNoteNo, date:c.date, total:-Math.abs(Number(c.total || 0)), ok:true,
+      lines:(c.lines || []).map(function(l){ return { d:l.desc, a:-Math.abs(Number(l.amount || 0)) }; }) });
+  });
+  items.sort(function(a, b){ return (b.date || '').localeCompare(a.date || '') || String(b.no).localeCompare(String(a.no)); });
+  return items;
+}
+function blRefreshHead(){
+  var t = blEl('unit-modal-title'), sub = blEl('unit-modal-sub'); if(!sub) return;
+  var isNew = !_currentUnitId || !UNITS[_currentUnitId];
+  var sec = _uNum('u-section');
+  if(t) t.textContent = isNew ? (sec ? 'New unit · Section ' + sec : 'Add unit') : 'Section ' + sec + (blEl('u-type') && blEl('u-type').value === 'store' ? ' · Garage' : ' · House ' + (_uStr('u-house') || sec));
+  var L = _editLedger || [], parts = [], cls = '';
+  if(L.length){
+    var b = _uLedgerTotal(L);
+    if(b > 0.005){ parts.push(blMoney(b) + ' owing'); cls = 'owe'; }
+    else if(b < -0.005){ parts.push(blMoney(-b) + ' in credit'); cls = 'cr'; }
+    else parts.push('Settled');
+  }
+  var owner = _uStr('u-owner'); if(owner) parts.push(blNice(owner));
+  sub.textContent = parts.join(' · ') || 'Fill in the details to get started'; sub.className = cls;
+}
+function blRefreshUnitView(){
+  if(!BL.open) return;
+  blRefreshHead();
+  var set = function(id, n){ var e = blEl(id); if(e) e.textContent = n; };
+  set('u-n-statement', (_editLedger || []).length);
+  set('u-n-invoices', blInvoiceItems().length);
+  set('u-n-meters', (_editReadings || []).length);
+  if(BL.tab === 'overview') renderUnitOverview();
+  if(BL.tab === 'invoices') renderUnitInvoices();
+  blUpdateDirty();
+}
+
+// ── Overview ────────────────────────────────────────────────────────────────
+function blWa(p){
+  var d = String(p || '').replace(/\D/g, ''); if(!d) return '';
+  if(d.charAt(0) === '0' && d.length === 10) d = '27' + d.slice(1);
+  return 'https://wa.me/' + d;
+}
+function renderUnitOverview(){
+  var el = blEl('u-overview'); if(!el || !BL.open) return;
+  var id = _currentUnitId, saved = !!(id && UNITS[id]), u = saved ? UNITS[id] : {};
+  var owner = _uStr('u-owner'), email = _uStr('u-email'), phone = _uStr('u-phone');
+  var garage = (blEl('u-type') && blEl('u-type').value === 'store') || _uNum('u-section') > 12;
+  var L = _editLedger || [], has = L.length > 0, bal = _uLedgerTotal(L);
+  var tone = !has ? 'none' : (bal > 0.005 ? 'owe' : (bal < -0.005 ? 'cr' : 'zero'));
+  var monthly = _uNum('u-admin') + _uNum('u-maint') + _uNum('u-csos');
+  var ref = _uStr('u-stmt-ref') || u.daviesRef || '';
+  var h = '';
+
+  if(garage) h += '<div class="bl-note info"><span class="ic">🅿️</span><span>This is a garage / store. Garages aren’t billed separately — their levy is charged on the owner’s main unit invoice.</span></div>';
+  else if(!email) h += '<div class="bl-note"><span class="ic">✉️</span><span>No owner email — invoices can’t be emailed to this unit yet.</span><button type="button" class="bl-btn sm" onclick="blGoField(\'details\',\'u-email\')">Add email</button></div>';
+
+  var label = { owe:'Balance due', cr:'Account in credit', zero:'Account settled', none:'No statement yet' }[tone];
+  var value = tone === 'owe' ? blMoney(bal) : (tone === 'cr' ? blMoney(-bal) : (tone === 'zero' ? 'R 0.00' : '—'));
+  var pill = { owe:'Owing', cr:'In credit', zero:'Settled', none:'No data' }[tone];
+  var asOf = (_editStmtMeta && _editStmtMeta.asOf) || (has ? L[L.length - 1].date : '');
+  h += '<div class="bl-card2"><div class="bl-hero ' + tone + '"><div><div class="k">' + label + '</div><div class="v">' + value + '</div>'
+    + '<div class="s">' + (has ? 'Statement as at ' + blEsc(blDate(asOf, true)) + (ref ? ' · ' + blEsc(ref) : '') : 'Record a payment or charge on the Statement tab, or import Davies PDFs.') + '</div></div>'
+    + '<span class="bl-pill ' + tone + '">' + pill + '</span></div>';
+  if(has){
+    var ag = _uAgeing();
+    h += '<div class="bl-ages">' + [['120+', ag.d120], ['90+', ag.d90], ['60+', ag.d60], ['30+', ag.d30], ['Current', ag.current]].map(function(x){
+      var v = Number(x[1] || 0); return '<div class="' + (v > 0.005 ? 'has pos' : (v < -0.005 ? 'has neg' : '')) + '"><small>' + x[0] + '</small><b>' + _uAmt(v) + '</b></div>';
+    }).join('') + '</div>';
+  }
+  h += '</div>';
+
+  var wa = blWa(phone);
+  h += '<div class="bl-acts">'
+    + '<button type="button" class="bl-act pri' + ((!saved || garage) ? ' off' : '') + '" onclick="blInvoiceFromModal()"><span class="ic">🧾</span><div><span>Generate invoice</span><small>' + (monthly ? 'Bill ' + blMoney(monthly) + ' this month' : 'Set the monthly levy first') + (email ? ' · email owner' : '') + '</small></div></button>'
+    + '<button type="button" class="bl-act' + (!saved ? ' off' : '') + '" onclick="printUnitStatement(_currentUnitId)"><span class="ic">🖨️</span>Statement<small>Print or save PDF</small></button>'
+    + '<a class="bl-act' + (email ? '' : ' off') + '" href="mailto:' + blEsc(email) + '"><span class="ic">✉️</span>Email<small>' + blEsc(email || 'not set') + '</small></a>'
+    + '<a class="bl-act' + (phone ? '' : ' off') + '" href="tel:' + blEsc(phone.replace(/[^\d+]/g, '')) + '"><span class="ic">📞</span>Call<small>' + blEsc(phone ? blPhone(phone) : 'not set') + '</small></a>'
+    + '<a class="bl-act' + (wa ? '' : ' off') + '" href="' + blEsc(wa) + '" target="_blank" rel="noopener"><span class="ic">💬</span>WhatsApp<small>' + blEsc(phone ? blPhone(phone) : 'not set') + '</small></a>'
+    + '</div>';
+
+  h += '<div class="bl-card2"><div class="bl-h"><span>Monthly levy</span><button type="button" class="lnk" onclick="setUnitTab(\'details\')">Edit</button></div>'
+    + '<div class="bl-kv"><span>Admin levy</span><b>' + blMoney(_uNum('u-admin')) + '</b></div>'
+    + '<div class="bl-kv"><span>10-yr maintenance</span><b>' + blMoney(_uNum('u-maint')) + '</b></div>'
+    + '<div class="bl-kv"><span>CSOS levy</span><b>' + blMoney(_uNum('u-csos')) + '</b></div>'
+    + '<div class="bl-kv"><span><b>Total per month</b></span><b>' + blMoney(monthly) + '</b></div></div>';
+
+  h += '<div class="bl-card2"><div class="bl-h"><span>Owner</span><button type="button" class="lnk" onclick="setUnitTab(\'details\')">Edit</button></div>'
+    + '<div class="bl-kv"><span>Name</span><b>' + (owner ? blEsc(blNice(owner)) : '<span style="color:var(--muted);font-weight:500">not set</span>') + '</b></div>'
+    + '<div class="bl-kv"><span>Email</span>' + (email ? '<a href="mailto:' + blEsc(email) + '">' + blEsc(email) + '</a>' : '<b style="color:var(--muted);font-weight:500">not set</b>') + '</div>'
+    + '<div class="bl-kv"><span>Phone</span>' + (phone ? '<a href="tel:' + blEsc(phone.replace(/[^\d+]/g, '')) + '">' + blEsc(blPhone(phone)) + '</a>' : '<b style="color:var(--muted);font-weight:500">not set</b>') + '</div>'
+    + (ref ? '<div class="bl-kv"><span>Reference</span><b>' + blEsc(ref) + '</b></div>' : '')
+    + (_uStr('u-water') ? '<div class="bl-kv"><span>💧 Water meter</span><b>' + blEsc(_uStr('u-water')) + '</b></div>' : '')
+    + (_uStr('u-elec') ? '<div class="bl-kv"><span>⚡ Electricity meter</span><b>' + blEsc(_uStr('u-elec')) + '</b></div>' : '')
+    + '</div>';
+
+  if(has){
+    var cum = _uRunning(L), last = L.map(function(l, i){ return i; }).slice(-5).reverse();
+    h += '<div class="bl-card2"><div class="bl-h"><span>Recent activity</span><button type="button" class="lnk" onclick="setUnitTab(\'statement\')">See all ' + L.length + '</button></div>'
+      + last.map(function(i){ return blLedgerRow(L[i], i, cum[i], false); }).join('') + '</div>';
+  }
+  el.innerHTML = h;
+}
+async function blInvoiceFromModal(){
+  if(!_currentUnitId || !UNITS[_currentUnitId]){ blToast('Save the unit first, then generate its invoice.', 'err'); return; }
+  if(blIsDirty()){
+    var ok = await blConfirm('Save your changes first?', '<p>The invoice is built from the saved levy amounts, so your edits need saving before it runs.</p>', 'Save & continue');
+    if(!ok) return;
+    if(!(await saveUnitFromModal({ keepOpen:true }))) return;
+  }
+  generateInvoice(_currentUnitId);
+}
+
+// ── Statement ───────────────────────────────────────────────────────────────
+function renderUnitLedger(){
+  var wrap = blEl('u-ledger-wrap');
+  if(!wrap){ blRefreshUnitView(); return; }
+  var L = _editLedger || [];
+  if(!L.length){
+    wrap.innerHTML = '<div class="bl-empty" style="margin:0;border:none;padding:16px 8px"><div class="big">📄</div><h3>No statement lines yet</h3><p>Add an opening balance, invoice or payment above — or use <b>Import PDFs</b> on the register to bring in the Davies statement.</p></div>';
+    blRefreshUnitView(); return;
+  }
+  var cum = _uRunning(L), total = _uLedgerTotal(L);
+  var order = L.map(function(l, i){ return i; }); if(BL.ledgerNewest) order.reverse();
+  var tone = total > 0.005 ? 'var(--bl-owe)' : (total < -0.005 ? 'var(--green)' : 'var(--text2)');
+  var head = '<div class="bl-lh"><div><small>' + (total < -0.005 ? 'In credit' : 'Total due') + '</small><b style="color:' + tone + '">' + blMoney(Math.abs(total) < 0.005 ? 0 : (total < 0 ? -total : total)) + '</b></div>'
+    + '<button type="button" class="bl-btn sm" onclick="blToggleLedgerSort()">⇅ ' + (BL.ledgerNewest ? 'Newest first' : 'Oldest first') + '</button></div>'
+    + (!_editStmtMeta.ageing ? '<div class="bl-hint" style="margin-bottom:6px">Ageing is recalculated from the lines below.</div>' : '');
+  var cards = '<div class="bl-ledger-cards">' + order.map(function(i){ return blLedgerRow(L[i], i, cum[i], true); }).join('') + '</div>';
+  var tbl = '<div class="bl-ledger-tbl"><table class="bl-tb"><thead><tr><th>Date</th><th>Source</th><th>Description</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th><th></th></tr></thead><tbody>'
+    + order.map(function(i){
+        var l = L[i], b = cum[i];
+        return '<tr><td class="mono" style="color:var(--muted)">' + blEsc(blDate(l.date, true)) + '</td><td style="color:var(--muted);font-size:12px">' + blEsc((l.src || '').replace(/FIRST NATIONAL BANK.*/i, 'FNB')) + '</td>'
+          + '<td style="font-size:13px">' + blEsc(l.desc || '') + '</td>'
+          + '<td class="r mono">' + (Number(l.debit) ? _uAmt(l.debit) : '<span style="color:var(--muted)">·</span>') + '</td>'
+          + '<td class="r mono" style="color:var(--green)">' + (Number(l.credit) ? _uAmt(l.credit) : '<span style="color:var(--muted)">·</span>') + '</td>'
+          + '<td class="r mono" style="font-weight:600;color:' + (b > 0.005 ? 'var(--bl-owe)' : (b < -0.005 ? 'var(--green)' : 'var(--muted)')) + '">' + _uAmt(b) + '</td>'
+          + '<td class="r"><button type="button" class="bl-ibtn" style="width:36px;height:36px;font-size:14px" title="Remove line" aria-label="Remove line" onclick="deleteLedgerLine(' + i + ')">✕</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  wrap.innerHTML = head + cards + tbl;
+  blRefreshUnitView();
+}
+function renderLineChips(){
+  var wrap = blEl('ul-type-chips'); if(!wrap) return;
+  wrap.innerHTML = LINE_TYPES.map(function(t){
+    return '<button type="button" class="bl-chip' + (t.key === _lineType ? ' on' : '') + '" onclick="setLineType(\'' + t.key + '\')">' + t.label + '</button>';
+  }).join('');
+}
+function addLedgerLine(){
+  var t = _lineTypeDef(_lineType);
+  var date = (blEl('ul-date') || {}).value || '';
+  var descEl = blEl('ul-desc'), desc = (descEl ? descEl.value : '').trim();
+  var amt = parseFloat((blEl('ul-amt') || {}).value) || 0;
+  if(!date){ blToast('Choose a date for the line.', 'err'); return; }
+  if(!amt){ blToast('Enter an amount.', 'err'); var a0 = blEl('ul-amt'); if(a0) a0.focus(); return; }
+  if(!desc) desc = t.descTpl ? t.descTpl.replace('{month}', _monthLabel(date)) : t.label.replace(/^\S+\s/, '');
+  var line = { date:date, src:t.src, desc:desc, debit:0, credit:0 };
+  if(t.side === 'credit') line.credit = Math.abs(amt); else line.debit = Math.abs(amt);
+  _editLedger.push(line);
+  _editLedger.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  _editStmtMeta.ageing = null;
+  var a = blEl('ul-amt'); if(a) a.value = '';
+  if(descEl){ descEl.value = ''; descEl.dataset.auto = '1'; }
+  _ulSyncDesc();
+  renderUnitLedger();
+  blToast((t.side === 'credit' ? 'Payment / credit' : 'Charge') + ' of ' + _uAmtR(Math.abs(amt)) + ' added', 'ok');
+}
+function deleteLedgerLine(i){
+  if(i < 0 || i >= _editLedger.length) return;
+  _editLedger.splice(i, 1);
+  _editStmtMeta.ageing = null;
+  renderUnitLedger();
+  blToast('Line removed — save to keep the change');
+}
+
+// ── Invoices ────────────────────────────────────────────────────────────────
+function renderUnitInvoices(){
+  var el = blEl('u-invoices'); if(!el || !BL.open) return;
+  var items = blInvoiceItems();
+  if(!items.length){
+    el.innerHTML = '<div class="bl-empty" style="margin:0"><div class="big">🧾</div><h3>No invoices yet</h3><p>Invoices show up here after you import Davies PDFs or generate one from the Overview tab.</p></div>';
+    return;
+  }
+  var kinds = { imp:['Imported from Davies', '🧾'], app:['Generated here', '🧾'], crn:['Credit note', '↩️'] };
+  el.innerHTML = items.map(function(it){
+    var meter = '';
+    var lines = it.lines.map(function(l){
+      var sub = '';
+      if(l.meter && (l.meter.prev != null || l.meter.curr != null)) sub = 'Reading ' + l.meter.prev + ' → ' + l.meter.curr + (l.meter.usage != null ? ' · ' + l.meter.usage + ' used' : '');
+      if(l.period) sub += (sub ? ' · ' : '') + (typeof l.period === 'string' ? l.period : '');
+      return '<div class="bl-il"><span>' + blEsc(l.d || 'Charge') + (sub ? '<i>' + blEsc(sub) + '</i>' : '') + '</span><b>' + blMoney(l.a) + '</b></div>';
+    }).join('');
+    return '<div class="bl-inv"><div class="bl-inv-h" onclick="this.parentNode.classList.toggle(\'open\')"><div class="bl-lic">' + kinds[it.kind][1] + '</div>'
+      + '<div class="bl-ltx"><b>' + blEsc(it.no || 'Document') + '</b><small>' + blEsc(blDate(it.date, true)) + (it.due && it.due !== it.date ? ' · due ' + blEsc(blDate(it.due)) : '') + ' · ' + kinds[it.kind][0] + '</small></div>'
+      + '<div class="bl-lam' + (it.total < 0 ? ' cr' : '') + '"><b>' + blMoney(it.total) + '</b>' + (it.ok ? '' : '<small style="color:var(--bl-owe)">⚠ check</small>') + '</div><span class="chev">›</span></div>'
+      + '<div class="bl-inv-b">' + (lines || '<div class="bl-hint" style="padding-top:10px">No line detail stored.</div>') + '</div></div>';
+  }).join('');
+}
+
+// ── Meters ──────────────────────────────────────────────────────────────────
+function renderMeters(){
+  var wrap = blEl('u-meters-wrap'); if(!wrap) return;
+  var R = _editReadings || [];
+  if(!R.length){
+    wrap.innerHTML = '<div class="bl-card2"><div class="bl-empty" style="margin:0;border:none;padding:12px 8px"><div class="big">🔢</div><h3>No readings yet</h3><p>Capture this month’s meter values above to start the history — or import Davies invoices to pull readings in automatically.</p></div></div>';
+    blRefreshUnitView(); return;
+  }
+  var order = R.map(function(r, i){ return i; }).reverse();
+  function usage(v, unit){ if(v == null) return '<span class="bl-use">first reading</span>'; return '<span class="bl-use' + (v < 0 ? ' neg' : '') + '">Used <b>' + _uAmt(v) + '</b> ' + unit + '</span>'; }
+  var cards = '<div class="bl-meter-cards">' + order.map(function(i){
+    var r = R[i], wu = _meterUsage(R, i, 'water'), eu = _meterUsage(R, i, 'elec');
+    return '<div class="bl-mc"><div class="bl-mc-h"><input type="date" class="bl-in" aria-label="Reading date" value="' + blEsc(r.date || '') + '" onchange="updateMeterReading(' + i + ',\'date\',this.value)">'
+      + '<button type="button" class="bl-ibtn" aria-label="Remove reading" onclick="deleteMeterReading(' + i + ')">🗑</button></div>'
+      + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">💧 Water (kL)</label><input type="number" inputmode="decimal" step="0.001" class="bl-in" value="' + (r.water == null ? '' : r.water) + '" placeholder="—" onchange="updateMeterReading(' + i + ',\'water\',this.value)">' + usage(wu, 'kL') + '</div>'
+      + '<div class="bl-f"><label class="bl-lbl">⚡ Electricity (kWh)</label><input type="number" inputmode="decimal" step="0.001" class="bl-in" value="' + (r.elec == null ? '' : r.elec) + '" placeholder="—" onchange="updateMeterReading(' + i + ',\'elec\',this.value)">' + usage(eu, 'kWh') + '</div></div>'
+      + ((wu || eu) ? '<button type="button" class="bl-btn sm" onclick="billMeterUsage(' + i + ')">Bill usage to statement</button>' : '') + '</div>';
+  }).join('') + '</div>';
+  var tbl = '<div class="bl-meter-tbl bl-card2"><table class="bl-tb"><thead><tr><th>Date</th><th class="r">💧 Reading</th><th class="r">Usage kL</th><th class="r">⚡ Reading</th><th class="r">Usage kWh</th><th></th></tr></thead><tbody>'
+    + order.map(function(i){
+        var r = R[i], wu = _meterUsage(R, i, 'water'), eu = _meterUsage(R, i, 'elec');
+        var u2 = function(v){ return v == null ? '<span style="color:var(--muted)">—</span>' : '<span style="color:' + (v < 0 ? 'var(--bl-owe)' : 'var(--text2)') + '">' + _uAmt(v) + '</span>'; };
+        return '<tr><td><input type="date" class="bl-in" style="min-height:38px;width:160px" value="' + blEsc(r.date || '') + '" onchange="updateMeterReading(' + i + ',\'date\',this.value)"></td>'
+          + '<td class="r"><input type="number" step="0.001" class="bl-in" style="min-height:38px;width:120px;text-align:right" value="' + (r.water == null ? '' : r.water) + '" onchange="updateMeterReading(' + i + ',\'water\',this.value)"></td><td class="r mono">' + u2(wu) + '</td>'
+          + '<td class="r"><input type="number" step="0.001" class="bl-in" style="min-height:38px;width:120px;text-align:right" value="' + (r.elec == null ? '' : r.elec) + '" onchange="updateMeterReading(' + i + ',\'elec\',this.value)"></td><td class="r mono">' + u2(eu) + '</td>'
+          + '<td class="r" style="white-space:nowrap">' + ((wu || eu) ? '<button type="button" class="bl-btn sm" onclick="billMeterUsage(' + i + ')">Bill usage</button> ' : '') + '<button type="button" class="bl-ibtn" style="width:36px;height:36px;font-size:14px" aria-label="Remove reading" onclick="deleteMeterReading(' + i + ')">✕</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  wrap.innerHTML = cards + tbl;
+  blRefreshUnitView();
+}
+function addMeterReading(){
+  var date = (blEl('mr-date') || {}).value || '';
+  var water = _mrNum((blEl('mr-water') || {}).value), elec = _mrNum((blEl('mr-elec') || {}).value);
+  if(!date){ blToast('Choose the reading date.', 'err'); return; }
+  if(water == null && elec == null){ blToast('Enter a water and/or electricity reading.', 'err'); return; }
+  var existing = null; _editReadings.forEach(function(r){ if(r.date === date) existing = r; });
+  if(existing){ if(water != null) existing.water = water; if(elec != null) existing.elec = elec; }
+  else _editReadings.push({ date:date, water:water, elec:elec });
+  _editReadings.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  ['mr-water', 'mr-elec'].forEach(function(id){ var e = blEl(id); if(e) e.value = ''; });
+  renderMeters();
+  blToast('Reading added', 'ok');
+}
+function billMeterUsage(i){
+  var R = _editReadings; if(i < 0 || i >= R.length) return;
+  var wt = parseFloat((blEl('u-water-tariff') || {}).value) || 0, et = parseFloat((blEl('u-elec-tariff') || {}).value) || 0;
+  var month = _monthLabel(R[i].date), wu = _meterUsage(R, i, 'water'), eu = _meterUsage(R, i, 'elec'), added = [];
+  if(wu != null && wu > 0){
+    if(wt > 0){ _editLedger.push({ date:R[i].date, src:'Water', desc:'Water: ' + _uAmt(wu) + ' kL @ R' + _uAmt(wt) + '/kL (' + month + ')', debit:Math.round(wu * wt * 100) / 100, credit:0 }); added.push('water'); }
+    else added.push('water-no-tariff');
+  }
+  if(eu != null && eu > 0){
+    if(et > 0){ _editLedger.push({ date:R[i].date, src:'Electricity', desc:'Electricity: ' + _uAmt(eu) + ' kWh @ R' + _uAmt(et) + '/kWh (' + month + ')', debit:Math.round(eu * et * 100) / 100, credit:0 }); added.push('elec'); }
+    else added.push('elec-no-tariff');
+  }
+  var billed = added.filter(function(x){ return x === 'water' || x === 'elec'; });
+  if(!billed.length){
+    if(added.length){ blToast('Set a water and/or electricity tariff first.', 'err'); blEl('u-water-tariff') && blEl('u-water-tariff').focus(); }
+    else blToast('No positive usage to bill for this reading.', 'err');
+    return;
+  }
+  _editLedger.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+  _editStmtMeta.ageing = null;
+  renderUnitLedger();
+  blToast('Posted ' + billed.join(' & ') + ' usage to the statement', 'ok');
+}
+
+// ── Open / close / save ─────────────────────────────────────────────────────
+function openUnitModal(id, opts){
+  opts = opts || {};
+  _currentUnitId = id;
+  var isNew = !id || !UNITS[id];
+  var u = isNew ? { section:'', type:'house', houseNo:'', area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, waterMeter:'', elecMeter:'', notes:'' } : UNITS[id];
+  BL.open = true; BL.snap = '';
+  var c = u.charges || {}, set = function(i, v){ var e = blEl(i); if(e) e.value = v; };
+  set('u-section', u.section || ''); set('u-type', u.type || 'house'); set('u-house', u.houseNo || ''); set('u-area', u.area || ''); set('u-pq', u.pq || '');
+  set('u-owner', u.ownerName || ''); set('u-email', u.ownerEmail || ''); set('u-phone', u.ownerPhone || '');
+  set('u-admin', c.adminLevy != null ? c.adminLevy : ''); set('u-maint', c.maintLevy != null ? c.maintLevy : ''); set('u-csos', c.csos != null ? c.csos : '');
+  set('u-water', u.waterMeter || ''); set('u-elec', u.elecMeter || ''); set('u-notes', u.notes || '');
+  var del = blEl('unit-delete-btn'); if(del) del.style.display = isNew ? 'none' : '';
+  _uTotalPreview();
+  var st = u.statement || {};
+  _editLedger = (st.ledger || []).map(function(l){ return { date:l.date || '', src:l.src || '', desc:l.desc || '', debit:Number(l.debit || 0), credit:Number(l.credit || 0) }; });
+  _editStmtMeta = { ageing:st.ageing || null, asOf:st.asOf || '' };
+  set('u-stmt-ref', st.ref || '');
+  var br = blEl('u-invoice-breakdown'); if(br) br.checked = !!u.invoiceBreakdown;
+  var today = new Date().toISOString().slice(0, 10);
+  set('ul-date', today); set('mr-date', today); set('mr-water', ''); set('mr-elec', '');
+  _lineType = 'levy'; renderLineChips();
+  var dd = blEl('ul-desc'); if(dd){ dd.value = ''; dd.dataset.auto = '1'; }
+  set('ul-amt', ''); setLineType('levy');
+  blToggleAddLine(false);
+  var tf = u.tariffs || {};
+  set('u-water-tariff', (tf.water != null && tf.water !== 0) ? tf.water : ''); set('u-elec-tariff', (tf.elec != null && tf.elec !== 0) ? tf.elec : '');
+  _editReadings = (u.meterReadings || []).map(function(r){ return { date:r.date, water:(r.water == null ? null : Number(r.water)), elec:(r.elec == null ? null : Number(r.elec)) }; });
+  renderUnitLedger(); renderMeters();
+  var m = blEl('unit-modal'); m.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  if(!BL.navUnit){ BL.navUnit = true; blNavPush(blUnitBack); }
+  setUnitTab(isNew ? 'details' : (opts.keepTab ? BL.tab : 'overview'));
+  blRefreshUnitView();
+  BL.snap = blSnapshot(); blUpdateDirty();
+  if(isNew) setTimeout(function(){ var s = blEl('u-section'); if(s) s.focus(); }, 80);
+}
+function blUnitBack(){            // browser/phone Back pressed (history entry already popped)
+  BL.navUnit = false;
+  if(blIsDirty()){
+    blConfirm('Discard your changes?', '<p>You have unsaved changes to this unit.</p>', 'Discard changes', { danger:true, cancelLabel:'Keep editing' }).then(function(ok){
+      if(ok) closeUnitModal(true); else { BL.navUnit = true; blNavPush(blUnitBack); }
+    });
+  } else closeUnitModal(true);
+}
+function closeUnitModal(fromBack){
+  var m = blEl('unit-modal'); if(m) m.style.display = 'none';
+  document.body.style.overflow = '';
+  BL.open = false; BL.snap = ''; _currentUnitId = null;
+  if(BL.navUnit && fromBack !== true){ BL.navUnit = false; blNavPop(); }
+}
+async function requestCloseUnitModal(){
+  if(!BL.open) return;
+  if(blIsDirty()){
+    var ok = await blConfirm('Discard your changes?', '<p>You have unsaved changes to this unit.</p>', 'Discard changes', { danger:true, cancelLabel:'Keep editing' });
+    if(!ok) return;
+  }
+  closeUnitModal();
+}
+async function saveUnitFromModal(opts){
+  opts = opts || {};
+  var section = _uNum('u-section');
+  if(!section){ setUnitTab('details'); blToast('Enter the section number first.', 'err'); var s = blEl('u-section'); if(s) s.focus(); return false; }
+  var id = _currentUnitId || ('unit_' + section);
+  if(!_currentUnitId && UNITS[id]){ setUnitTab('details'); blToast('Section ' + section + ' already exists — open it from the list instead.', 'err'); return false; }
+  var prev = UNITS[id] || {};
+  UNITS[id] = {
+    id:id, section:section, type:_uStr('u-type') || 'house', houseNo:_uStr('u-house'),
+    area:_uNum('u-area'), pq:_uNum('u-pq'),
+    ownerName:_uStr('u-owner'), ownerEmail:_uStr('u-email'), ownerPhone:_uStr('u-phone'),
+    charges:{ adminLevy:_uNum('u-admin'), maintLevy:_uNum('u-maint'), csos:_uNum('u-csos') },
+    waterMeter:_uStr('u-water'), elecMeter:_uStr('u-elec'), notes:_uStr('u-notes'),
+    tariffs:{ water:_uNum('u-water-tariff'), elec:_uNum('u-elec-tariff') },
+    meterReadings:(_editReadings || []).map(function(r){ return { date:r.date, water:r.water, elec:r.elec }; }),
+    statement:_uCollectStatement(prev),
+    invoiceBreakdown:!!(blEl('u-invoice-breakdown') && blEl('u-invoice-breakdown').checked),
+    invoices:prev.invoices, invoiceLines:prev.invoiceLines,
+    importedInvoices:prev.importedInvoices, importedCharges:prev.importedCharges, creditNotes:prev.creditNotes, daviesRef:prev.daviesRef,
+    added:prev.added || Date.now(), updated:Date.now()
+  };
+  if(opts.keepOpen){ _currentUnitId = id; BL.snap = blSnapshot(); blRefreshUnitView(); } else closeUnitModal();
+  renderUnits();
+  try { await saveUnits(); } catch(e){ blToast('Saved on this device, but the cloud save failed.', 'err'); return true; }
+  blToast('Section ' + section + ' saved', 'ok');
+  return true;
+}
+async function deleteUnit(id){
+  if(!id || !UNITS[id]) return;
+  var u = UNITS[id];
+  var ok = await blConfirm('Delete Section ' + (u.section || '') + '?',
+    '<p>This removes the unit' + (u.ownerName ? ' (<b>' + blEsc(blNice(u.ownerName)) + '</b>)' : '') + ' with its statement and meter readings from the billing register.</p><p class="mut">It doesn’t affect your Davies account. This can’t be undone.</p>', 'Delete unit', { danger:true });
+  if(!ok) return;
+  delete UNITS[id];
+  closeUnitModal();
+  renderUnits();
+  await saveUnits();
+  blToast('Section ' + (u.section || '') + ' deleted');
+}
+
+// Live updates while typing in the unit sheet.
+document.addEventListener('input', function(e){
+  if(!BL.open || !e.target || !e.target.closest || !e.target.closest('#unit-modal')) return;
+  if(/^u-(admin|maint|csos)$/.test(e.target.id)) _uTotalPreview();
+  blRefreshHead(); blUpdateDirty();
+});
+document.addEventListener('change', function(e){
+  if(!BL.open || !e.target || !e.target.closest || !e.target.closest('#unit-modal')) return;
+  blUpdateDirty();
+  if(BL.tab === 'overview') renderUnitOverview();
+});
+
+// ═══ Invoicing flows (single + monthly run) ═════════════════════════════════
+// Generate an invoice + statement for one unit: bill the period's charges, post
+// them to the statement, email both PDFs to the owner, and offer them for review.
+async function generateInvoice(id){
+  if(!id || !UNITS[id]){ blToast('Save the unit first, then generate its invoice.', 'err'); return; }
+  _syncUnitFromModalIfOpen(id);
+  var u = UNITS[id];
+  if(blIsGarage(u)){
+    await blAlert('Garages aren’t billed', '<p>Section ' + blEsc(u.section) + ' is a garage / store. Its levy is billed on the owner’s main unit invoice, so there’s nothing to invoice here.</p>');
+    return;
+  }
+  var inv = _buildInvoice(u);
+  if(!inv.lines.length || Math.abs(inv.total) < 0.005){
+    await blAlert('Nothing to invoice yet', '<p>Set the monthly levy amounts (admin, 10-yr maintenance, CSOS) on the unit’s <b>Details</b> tab first — they become the invoice lines.</p>');
+    return;
+  }
+  var ownerEmail = (u.ownerEmail || '').trim();
+  var bcInbox = (typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '';
+  var body = '<ul>' + inv.lines.map(function(l){ return '<li><span>' + blEsc(l.account) + '</span><b>' + _uAmtR(l.total) + '</b></li>'; }).join('')
+    + '<li><span><b>Invoice total</b></span><b>' + _uAmtR(inv.total) + '</b></li></ul>'
+    + '<p>Posted to the account and ' + (ownerEmail
+        ? 'emailed (invoice + statement PDFs) to <b>' + blEsc(u.ownerName || 'the owner') + '</b> at ' + blEsc(ownerEmail) + (bcInbox ? ', cc ' + blEsc(bcInbox) : '') + '.'
+        : 'opened for printing.') + '</p>'
+    + (ownerEmail ? '' : '<div class="warn">⚠ No owner email is set, so this won’t be emailed.</div>');
+  var ok = await blConfirm('Generate ' + inv.no + ' for Section ' + u.section + '?', body, ownerEmail ? 'Generate & email' : 'Generate', { kind:'ok' });
+  if(!ok) return;
+  _recordInvoiceOnUnit(u, inv, !!u.invoiceBreakdown);
+  var outstanding = _uLedgerTotal(u.statement.ledger);
+  if(id === _currentUnitId && BL.open){            // reflect on the open sheet immediately
+    _invoiceLedgerLines(inv, !!u.invoiceBreakdown).forEach(function(l){ _editLedger.push(l); });
+    _editLedger.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
+    _editStmtMeta.ageing = null;
+    renderUnitLedger();
+  }
+  await saveUnits();
+  renderUnits();
+  if(id === _currentUnitId && BL.open){ BL.snap = blSnapshot(); blRefreshUnitView(); }
+  blProgressOpen('Building ' + inv.no + '…', 'Creating the invoice and statement PDFs');
+  var invPdf, stmtPdf;
+  try {
+    invPdf = await _invoicePdf(u, inv);
+    stmtPdf = await _statementPdf(u);
+  } catch(e){
+    blDialogClose();
+    await blAlert(inv.no + ' posted', '<p>The charge is recorded on the statement, but the PDF couldn’t be built:</p><p class="mut">' + blEsc(e && e.message || e) + '</p><p>You can try again after a reload.</p>');
+    return;
+  }
+  var emailMsg = '', emailOk = null;
+  if(ownerEmail){
+    blProgress(0.6, 1, 'Emailing ' + ownerEmail + '…');
+    var r = await _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding);
+    emailOk = !!r.ok;
+    emailMsg = r.ok ? '<p>✓ Emailed to <b>' + blEsc(ownerEmail) + '</b>' + (bcInbox ? ' (cc ' + blEsc(bcInbox) + ')' : '') + '.</p>'
+                    : '<div class="warn">The email couldn’t be sent: ' + blEsc(r.error) + '<br>The PDFs are ready below so you can send them manually.</div>';
+  }
+  await blDialog({
+    title: (emailOk === false ? '⚠ ' : '✓ ') + inv.no + ' generated',
+    body: '<ul><li><span>Invoice total</span><b>' + _uAmtR(inv.total) + '</b></li><li><span>Balance now due</span><b>' + blMoney(outstanding) + '</b></li></ul>' + emailMsg,
+    cancel:true,
+    buttons:[
+      { label:'View invoice PDF', keep:true, onClick:function(){ try { window.open(invPdf.doc.output('bloburl'), '_blank'); } catch(e){ blToast('Couldn’t open the PDF', 'err'); } } },
+      { label:'View statement PDF', keep:true, onClick:function(){ try { window.open(stmtPdf.doc.output('bloburl'), '_blank'); } catch(e){ blToast('Couldn’t open the PDF', 'err'); } } },
+      { label:'Done', kind:'pri', value:true }
+    ]
+  });
+}
+
+// Generate invoices + statements for every billable house (monthly run).
+// Garages (sections 13+) are never billed on their own.
+async function generateAllInvoices(){
+  if(!_unitsLoaded){ await loadUnits(); }
+  var all = Object.values(UNITS);
+  var garages = all.filter(blIsGarage);
+  var list = all.filter(function(u){ return !blIsGarage(u) && _invoiceLineItems(u).length; }).sort(function(a, b){ return (a.section || 0) - (b.section || 0); });
+  if(!list.length){
+    await blAlert('No units to invoice', '<p>Set each house’s monthly levy amounts first (or use <b>Load Park Manor units</b> from the ⋯ menu).</p>');
+    return;
+  }
+  var withEmail = list.filter(function(u){ return (u.ownerEmail || '').trim(); });
+  var noEmail = list.length - withEmail.length;
+  var total = list.reduce(function(s, u){ return s + _invoiceLineItems(u).reduce(function(a, l){ return a + Number(l.total || 0); }, 0); }, 0);
+  var body = '<ul><li><span>Houses to bill</span><b>' + list.length + '</b></li><li><span>Total billed</span><b>' + _uAmtR(total) + '</b></li>'
+    + '<li><span>Will be emailed</span><b>' + withEmail.length + '</b></li><li><span>No email (recorded only)</span><b>' + noEmail + '</b></li></ul>'
+    + '<p class="mut">Each invoice is dated today, posted to the unit’s statement, and emailed with the statement PDF.'
+    + (garages.length ? ' ' + garages.length + ' garage' + (garages.length === 1 ? '' : 's') + ' skipped — they’re billed on the owner’s main unit.' : '') + '</p>'
+    + (noEmail ? '<div class="warn">⚠ ' + noEmail + ' house' + (noEmail === 1 ? ' has' : 's have') + ' no owner email and won’t be emailed.</div>' : '');
+  var ok = await blConfirm('Generate ' + list.length + ' invoices?', body, 'Generate ' + list.length + ' invoices', { kind:'ok' });
+  if(!ok) return;
+  blProgressOpen('Generating invoices…', 'Preparing PDFs');
+  try { await _ensurePdfLib(); } catch(e){ blDialogClose(); await blAlert('PDF library unavailable', '<p>Couldn’t load the PDF library:</p><p class="mut">' + blEsc(e && e.message || e) + '</p><p>Check your connection and try again.</p>'); return; }
+  var okEmail = 0, failEmail = 0, done = 0, failed = [];
+  for(var i = 0; i < list.length; i++){
+    var u = list[i], inv = _buildInvoice(u);
+    blProgress(i, list.length, 'Section ' + u.section + (u.ownerName ? ' · ' + u.ownerName : '') + ' (' + (i + 1) + ' of ' + list.length + ')');
+    await new Promise(function(r){ setTimeout(r, 0); });
+    if(!inv.lines.length || Math.abs(inv.total) < 0.005) continue;
+    _recordInvoiceOnUnit(u, inv, !!u.invoiceBreakdown); done++;
+    var outstanding = _uLedgerTotal(u.statement.ledger);
+    if((u.ownerEmail || '').trim()){
+      try {
+        var invPdf = await _invoicePdf(u, inv), stmtPdf = await _statementPdf(u);
+        var r = await _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding);
+        if(r.ok) okEmail++; else { failEmail++; failed.push('Section ' + u.section); }
+      } catch(e){ failEmail++; failed.push('Section ' + u.section); }
+    }
+  }
+  blProgress(list.length, list.length, 'Saving…');
+  await saveUnits();
+  renderUnits();
+  await blDialog({
+    title: (failEmail ? '⚠ ' : '✓ ') + done + ' invoice' + (done === 1 ? '' : 's') + ' generated',
+    body: '<ul><li><span>Emailed</span><b>' + okEmail + '</b></li><li><span>Email failed</span><b>' + failEmail + '</b></li><li><span>No email (recorded only)</span><b>' + noEmail + '</b></li></ul>'
+      + (failEmail ? '<div class="warn">Couldn’t email: ' + blEsc(failed.join(', ')) + '. Check that Brevo email is configured and the owners’ addresses are valid. The charges are still on their statements.</div>' : ''),
+    cancel:true, buttons:[{ label:'Done', kind:'pri', value:true }]
+  });
+}
+
+// ═══ Davies PDF importer — step-by-step sheet ═══════════════════════════════
+// (pdf.js loading / text extraction and the parsers live elsewhere and are unchanged.)
+var WC = { nav:false, bound:false };
+function wcStep(n){
+  document.querySelectorAll('#wc-steps .bl-step').forEach(function(s){
+    var k = Number(s.dataset.s); s.classList.toggle('on', k === n); s.classList.toggle('done', k < n);
+    s.querySelector('i').textContent = k < n ? '✓' : k;
+  });
+  blEl('wc-sec-choose').classList.toggle('on', n === 1);
+  blEl('wc-sec-review').classList.toggle('on', n >= 2);
+  blEl('wc-back-btn').style.display = n >= 2 ? '' : 'none';
+  blEl('wc-apply-btn').style.display = n >= 2 ? '' : 'none';
+  var body = document.querySelector('#wc-import-modal .bl-body'); if(body) body.scrollTop = 0;
+}
+function wcSetBtn(id, on){ var b = blEl(id); if(b) b.disabled = !on; }
+function openWeconnectImport(){
+  window._wcMap = null; window._wcDocs = null; window._wcFileCount = 0;
+  var fi = blEl('wc-files'); if(fi) fi.value = '';
+  blEl('wc-preview').innerHTML = ''; blEl('wc-status').textContent = ''; blEl('wc-foot-msg').textContent = '';
+  blEl('wc-prog').style.display = 'none';
+  blEl('wc-drop-title').textContent = 'Tap to choose PDFs';
+  blEl('wc-drop-sub').textContent = 'Select a month’s invoices, statements and credit notes — as many as you like at once. You can also drag & drop them here.';
+  wcSetBtn('wc-apply-btn', false);
+  wcStep(1);
+  blEl('wc-import-modal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  if(!WC.nav){ WC.nav = true; blNavPush(function(){ WC.nav = false; closeWeconnectImport(true); }); }
+  wcBindDrop();
+}
+function closeWeconnectImport(fromBack){
+  blEl('wc-import-modal').style.display = 'none';
+  if(!BL.open) document.body.style.overflow = '';
+  if(WC.nav && fromBack !== true){ WC.nav = false; blNavPop(); }
+}
+function wcBindDrop(){
+  if(WC.bound) return; WC.bound = true;
+  var d = blEl('wc-drop'); if(!d) return;
+  ['dragenter', 'dragover'].forEach(function(ev){ d.addEventListener(ev, function(e){ e.preventDefault(); d.classList.add('hot'); }); });
+  ['dragleave', 'drop'].forEach(function(ev){ d.addEventListener(ev, function(e){ e.preventDefault(); d.classList.remove('hot'); }); });
+  d.addEventListener('drop', function(e){
+    var files = Array.prototype.filter.call((e.dataTransfer && e.dataTransfer.files) || [], function(f){ return /pdf$/i.test(f.name) || f.type === 'application/pdf'; });
+    if(!files.length){ blToast('Drop PDF files only.', 'err'); return; }
+    try { var dt = new DataTransfer(); files.forEach(function(f){ dt.items.add(f); }); blEl('wc-files').files = dt.files; wcFilesChosen(); }
+    catch(err){ blToast('Your browser can’t accept dropped files here — tap to choose them instead.', 'err'); }
+  });
+}
+function wcBack(){
+  var fi = blEl('wc-files'); if(fi) fi.value = '';
+  window._wcMap = null; wcSetBtn('wc-apply-btn', false); blEl('wc-foot-msg').textContent = '';
+  wcStep(1);
+}
+function wcFilesChosen(){
+  var fi = blEl('wc-files'); if(!fi || !fi.files || !fi.files.length) return;
+  var n = fi.files.length, names = Array.prototype.slice.call(fi.files, 0, 3).map(function(f){ return f.name; }).join(', ');
+  blEl('wc-drop-title').textContent = n + ' PDF' + (n === 1 ? '' : 's') + ' selected';
+  blEl('wc-drop-sub').textContent = names + (n > 3 ? ' and ' + (n - 3) + ' more' : '');
+  wcParseFiles();
+}
+function _wcEsc(s){ return blEsc(s); }
+
+async function wcParseFiles(){
+  var fi = blEl('wc-files'), st = blEl('wc-status');
+  if(!fi || !fi.files || !fi.files.length) return;
+  if(typeof PMWeconnectU === 'undefined' || typeof PMMapper === 'undefined'){
+    wcStep(2); st.innerHTML = '<span style="color:var(--bl-owe)">The importer modules didn’t load — hard-refresh the page and try again.</span>'; return;
+  }
+  wcStep(2); wcSetBtn('wc-apply-btn', false); blEl('wc-preview').innerHTML = ''; blEl('wc-foot-msg').textContent = '';
+  var prog = blEl('wc-prog'), bar = blEl('wc-prog-bar'); prog.style.display = ''; bar.style.width = '0%';
+  var files = Array.prototype.slice.call(fi.files); window._wcFileCount = files.length;
+  var docs = [], errors = [];
+  for(var i = 0; i < files.length; i++){
+    var f = files[i];
+    st.textContent = 'Reading ' + (i + 1) + ' of ' + files.length + ' — ' + f.name;
+    bar.style.width = Math.round(i / files.length * 100) + '%';
+    await new Promise(function(r){ setTimeout(r, 0); });
+    try { var items = await wcExtractItems(f); var d = PMWeconnectU.detectAndParse(items, f.name); d._file = f.name; docs.push(d); }
+    catch(e){ errors.push(f.name + ': ' + (e && e.message || e)); }
+  }
+  bar.style.width = '100%';
+  var map = PMMapper.mapDocsToUnits(docs);
+  window._wcMap = map; window._wcDocs = docs;
+  prog.style.display = 'none';
+  st.textContent = '';
+  wcRenderPreview(map, docs, errors);
+  var n = Object.keys(map.units).length;
+  blEl('wc-foot-msg').textContent = n ? n + ' unit' + (n === 1 ? '' : 's') + ' ready to import' : 'Nothing importable found';
+  wcSetBtn('wc-apply-btn', n > 0);
+  blEl('wc-apply-btn').textContent = n ? 'Apply to ' + n + ' unit' + (n === 1 ? '' : 's') : 'Apply to units';
+}
+
+function wcRenderPreview(map, docs, errors){
+  var pv = blEl('wc-preview'); if(!pv) return;
+  var doors = Object.keys(map.units).map(Number).sort(function(a, b){ return a - b; });
+  var counts = { invoice:0, statement:0, credit_note:0, unknown:0 };
+  docs.forEach(function(d){ counts[d.docType] = (counts[d.docType] || 0) + 1; });
+  var nonRecon = docs.filter(function(d){ return d.docType === 'invoice' && d.reconciles === false; });
+  var h = '<div class="bl-chipsrow">'
+    + '<span class="bl-stat">🧾 <b>' + counts.invoice + '</b> invoice' + (counts.invoice === 1 ? '' : 's') + '</span>'
+    + '<span class="bl-stat">📄 <b>' + counts.statement + '</b> statement' + (counts.statement === 1 ? '' : 's') + '</span>'
+    + '<span class="bl-stat">↩️ <b>' + (counts.credit_note || 0) + '</b> credit note' + (counts.credit_note === 1 ? '' : 's') + '</span>'
+    + '<span class="bl-stat">🏠 <b>' + doors.length + '</b> unit' + (doors.length === 1 ? '' : 's') + '</span></div>';
+  if(counts.unknown) h += '<div class="bl-note"><span class="ic">❓</span><span>' + counts.unknown + ' file' + (counts.unknown === 1 ? ' wasn’t' : 's weren’t') + ' recognised as an invoice, statement or credit note and will be ignored.</span></div>';
+  if(errors && errors.length) h += '<div class="bl-note"><span class="ic">⚠️</span><span><b>Couldn’t read:</b> ' + errors.map(blEsc).join('; ') + (errors.some(function(e){ return /PDF reader/i.test(e); }) ? '<br>Check your connection, then tap “Back” and choose the files again.' : '') + '</span></div>';
+  if(nonRecon.length) h += '<div class="bl-note"><span class="ic">⚠️</span><span><b>Not reconciling:</b> ' + nonRecon.map(function(d){ return blEsc(d.invoiceNo); }).join(', ') + ' — line items don’t add up to the invoice total. Worth checking against the PDF.</span></div>';
+  if(map.flags && map.flags.length){
+    h += '<details class="bl-flags" open><summary>🔍 ' + map.flags.length + ' thing' + (map.flags.length === 1 ? '' : 's') + ' to review before applying</summary><ul>'
+      + map.flags.map(function(f){ return '<li>' + blEsc(f) + '</li>'; }).join('') + '</ul></details>';
+  }
+  h += '<div class="bl-ucards">' + doors.map(function(d){
+    var u = map.units[d], c = u.charges || {};
+    var levy = (c.levies || 0) + (c.csos || 0) + (c.reserve_fund || 0);
+    var led = u.statement && u.statement.ledger && u.statement.ledger.length ? u.statement.ledger : null;
+    var bal = led ? led[led.length - 1].cumulative : null;
+    var isNew = !UNITS['unit_' + d];
+    return '<div class="bl-uc"><div class="bl-sec">' + d + '</div><div class="bl-who">'
+      + '<div class="bl-name">' + (u.owner ? blEsc(blNice(u.owner)) : 'Unit ' + d) + '</div>'
+      + '<div class="bl-meta"><span class="bl-tag' + (isNew ? ' warn' : '') + '" style="margin:0 6px 0 0">' + (isNew ? 'new' : 'update') + '</span>' + u.invoices.length + ' invoice' + (u.invoices.length === 1 ? '' : 's') + ' · ' + u.meterReadings.length + ' reading' + (u.meterReadings.length === 1 ? '' : 's')
+      + (levy ? ' · levy ' + blMoney(levy) : '') + '</div></div>'
+      + '<div class="bl-bal ' + (bal == null ? 'none' : (bal > 0.005 ? 'owe' : (bal < -0.005 ? 'cr' : 'zero'))) + '"><b>' + (bal == null ? '—' : blMoney(Math.abs(bal))) + '</b><small>'
+      + (bal == null ? 'no statement' : (bal > 0.005 ? 'owing' : (bal < -0.005 ? 'in credit' : 'settled'))) + '</small></div></div>';
+  }).join('') + '</div>';
+  pv.innerHTML = h;
+}
+
+async function wcApplyImport(){
+  var map = window._wcMap; if(!map) return;
+  var applied = 0;
+  Object.keys(map.units).forEach(function(door){
+    var src = map.units[door], id = 'unit_' + door, u = UNITS[id];
+    if(!u){ u = UNITS[id] = { id:id, section:Number(door), type:(Number(door) > 12 ? 'store' : 'house'), houseNo:String(door), area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, meterReadings:[], added:Date.now() }; }
+    if(src.owner) u.ownerName = src.owner;
+    if(src.email) u.ownerEmail = src.email;
+    if(src.tel) u.ownerPhone = src.tel;
+    if(src.reference) u.daviesRef = src.reference;
+    if(src.charges && Object.keys(src.charges).length){
+      u.charges = u.charges || {};
+      if(src.charges.levies != null) u.charges.adminLevy = src.charges.levies;
+      if(src.charges.reserve_fund != null) u.charges.maintLevy = src.charges.reserve_fund;
+      if(src.charges.csos != null) u.charges.csos = src.charges.csos;
+      u.importedCharges = src.charges;
+    }
+    if(src.meterReadings && src.meterReadings.length){
+      var byDate = {}; (u.meterReadings || []).forEach(function(r){ byDate[r.date] = r; });
+      src.meterReadings.forEach(function(r){ byDate[r.date] = { date:r.date, water:r.water, elec:r.elec }; });
+      u.meterReadings = Object.keys(byDate).sort().map(function(k){ return byDate[k]; });
+    }
+    if(src.invoices && src.invoices.length) u.importedInvoices = src.invoices;
+    if(src.creditNotes && src.creditNotes.length) u.creditNotes = src.creditNotes;
+    if(src.statement) u.statement = src.statement;
+    u.updated = Date.now();
+    applied++;
+  });
+  wcSetBtn('wc-apply-btn', false);
+  try { await saveUnits(); } catch(e){ console.warn('wcApplyImport save', e); blToast('Saved on this device, but the cloud save failed.', 'err'); }
+  renderUnits();
+  closeWeconnectImport();
+  blToast('Imported ' + applied + ' unit' + (applied === 1 ? '' : 's') + ' from ' + (window._wcFileCount || 0) + ' file' + (window._wcFileCount === 1 ? '' : 's'), 'ok');
+}
+
+</script>
 
 <script>
 // ── Billing / Levies — Phase 1: Units register ──────────────────────────────
@@ -6872,198 +8342,10 @@ async function saveUnits(){
   try { await sbSetSetting('units', UNITS); } catch(e){ console.warn('saveUnits', e); }
 }
 
-async function openBillingTab(){
-  if(!_unitsLoaded){ await loadUnits(); }
-  renderUnits();
-}
 
-async function seedParkManorUnits(){
-  if(Object.keys(UNITS).length && !confirm('Load the 20 Park Manor units from the levy schedule?\n\nExisting units are kept; sections with the same number are overwritten with the schedule values (owner details preserved).')) return;
-  PARK_MANOR_UNITS_SEED.forEach(function(s){
-    var id = 'unit_' + s.section;
-    var prev = UNITS[id] || {};
-    UNITS[id] = {
-      id:id, section:s.section, type:s.type, houseNo:s.houseNo, area:s.area, pq:s.pq,
-      ownerName: prev.ownerName||'', ownerEmail: prev.ownerEmail||'', ownerPhone: prev.ownerPhone||'',
-      charges: { adminLevy:s.adminLevy, maintLevy:s.maintLevy, csos:s.csos },
-      waterMeter: prev.waterMeter||'', elecMeter: prev.elecMeter||'', notes: prev.notes||'',
-      tariffs: prev.tariffs||{}, meterReadings: prev.meterReadings||[], statement: prev.statement,
-      added: prev.added||Date.now(), updated: Date.now()
-    };
-  });
-  await saveUnits();
-  renderUnits();
-}
 
-function renderUnits(){
-  var wrap = document.getElementById('units-table-wrap');
-  var summary = document.getElementById('units-summary');
-  var empty = document.getElementById('units-empty');
-  var seedBtn = document.getElementById('units-seed-btn');
-  if(!wrap) return;
-  var all = Object.values(UNITS).sort(function(a,b){ return (a.section||0)-(b.section||0); });
 
-  // Keep the seed action available at all times — even after the first unit is
-  // added — so the schedule can always be (re)loaded. Label reflects state.
-  if(seedBtn){ seedBtn.style.display=''; seedBtn.innerHTML = all.length ? '⤓ Reload from schedule' : '⤓ Load Park Manor units'; }
 
-  if(!all.length){
-    wrap.innerHTML=''; if(summary) summary.innerHTML='';
-    if(empty){ empty.style.display='block'; empty.innerHTML='No units yet. Tap <b>“Load Park Manor units”</b> to import your 20 sections from the levy schedule, or <b>Add unit</b> to enter them manually.'; }
-    return;
-  }
-  if(empty) empty.style.display='none';
-
-  var q = ((document.getElementById('units-search')||{}).value||'').toLowerCase().trim();
-  var rows = all.filter(function(u){
-    if(!q) return true;
-    return (String(u.section)+' '+(u.houseNo||'')+' '+(u.type||'')+' '+(u.ownerName||'')+' '+(u.ownerEmail||'')).toLowerCase().indexOf(q)>=0;
-  });
-
-  var totPQ = all.reduce(function(s,u){ return s+Number(u.pq||0); },0);
-  var totAdmin = all.reduce(function(s,u){ return s+Number((u.charges||{}).adminLevy||0); },0);
-  var totMaint = all.reduce(function(s,u){ return s+Number((u.charges||{}).maintLevy||0); },0);
-  var totCsos = all.reduce(function(s,u){ return s+Number((u.charges||{}).csos||0); },0);
-  var totAll = totAdmin+totMaint+totCsos;
-  var pqOk = Math.abs(totPQ-100) < 0.05;
-  // Statement balances across the register
-  var balances = all.map(unitBalance);
-  var arrears = balances.reduce(function(s,b){ return s + (b>0.005?b:0); },0);
-  var arrearsCount = balances.filter(function(b){ return b>0.005; }).length;
-  var haveStmts = all.some(function(u){ return u.statement && (u.statement.ledger||[]).length; });
-  function tile(lbl,val,extra){ return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:9px;padding:10px 12px"><div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">'+lbl+'</div><div style="font-size:16px;font-weight:700;color:var(--text2);font-family:var(--sans)">'+val+'</div>'+(extra||'')+'</div>'; }
-  function tileWarn(lbl,val,extra){ return '<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid '+(arrearsCount?'#f0a06f':'var(--green)')+';border-radius:9px;padding:10px 12px"><div style="font-size:9px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">'+lbl+'</div><div style="font-size:16px;font-weight:700;color:'+(arrearsCount?'#f0a06f':'var(--green)')+';font-family:var(--sans)">'+val+'</div>'+(extra||'')+'</div>'; }
-  if(summary) summary.innerHTML =
-      tile('Units', all.length)
-    + tile('Total PQ', totPQ.toFixed(4)+'%', pqOk?'<div style="font-size:9px;color:var(--green);font-family:var(--mono)">✓ balances to 100%</div>':'<div style="font-size:9px;color:#f59e0b;font-family:var(--mono)">⚠ should total 100%</div>')
-    + tile('Monthly levies', _uMoney(totAll))
-    + tile('Admin levy', _uMoney(totAdmin), '<div style="font-size:9px;color:var(--muted);font-family:var(--mono)">+ maint '+_uMoney(totMaint)+' · CSOS '+_uMoney(totCsos)+'</div>')
-    + (haveStmts ? tileWarn('Arrears', _uMoney(arrears), '<div style="font-size:9px;color:var(--muted);font-family:var(--mono)">'+(arrearsCount?arrearsCount+' unit'+(arrearsCount>1?'s':'')+' in arrears':'all clear')+'</div>') : '');
-
-  var head = '<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.5px">'
-    + '<th style="padding:7px 8px">Sec</th><th style="padding:7px 8px">Type</th><th style="padding:7px 8px">House</th>'
-    + '<th style="padding:7px 8px;text-align:right">Area</th><th style="padding:7px 8px;text-align:right">PQ %</th>'
-    + '<th style="padding:7px 8px">Owner</th>'
-    + '<th style="padding:7px 8px;text-align:right">Admin</th><th style="padding:7px 8px;text-align:right">10-yr</th><th style="padding:7px 8px;text-align:right">CSOS</th>'
-    + '<th style="padding:7px 8px;text-align:right">Monthly total</th>'
-    + '<th style="padding:7px 8px;text-align:right">Balance due</th></tr>';
-  var body = rows.map(function(u){
-    var c=u.charges||{};
-    var typeBadge = u.type==='store'
-      ? '<span style="font-size:9px;font-family:var(--mono);color:#8aa0bd;background:rgba(138,160,189,.1);border:1px solid rgba(138,160,189,.25);padding:1px 7px;border-radius:9px">store</span>'
-      : '<span style="font-size:9px;font-family:var(--mono);color:var(--accent2);background:var(--accent-bg);border:1px solid var(--accent-bd);padding:1px 7px;border-radius:9px">house</span>';
-    return '<tr onclick="openUnitModal(\''+u.id+'\')" style="cursor:pointer;border-top:1px solid var(--border)" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-      + '<td style="padding:8px;font-family:var(--mono);color:var(--accent2);font-weight:600">'+escHtml(String(u.section||''))+'</td>'
-      + '<td style="padding:8px">'+typeBadge+'</td>'
-      + '<td style="padding:8px;color:var(--text2)">'+escHtml(u.houseNo||'')+'</td>'
-      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+escHtml(String(u.area||''))+'</td>'
-      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+Number(u.pq||0).toFixed(4)+'</td>'
-      + '<td style="padding:8px;color:var(--text2)">'+(u.ownerName?escHtml(u.ownerName):'<span style="color:var(--st-open);font-style:italic;font-size:11px">— set owner —</span>')+'</td>'
-      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--text2)">'+_uMoney(c.adminLevy)+'</td>'
-      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(c.maintLevy)+'</td>'
-      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(c.csos)+'</td>'
-      + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--green);font-weight:700">'+_uMoney(unitTotal(u))+'</td>'
-      + (function(){ var b=unitBalance(u); var has=u.statement&&(u.statement.ledger||[]).length; if(!has) return '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">—</td>'; var col=b>0.005?'#f0a06f':(b<-0.005?'var(--green)':'var(--muted)'); return '<td style="padding:8px;text-align:right;font-family:var(--mono);font-weight:600;color:'+col+'">'+_uMoney(b)+'</td>'; })()
-    + '</tr>';
-  }).join('');
-  var foot = '<tr style="border-top:2px solid var(--border2);font-weight:700">'
-    + '<td colspan="4" style="padding:8px;color:var(--muted);font-family:var(--mono);font-size:11px">TOTAL ('+rows.length+(rows.length!==all.length?' of '+all.length:'')+')</td>'
-    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:'+(pqOk?'var(--green)':'#f59e0b')+'">'+totPQ.toFixed(4)+'</td>'
-    + '<td></td>'
-    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--text2)">'+_uMoney(totAdmin)+'</td>'
-    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(totMaint)+'</td>'
-    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--muted)">'+_uMoney(totCsos)+'</td>'
-    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:var(--green)">'+_uMoney(totAll)+'</td>'
-    + '<td style="padding:8px;text-align:right;font-family:var(--mono);color:'+(arrears>0.005?'#f0a06f':'var(--muted)')+'">'+(haveStmts?_uMoney(arrears):'—')+'</td>'
-  + '</tr>';
-  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px;min-width:800px"><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table>';
-}
-
-function _uTotalPreview(){
-  var el=document.getElementById('u-total-preview');
-  if(el) el.textContent = 'Monthly total: ' + _uMoney(_uNum('u-admin')+_uNum('u-maint')+_uNum('u-csos'));
-}
-
-function openUnitModal(id){
-  _currentUnitId = id;
-  var isNew = !id || !UNITS[id];
-  var u = isNew ? {section:'',type:'house',houseNo:'',area:'',pq:'',ownerName:'',ownerEmail:'',ownerPhone:'',charges:{},waterMeter:'',elecMeter:'',notes:''} : UNITS[id];
-  document.getElementById('unit-modal-title').textContent = isNew ? 'Add unit' : ('Unit — Section '+(u.section||''));
-  document.getElementById('unit-delete-btn').style.display = isNew ? 'none' : '';
-  var c=u.charges||{};
-  document.getElementById('u-section').value = u.section||'';
-  document.getElementById('u-type').value = u.type||'house';
-  document.getElementById('u-house').value = u.houseNo||'';
-  document.getElementById('u-area').value = u.area||'';
-  document.getElementById('u-pq').value = u.pq||'';
-  document.getElementById('u-owner').value = u.ownerName||'';
-  document.getElementById('u-email').value = u.ownerEmail||'';
-  document.getElementById('u-phone').value = u.ownerPhone||'';
-  document.getElementById('u-admin').value = (c.adminLevy!=null?c.adminLevy:'');
-  document.getElementById('u-maint').value = (c.maintLevy!=null?c.maintLevy:'');
-  document.getElementById('u-csos').value = (c.csos!=null?c.csos:'');
-  document.getElementById('u-water').value = u.waterMeter||'';
-  document.getElementById('u-elec').value = u.elecMeter||'';
-  document.getElementById('u-notes').value = u.notes||'';
-  ['u-admin','u-maint','u-csos'].forEach(function(fid){ var e=document.getElementById(fid); if(e) e.oninput=_uTotalPreview; });
-  _uTotalPreview();
-  // Statement / ledger — load a working copy so Cancel discards edits
-  var st = u.statement || {};
-  _editLedger = (st.ledger||[]).map(function(l){ return {date:l.date||'', src:l.src||'', desc:l.desc||'', debit:Number(l.debit||0), credit:Number(l.credit||0)}; });
-  _editStmtMeta = { ageing: st.ageing||null, asOf: st.asOf||'' };
-  var refEl=document.getElementById('u-stmt-ref'); if(refEl) refEl.value = st.ref||'';
-  var brEl=document.getElementById('u-invoice-breakdown'); if(brEl) brEl.checked = !!u.invoiceBreakdown;
-  var today = new Date().toISOString().slice(0,10);
-  var dEl=document.getElementById('ul-date'); if(dEl) dEl.value = today;
-  renderUnitLedger();
-  // Guided line-item entry — reset to the default type
-  _lineType='levy'; renderLineChips(); var dd=document.getElementById('ul-desc'); if(dd){ dd.value=''; dd.dataset.auto='1'; } var aa=document.getElementById('ul-amt'); if(aa) aa.value=''; setLineType('levy');
-  // Meter readings + tariffs — load working copy so Cancel discards edits
-  var tf = u.tariffs || {};
-  var wtEl=document.getElementById('u-water-tariff'); if(wtEl) wtEl.value = (tf.water!=null&&tf.water!==0)?tf.water:'';
-  var etEl=document.getElementById('u-elec-tariff'); if(etEl) etEl.value = (tf.elec!=null&&tf.elec!==0)?tf.elec:'';
-  _editReadings = (u.meterReadings||[]).map(function(r){ return {date:r.date, water:(r.water==null?null:Number(r.water)), elec:(r.elec==null?null:Number(r.elec))}; });
-  var mrEl=document.getElementById('mr-date'); if(mrEl) mrEl.value = today;
-  renderMeters();
-  document.getElementById('unit-modal').style.display='flex';
-  document.body.style.overflow='hidden';
-}
-function closeUnitModal(){
-  document.getElementById('unit-modal').style.display='none';
-  document.body.style.overflow='';
-  _currentUnitId=null;
-}
-async function saveUnitFromModal(){
-  var section = _uNum('u-section');
-  if(!section){ alert('Please enter the section number.'); return; }
-  var id = _currentUnitId || ('unit_'+section);
-  var prev = UNITS[id] || {};
-  UNITS[id] = {
-    id:id, section:section, type:_uStr('u-type')||'house', houseNo:_uStr('u-house'),
-    area:_uNum('u-area'), pq:_uNum('u-pq'),
-    ownerName:_uStr('u-owner'), ownerEmail:_uStr('u-email'), ownerPhone:_uStr('u-phone'),
-    charges:{ adminLevy:_uNum('u-admin'), maintLevy:_uNum('u-maint'), csos:_uNum('u-csos') },
-    waterMeter:_uStr('u-water'), elecMeter:_uStr('u-elec'), notes:_uStr('u-notes'),
-    tariffs:{ water:_uNum('u-water-tariff'), elec:_uNum('u-elec-tariff') },
-    meterReadings: (_editReadings||[]).map(function(r){ return {date:r.date, water:r.water, elec:r.elec}; }),
-    statement: _uCollectStatement(prev),
-    invoiceBreakdown: !!(document.getElementById('u-invoice-breakdown') && document.getElementById('u-invoice-breakdown').checked),
-    invoices: prev.invoices,
-    invoiceLines: prev.invoiceLines,
-    added: prev.added||Date.now(), updated: Date.now()
-  };
-  closeUnitModal();
-  renderUnits();
-  await saveUnits();
-}
-async function deleteUnit(id){
-  if(!id || !UNITS[id]) return;
-  if(!confirm('Delete Section '+(UNITS[id].section||'')+'? This only removes it from the billing register.')) return;
-  delete UNITS[id];
-  closeUnitModal();
-  renderUnits();
-  await saveUnits();
-}
 
 // ── Levy statements / owner ledger — Phase 2 ────────────────────────────────
 // Each unit carries an optional `statement` = { ref, asOf, ageing, ledger[] }.
@@ -7143,47 +8425,6 @@ function _uAgeing(){
 }
 
 // Render the ledger table inside the unit modal.
-function renderUnitLedger(){
-  var wrap = document.getElementById('u-ledger-wrap');
-  if(!wrap) return;
-  var L = _editLedger || [];
-  if(!L.length){
-    wrap.innerHTML = '<div style="font-size:11px;color:var(--muted);font-family:var(--mono);padding:8px 2px">No statement lines yet. Add an opening balance / invoice / payment below, or use “Import statements” on the register to load the latest Davies statements.</div>';
-    return;
-  }
-  var cum = _uRunning(L);
-  var head = '<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.5px">'
-    + '<th style="padding:5px 6px">Date</th><th style="padding:5px 6px">Source</th><th style="padding:5px 6px">Description</th>'
-    + '<th style="padding:5px 6px;text-align:right">Debit</th><th style="padding:5px 6px;text-align:right">Credit</th>'
-    + '<th style="padding:5px 6px;text-align:right">Balance</th><th style="padding:5px 6px"></th></tr>';
-  var body = L.map(function(l,i){
-    var bal = cum[i];
-    return '<tr style="border-top:1px solid var(--border)">'
-      + '<td style="padding:5px 6px;font-family:var(--mono);color:var(--muted);white-space:nowrap">'+escHtml(l.date||'')+'</td>'
-      + '<td style="padding:5px 6px;color:#8aa0bd;font-size:11px">'+escHtml(l.src||'')+'</td>'
-      + '<td style="padding:5px 6px;color:var(--text2);font-size:11px">'+escHtml(l.desc||'')+'</td>'
-      + '<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--text2);white-space:nowrap">'+(Number(l.debit)?_uAmt(l.debit):'<span style="color:var(--muted)">·</span>')+'</td>'
-      + '<td style="padding:5px 6px;text-align:right;font-family:var(--mono);color:var(--green);white-space:nowrap">'+(Number(l.credit)?_uAmt(l.credit):'<span style="color:var(--muted)">·</span>')+'</td>'
-      + '<td style="padding:5px 6px;text-align:right;font-family:var(--mono);font-weight:600;white-space:nowrap;color:'+(bal>0.005?'#f0a06f':(bal<-0.005?'var(--green)':'var(--muted)'))+'">'+_uAmt(bal)+'</td>'
-      + '<td style="padding:5px 6px;text-align:right"><button type="button" title="Remove line" onclick="deleteLedgerLine('+i+')" style="background:none;border:none;color:#f06f6f;cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></td>'
-    + '</tr>';
-  }).join('');
-  var ag = _uAgeing();
-  var total = _uLedgerTotal(L);
-  var ageRow = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
-    + [['120+',ag.d120],['90+',ag.d90],['60+',ag.d60],['30+',ag.d30],['Current',ag.current]].map(function(x){
-        return '<div style="flex:1;min-width:70px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 8px;text-align:center">'
-          + '<div style="font-size:8px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase">'+x[0]+'</div>'
-          + '<div style="font-size:12px;font-family:var(--mono);color:'+(Math.abs(x[1])>0.005?'var(--text2)':'var(--muted)')+'">'+_uAmt(x[1])+'</div></div>';
-      }).join('')
-    + '</div>';
-  var totalRow = '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:2px solid var(--border2)">'
-    + '<span style="font-size:10px;color:#5a7fa8;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Total due</span>'
-    + '<span style="font-size:16px;font-weight:700;font-family:var(--mono);color:'+(total>0.005?'#f0a06f':(total<-0.005?'var(--green)':'var(--text2)'))+'">'+_uAmtR(total)+'</span></div>'
-    + (total<-0.005?'<div style="font-size:9px;color:var(--green);font-family:var(--mono);text-align:right">owner in credit</div>':'')
-    + (!_editStmtMeta.ageing?'<div style="font-size:9px;color:var(--muted);font-family:var(--mono);text-align:right;margin-top:2px">ageing recalculated from ledger</div>':'');
-  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>' + ageRow + totalRow;
-}
 
 // Guided line-item types — the user picks what the line IS; the app decides
 // which side (debit = charge to owner, credit = money in) and fills sensible
@@ -7199,15 +8440,6 @@ var LINE_TYPES = [
 var _lineType = 'levy';
 function _lineTypeDef(k){ for(var i=0;i<LINE_TYPES.length;i++) if(LINE_TYPES[i].key===k) return LINE_TYPES[i]; return LINE_TYPES[0]; }
 function _monthLabel(d){ if(!d) return ''; var dt=new Date(d+'T00:00:00'); if(isNaN(dt)) return ''; return dt.toLocaleDateString('en-ZA',{month:'short',year:'numeric'}); }
-function renderLineChips(){
-  var wrap=document.getElementById('ul-type-chips'); if(!wrap) return;
-  wrap.innerHTML = LINE_TYPES.map(function(t){
-    var on = t.key===_lineType;
-    return '<button type="button" onclick="setLineType(\''+t.key+'\')" style="padding:5px 11px;border-radius:20px;font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap;'
-      + (on ? 'background:var(--accent);border:1px solid var(--accent);color:#fff;font-weight:600' : 'background:var(--surface);border:1px solid var(--border2);color:var(--text2)')
-      + '">'+t.label+'</button>';
-  }).join('');
-}
 function setLineType(k){
   _lineType=k; var t=_lineTypeDef(k);
   renderLineChips();
@@ -7232,37 +8464,6 @@ function _ulSyncDesc(){
   if(!descEl.value || descEl.dataset.auto==='1'){ descEl.value = suggested; descEl.dataset.auto='1'; }
 }
 
-function addLedgerLine(){
-  var t=_lineTypeDef(_lineType);
-  var date=(document.getElementById('ul-date')||{}).value||'';
-  var descEl=document.getElementById('ul-desc');
-  var desc=(descEl?descEl.value:'').trim();
-  var amt=parseFloat((document.getElementById('ul-amt')||{}).value)||0;
-  if(!date){ alert('Please choose a date for the line.'); return; }
-  if(!amt){ alert('Please enter an amount.'); return; }
-  if(!desc) desc = t.descTpl ? t.descTpl.replace('{month}', _monthLabel(date)) : t.label.replace(/^\S+\s/,'');
-  var line={date:date, src:t.src, desc:desc, debit:0, credit:0};
-  if(t.side==='credit') line.credit=Math.abs(amt); else line.debit=Math.abs(amt);
-  _editLedger.push(line);
-  _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-  _editStmtMeta.ageing = null;   // snapshot no longer valid once edited
-  var a=document.getElementById('ul-amt'); if(a) a.value='';
-  if(descEl){ descEl.value=''; descEl.dataset.auto='1'; }
-  _ulSyncDesc();
-  renderUnitLedger();
-}
-function deleteLedgerLine(i){
-  if(i<0 || i>=_editLedger.length) return;
-  _editLedger.splice(i,1);
-  _editStmtMeta.ageing = null;
-  renderUnitLedger();
-}
-function deleteLedgerLine(i){
-  if(i<0 || i>=_editLedger.length) return;
-  _editLedger.splice(i,1);
-  _editStmtMeta.ageing = null;
-  renderUnitLedger();
-}
 
 // ── Meter readings ──────────────────────────────────────────────────────────
 // One row per reading date: cumulative water (kL) and electricity (kWh) values.
@@ -7273,34 +8474,6 @@ function _meterUsage(readings, i, key){
   var cur = readings[i]; if(cur[key]==null) return null;
   for(var j=i-1;j>=0;j--){ if(readings[j][key]!=null) return Math.round((cur[key]-readings[j][key])*1000)/1000; }
   return null; // first reading — no baseline yet
-}
-function renderMeters(){
-  var wrap=document.getElementById('u-meters-wrap'); if(!wrap) return;
-  var R=_editReadings||[];
-  if(!R.length){ wrap.innerHTML='<div style="font-size:11px;color:var(--muted);font-family:var(--mono);padding:6px 2px">No readings yet. Capture this month’s meter values below to start the history.</div>'; return; }
-  var head='<tr style="text-align:left;color:#5a7fa8;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.5px">'
-    +'<th style="padding:5px 6px">Date</th>'
-    +'<th style="padding:5px 6px;text-align:right">💧 Reading</th><th style="padding:5px 6px;text-align:right">Usage (kL)</th>'
-    +'<th style="padding:5px 6px;text-align:right">⚡ Reading</th><th style="padding:5px 6px;text-align:right">Usage (kWh)</th>'
-    +'<th style="padding:5px 6px"></th></tr>';
-  // Each Date / Reading cell is an editable input; editing recomputes usage
-  // (and every following row's usage) automatically via updateMeterReading().
-  var inCss='width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-size:12px;font-family:var(--mono);padding:4px 6px;outline:none';
-  var body=R.map(function(r,i){
-    var wu=_meterUsage(R,i,'water'), eu=_meterUsage(R,i,'elec');
-    function usg(v){ if(v==null) return '<span style="color:var(--muted)">—</span>'; var neg=v<0; return '<span style="color:'+(neg?'#f0a06f':'var(--text2)')+'">'+_uAmt(v)+'</span>'; }
-    return '<tr style="border-top:1px solid var(--border)">'
-      +'<td style="padding:4px 6px;white-space:nowrap"><input type="date" value="'+escHtml(r.date||'')+'" onchange="updateMeterReading('+i+',\'date\',this.value)" style="'+inCss+';width:150px"></td>'
-      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap"><input type="number" step="0.001" value="'+(r.water==null?'':r.water)+'" placeholder="kL" onchange="updateMeterReading('+i+',\'water\',this.value)" style="'+inCss+';text-align:right;width:110px"></td>'
-      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(wu)+'</td>'
-      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap"><input type="number" step="0.001" value="'+(r.elec==null?'':r.elec)+'" placeholder="kWh" onchange="updateMeterReading('+i+',\'elec\',this.value)" style="'+inCss+';text-align:right;width:110px"></td>'
-      +'<td style="padding:5px 6px;text-align:right;font-family:var(--mono);white-space:nowrap">'+usg(eu)+'</td>'
-      +'<td style="padding:5px 6px;text-align:right;white-space:nowrap">'
-        +((wu||eu)?'<button type="button" title="Bill this month’s usage to the statement" onclick="billMeterUsage('+i+')" style="background:none;border:1px solid var(--accent-bd);border-radius:6px;color:var(--accent2);cursor:pointer;font-size:10px;font-family:var(--mono);padding:2px 7px;margin-right:4px">Bill</button>':'')
-        +'<button type="button" title="Remove reading" onclick="deleteMeterReading('+i+')" style="background:none;border:none;color:#f06f6f;cursor:pointer;font-size:13px;line-height:1;padding:0 3px">✕</button></td>'
-    +'</tr>';
-  }).join('');
-  wrap.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px"><thead style="position:static">'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
 // Edit an existing reading in place. Recomputes usage for this row and every
 // following row (each usage is the difference from the previous reading).
@@ -7314,50 +8487,12 @@ function updateMeterReading(i, field, value){
   }
   renderMeters();
 }
-function addMeterReading(){
-  var date=(document.getElementById('mr-date')||{}).value||'';
-  var water=_mrNum((document.getElementById('mr-water')||{}).value);
-  var elec=_mrNum((document.getElementById('mr-elec')||{}).value);
-  if(!date){ alert('Please choose the reading date.'); return; }
-  if(water==null && elec==null){ alert('Enter a water and/or electricity reading.'); return; }
-  var existing=null; _editReadings.forEach(function(r){ if(r.date===date) existing=r; });
-  if(existing){ if(water!=null) existing.water=water; if(elec!=null) existing.elec=elec; }
-  else _editReadings.push({date:date, water:water, elec:elec});
-  _editReadings.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-  ['mr-water','mr-elec'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
-  renderMeters();
-}
 function deleteMeterReading(i){
   if(i<0||i>=_editReadings.length) return;
   _editReadings.splice(i,1);
   renderMeters();
 }
 // Turn a month's usage into charge line(s) on the statement, using the tariffs.
-function billMeterUsage(i){
-  var R=_editReadings; if(i<0||i>=R.length) return;
-  var wt=parseFloat((document.getElementById('u-water-tariff')||{}).value)||0;
-  var et=parseFloat((document.getElementById('u-elec-tariff')||{}).value)||0;
-  var month=_monthLabel(R[i].date);
-  var wu=_meterUsage(R,i,'water'), eu=_meterUsage(R,i,'elec');
-  var added=[];
-  if(wu!=null && wu>0){
-    if(wt>0){ _editLedger.push({date:R[i].date, src:'Water', desc:'Water: '+_uAmt(wu)+' kL @ R'+_uAmt(wt)+'/kL ('+month+')', debit:Math.round(wu*wt*100)/100, credit:0}); added.push('water'); }
-    else added.push('water-no-tariff');
-  }
-  if(eu!=null && eu>0){
-    if(et>0){ _editLedger.push({date:R[i].date, src:'Electricity', desc:'Electricity: '+_uAmt(eu)+' kWh @ R'+_uAmt(et)+'/kWh ('+month+')', debit:Math.round(eu*et*100)/100, credit:0}); added.push('elec'); }
-    else added.push('elec-no-tariff');
-  }
-  var billed=added.filter(function(x){ return x==='water'||x==='elec'; });
-  if(!billed.length){
-    if(added.length) alert('Set a water and/or electricity tariff above to bill this usage.');
-    else alert('No positive usage to bill for this reading.');
-    return;
-  }
-  _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-  _editStmtMeta.ageing=null;
-  renderUnitLedger();
-}
 
 // Build the statement object saved onto the unit from the modal's working copy.
 function _uCollectStatement(prev){
@@ -7783,114 +8918,12 @@ async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
 
 // Generate an invoice + statement for a single unit: bill the period's charges,
 // email both PDFs to the owner, and open them for review.
-async function generateInvoice(id){
-  if(!UNITS[id]){ alert('No unit selected.'); return; }
-  _syncUnitFromModalIfOpen(id);
-  var u = UNITS[id];
-  var inv = _buildInvoice(u);
-  if(!inv.lines.length || Math.abs(inv.total) < 0.005){
-    alert('This unit has no charges to invoice yet.\n\nSet the monthly levy amounts (Admin / 10-yr maintenance / CSOS) on the unit first — those become the invoice line items.');
-    return;
-  }
-  var ownerEmail = (u.ownerEmail||'').trim();
-  var bcInbox = (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '';
-  var lineSummary = inv.lines.map(function(l){ return '  • '+l.account+':  '+_uAmtR(l.total); }).join('\n');
-  var msg = 'Generate ' + inv.no + ' for Section ' + (u.section||'') + '?\n\n'
-    + 'This bills the unit for this period:\n' + lineSummary + '\n'
-    + '  ────────────\n  Invoice total:  ' + _uAmtR(inv.total) + '\n\n'
-    + 'It will be posted to the account (statement) and '
-    + (ownerEmail
-        ? ('emailed — with a PDF invoice and statement — to ' + (u.ownerName||'the owner') + ' (' + ownerEmail + ')' + (bcInbox?(', cc ' + bcInbox):'') + '.')
-        : 'opened for printing.\n\n⚠ No owner email is set, so it will not be emailed.');
-  if(!confirm(msg)) return;
-  var breakdown = !!u.invoiceBreakdown;
-  _recordInvoiceOnUnit(u, inv, breakdown);
-  var outstanding = _uLedgerTotal(u.statement.ledger);
-  if(id===_currentUnitId){ // reflect on the open modal immediately
-    _invoiceLedgerLines(inv, breakdown).forEach(function(l){ _editLedger.push(l); });
-    _editLedger.sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
-    _editStmtMeta.ageing = null;
-    renderUnitLedger();
-  }
-  await saveUnits();
-  renderUnits();
-  var invPdf, stmtPdf;
-  try {
-    invPdf = await _invoicePdf(u, inv);
-    stmtPdf = await _statementPdf(u);
-  } catch(e){
-    alert(inv.no + ' was posted to the statement, but the PDF could not be built:\n\n' + (e && e.message || e) + '\n\n(The charge is recorded; you can try emailing again after a reload.)');
-    return;
-  }
-  if(ownerEmail){
-    var r = await _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding);
-    if(r.ok) alert('✓ ' + inv.no + ' generated and emailed to ' + ownerEmail + (bcInbox?(' (cc ' + bcInbox + ')'):'') + '.\n\nThe invoice and statement PDFs will open for your records.');
-    else alert(inv.no + ' was posted to the statement, but the email could not be sent:\n\n' + r.error + '\n\nThe PDFs will still open so you can save/send them manually.');
-  }
-  try { window.open(invPdf.doc.output('bloburl'), '_blank'); window.open(stmtPdf.doc.output('bloburl'), '_blank'); } catch(e){}
-}
 
 // Generate invoices + statements for every unit that has charges (monthly run).
-async function generateAllInvoices(){
-  if(!_unitsLoaded){ await loadUnits(); }
-  var list = Object.values(UNITS).filter(function(u){ return _invoiceLineItems(u).length; });
-  if(!list.length){ alert('No units have charges to invoice yet.\n\nSet each unit’s monthly levy amounts first (or use “Load Park Manor units”).'); return; }
-  var withEmail = list.filter(function(u){ return (u.ownerEmail||'').trim(); }).length;
-  if(!confirm('Generate invoices for ' + list.length + ' unit(s), dated today?\n\n'
-      + 'This bills each unit for its current levy charges, posts the invoice to its statement, and emails the invoice + statement PDFs to owners.\n\n'
-      + '• ' + withEmail + ' will be emailed\n'
-      + '• ' + (list.length-withEmail) + ' have no email (recorded only)')) return;
-  try { await _ensurePdfLib(); } catch(e){ alert('Could not load the PDF library:\n\n'+(e&&e.message||e)); return; }
-  var okEmail=0, failEmail=0;
-  for(var i=0;i<list.length;i++){
-    var u = list[i];
-    var inv = _buildInvoice(u);
-    if(!inv.lines.length || Math.abs(inv.total) < 0.005) continue;
-    _recordInvoiceOnUnit(u, inv, !!u.invoiceBreakdown);
-    var outstanding = _uLedgerTotal(u.statement.ledger);
-    if((u.ownerEmail||'').trim()){
-      try {
-        var invPdf = await _invoicePdf(u, inv);
-        var stmtPdf = await _statementPdf(u);
-        var r = await _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding);
-        if(r.ok) okEmail++; else failEmail++;
-      } catch(e){ failEmail++; }
-    }
-  }
-  await saveUnits();
-  renderUnits();
-  if(_currentUnitId && UNITS[_currentUnitId]) openUnitModal(_currentUnitId);
-  alert('Generated ' + list.length + ' invoice(s).\n\nEmailed: ' + okEmail + '   ·   Failed: ' + failEmail + '   ·   No email: ' + (list.length-withEmail)
-    + (failEmail?('\n\nSome emails failed — check that Brevo email is configured and owner addresses are valid.'):''));
-}
 
 // Import the supplied Davies statement snapshot into matching units (by section
 // = Door No). Owner name / email / phone are filled only where blank so manual
 // edits are preserved; the statement (ledger + ageing snapshot) is (re)loaded.
-async function seedParkManorStatements(){
-  if(typeof PARK_MANOR_STATEMENTS_SEED === 'undefined'){ alert('Statement seed not found.'); return; }
-  var keys = Object.keys(PARK_MANOR_STATEMENTS_SEED);
-  if(!confirm('Import the latest levy statements for '+keys.length+' units?\n\nThis loads each ledger and the ageing snapshot (as at 2026-09-14) onto the matching section. Owner name/email/phone are filled only where blank; levy charges and other fields are untouched.')) return;
-  if(!_unitsLoaded){ await loadUnits(); }
-  var applied = 0;
-  keys.forEach(function(sec){
-    var s = PARK_MANOR_STATEMENTS_SEED[sec];
-    var id = 'unit_' + sec;
-    var u = UNITS[id];
-    if(!u){ // create a stub unit if the section isn't loaded yet
-      u = UNITS[id] = { id:id, section:Number(sec), type:(Number(sec)>12?'store':'house'), houseNo:'', area:'', pq:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, waterMeter:'', elecMeter:'', notes:'', added:Date.now() };
-    }
-    if(!u.ownerName && s.owner) u.ownerName = s.owner;
-    if(!u.ownerEmail && s.email) u.ownerEmail = s.email;
-    if(!u.ownerPhone && s.tel) u.ownerPhone = s.tel;
-    u.statement = { ref:s.ref, asOf:'2026-09-14', ageing:s.ageing, ledger:s.ledger.map(function(l){ return {date:l.date, src:l.src, desc:l.desc, debit:l.debit, credit:l.credit}; }) };
-    u.updated = Date.now();
-    applied++;
-  });
-  await saveUnits();
-  renderUnits();
-  alert('Imported statements for '+applied+' units. Open a unit to view its ledger or print the statement.');
-}
 </script>
 
 <!-- TICKETS PANEL -->
