@@ -34,6 +34,11 @@
     return out;
   }
 
+  // "Water Fixed Basic Charges - Backdate 2026 payment 1 of 3" → {n:1, of:3}
+  function instalment(txt) {
+    var m = /payment\s+(\d+)\s+of\s+(\d+)\s*$/i.exec(txt || "");
+    return m ? { n: parseInt(m[1], 10), of: parseInt(m[2], 10) } : null;
+  }
   function period(txt) {
     var m = /\((\d{4}-\d\d-\d\d) to (\d{4}-\d\d-\d\d)\)/.exec(txt);
     return m ? { from: m[1], to: m[2] } : null;
@@ -94,9 +99,10 @@
       var amount = money(t[4]);
       var kind = classify(txt);
       var line = { kind: kind, desc: txt, unitPrice: money(t[1]), disc: money(t[2]), tax: money(t[3]), amount: amount };
-      var p = period(txt), mt = meter(txt);
+      var p = period(txt), mt = meter(txt), ins = instalment(txt);
       if (p) line.period = p;
       if (mt) line.meter = mt;
+      if (ins) line.inst = ins;
       res.lines.push(line);
       // Roll up named charges + pull meter readings out to the top level.
       if (kind === "other") res.other.push({ desc: txt, amount: amount });
@@ -270,8 +276,9 @@
       var combined = (L.account + " " + L.desc).trim();
       var kind = classify(combined);
       var p = period(L.desc), mt = meter(L.desc);
-      var line = { kind: kind, desc: combined, amount: L.amount };
-      if (p) line.period = p; if (mt) line.meter = mt;
+      var ins = instalment(L.desc);
+      var line = { kind: kind, desc: combined, account: L.account, description: L.desc, amount: L.amount };
+      if (p) line.period = p; if (mt) line.meter = mt; if (ins) line.inst = ins;
       res.lines.push(line);
       if (kind === "other") res.other.push({ desc: combined, amount: L.amount });
       else res.charges[kind] = (res.charges[kind] || 0) + L.amount;
@@ -301,7 +308,7 @@
     return parseInvoiceItems(items);
   }
 
-  var API = { parseInvoiceText: parseInvoiceText, parseInvoiceItems: parseInvoiceItems,
+  var API = { instalment: instalment, classify: classify, parseInvoiceText: parseInvoiceText, parseInvoiceItems: parseInvoiceItems,
     parseCreditNoteText: parseCreditNoteText, parseStatementItems: parseStatementItems,
     groupRows: groupRows, flattenItems: flattenItems, detectAndParse: detectAndParse, money: money };
   if (typeof module !== "undefined" && module.exports) module.exports = API;

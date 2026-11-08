@@ -224,3 +224,12 @@ Store the CSVs somewhere durable. If Supabase disappears or the project is delet
   `management`.
 - **`invoices.data`**: `added` (ms timestamp — the Journey's doc time; admin
   re-timing mutates it), spreadsheet mime types now accepted.
+
+## November 2026 additions
+
+- **`users.data`**: `tabs[]` now stored for viewer, trustee and management
+  (may include `'billing'`); `billingEdit?: true` lets that user edit Billing
+  (default is view-only). Older records may carry `billing: 'view'|'edit'` —
+  still honoured. Helper: `userBillingLevel(user)`.
+- **`settings.units`**: the billing register (`UNITS` map) — see the Billing
+  UI in `index.html` (`<style id="bl-css">` / `<script id="bl-ui">`).

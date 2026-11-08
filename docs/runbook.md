@@ -82,8 +82,13 @@ their own password anytime via the **🔑 button** in the header; the login
 screen has **Forgot password?** (emails fresh credentials, reveals nothing
 about which emails exist).
 
-**Rollout lock (temporary):** all non-admin roles currently see only the
-Tracker tab — two `ROLLOUT LOCK` branches in `postLoginUiSetup` control this.
+**Rollout lock (temporary):** non-admin roles are limited to the Tracker —
+the `ROLLOUT LOCK` branches in `applyUserSession` control this. Exceptions,
+both set in the user's **Tabs this user can see** list (Users → edit): the
+**Billing** tab (Viewer / Trustee / Management; view-only unless "Billing is
+view only" is unticked) and, for Viewers, whether the **Tracker** shows
+(Trustees and management always keep it). Other ticks in that list (Expenses,
+Transactions, …) have no effect until the lock is lifted.
 
 ### Toggling the public reporting form
 
@@ -164,6 +169,13 @@ Ranked roughly by severity:
 4. **Hardcoded admin path.** The legacy "admin/admin" fallback bypasses the server endpoint (no JWT, no passkey). Kept because losing access is worse than the weak auth. Retire once passkey enrolment is universal.
 5. **Concurrent-edit races.** Last-write-wins. Rare in practice but real.
 6. **Long conversation state on visibilitychange.** The tab-refocus refetch can cause "docs disappear then reappear" flicker. Mostly fixed but keep an eye on it.
+
+## Billing (levies)
+
+See `billing.md`. Short version: import the Davies PDFs monthly; the app learns
+each unit's charges from the newest invoice; drafts are free to edit, issued
+invoices are locked and fixed with credit notes; ⋯ → Billing settings holds the
+letterhead, bank details, numbering and tariffs.
 
 ## Getting help
 

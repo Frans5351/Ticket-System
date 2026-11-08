@@ -57,10 +57,15 @@
         u.invoices.push({ invoiceNo: d.invoiceNo, date: d.invoiceDate, due: d.dueDate, total: d.total, lines: d.lines, meter: d.meter, reconciles: d.reconciles });
         if (!d.reconciles) flags.push(d.invoiceNo + " (door " + d.doorNo + ") does not reconcile: lines " + d.lineSum + " vs total " + d.total + ".");
         // Meter readings: one row per invoice month (water & elec cumulative).
+        // The row is dated by the invoice; each meter also keeps its own
+        // reading date (the end of the period printed on the invoice) so the
+        // next invoice's usage runs from the right day.
         if (d.meter && (d.meter.water || d.meter.elec)) {
-          u.meterReadings.push({ date: d.invoiceDate,
-            water: d.meter.water ? d.meter.water.curr : null,
-            elec: d.meter.elec ? d.meter.elec.curr : null, src: d.invoiceNo });
+          var w = d.meter.water, e = d.meter.elec;
+          u.meterReadings.push({ date: (w && w.period && w.period.to) || (e && e.period && e.period.to) || d.invoiceDate,
+            water: w ? w.curr : null, wDate: (w && w.period) ? w.period.to : null, wFrom: (w && w.period) ? w.period.from : null,
+            elec: e ? e.curr : null, eDate: (e && e.period) ? e.period.to : null, eFrom: (e && e.period) ? e.period.from : null,
+            src: d.invoiceNo });
         }
         // Keep the latest month's named charges as the unit's current charges.
         if (d.invoiceDate >= u.latestInvoiceDate) { u.latestInvoiceDate = d.invoiceDate; u.charges = d.charges; }

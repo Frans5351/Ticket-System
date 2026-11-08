@@ -11,6 +11,7 @@ If you're new to the system, read in this order:
 3. **[Components](./03-components.md)** — the logical modules inside the frontend
 4. **[Data model](./data-model.md)** — Supabase tables and record shapes
 5. **[Runbook](./runbook.md)** — how to deploy, configure, and operate
+6. **[Billing](./billing.md)** — the levy billing module: rules, data, monthly run, tariffs
 
 ## What this is not
 
