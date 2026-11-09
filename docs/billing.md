@@ -78,6 +78,27 @@ from the newest imported invoice (or the legacy charges).
    (`/api/send-email`, same Brevo function as tickets), result recorded on the
    invoice (`sentAt`, `emailOk`). Failures leave the invoice issued; use Resend.
 
+## Shared charges & recoveries (⋯ menu)
+
+One screen for every charge raised on all the houses at once (`settings.billing_plans`,
+`BL_PLANS`). A plan has a kind (every month / N instalments / once), a scheme-wide
+total and a split basis: **participation quota** (`unit.pq`), **equal**,
+**fixed-charge ratio** (`unit.fixedRatio` — Azure's historic water/sanitation
+split, kept by trustee decision 30 Oct 2026; Park Manor's figures are built in as
+`PARK_MANOR_FIXED_RATIO`), **manual** per house, or the **CSOS rule** (2% of the
+house's monthly levy above R500, capped at R40 — matches Davies to the cent).
+Cents are balanced with the largest-remainder rule so shares add up exactly.
+Applying writes one line per house onto its charge schedule tagged `planId`
+(adopting an existing identical line instead of duplicating it); removing a plan
+takes the lines off. Instalment progress is counted from issued invoices, so
+plans survive edits and re-imports. "Adopt existing" turns the lines learned
+from the Davies invoices into plans with their current amounts kept as manual
+splits — nothing on the next invoice changes until you choose a basis.
+
+Billing settings → **Quotas & splits** edits each section's PQ and fixed-charge
+ratio (totals must be 100) and the default bases (`BL_SETTINGS.split`:
+levies by PQ, municipal fixed charges by ratio — Park Manor's current rules).
+
 ## Tariffs
 
 `BL_TARIFFS` holds one era per municipal year (in force from a date; picked by

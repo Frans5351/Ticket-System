@@ -1,14 +1,18 @@
 # Billing changelog
 
-## v2.1 — instalments counted from the invoices on file
-- "Payment n of 3" lines no longer depend on a stored counter that every test
-  invoice bumped. The next number is worked out from the Davies invoices and the
-  invoices issued here (fully credited ones don't count), so a draft you delete
-  or a test invoice you credit puts the plan back where it was.
-- Charges tab shows, per instalment line, what has been billed so far
-  (e.g. "billed on INV00081 (1) — next is payment 2 of 3") and marks finished
-  plans "finished" instead of silently dropping them; a draft says in its
-  warnings when a plan was left off because all instalments are billed.
+## v2.2 — shared charges, quotas & splits
+- ⋯ → **Shared charges & recoveries**: set up any charge for all houses at once
+  (every month / over N months / once), split by participation quota, equally,
+  by the fixed-charge ratio, typed per house, or by the CSOS rule; preview per
+  house, apply, and every house's Charges tab is updated. Backdated recoveries
+  and special levies are "over N months" plans; progress is counted from the
+  invoices issued.
+- First open offers to adopt the shared lines already learned from the Davies
+  invoices (levies, reserve fund, CSOS, garage levy, service charge, fixed basic
+  charges, both backdate recoveries, garden service) with amounts kept exactly.
+- Billing settings → **Quotas & splits**: edit each section's PQ and fixed-charge
+  ratio (from the Davies/Azure sheet of 29 Oct 2026; totals checked), and the
+  default bases: levies by PQ, municipal fixed charges by the ratio.
 
-## v2 — invoicing engine
-See billing.md.
+## v2.1 — instalments counted from the invoices on file
+## v2 — invoicing engine (see billing.md)

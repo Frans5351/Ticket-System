@@ -6313,15 +6313,15 @@ document.getElementById('tbody').addEventListener('click', function(e){
 <style id="bl-css">
 /* ═══ Billing UI — mobile-first. Everything is scoped to the billing surfaces
    so it can't leak into the rest of the app. ═══════════════════════════════ */
-#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog,#bl-menu,#bl-toast{
+#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu,#bl-toast{
   --bl-owe:#f0a06f;--bl-owe-bg:rgba(240,160,111,.12);--bl-owe-bd:rgba(240,160,111,.40);
   --bl-a1:#e6b34a;--bl-a2:#e8873a;--bl-a3:#e05c4a;--bl-a4:#b32d3a;
 }
-body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog,#bl-menu,#bl-toast){
+body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu,#bl-toast){
   --bl-owe:#b4570f;--bl-owe-bg:rgba(180,87,15,.09);--bl-owe-bd:rgba(180,87,15,.35);
 }
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── Buttons ── */
 .bl-btn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 14px var(--sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .12s,border-color .12s,transform .06s}
@@ -6421,14 +6421,14 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Unit table (desktop) ── */
 .bl-tbl{display:none}
 @media(min-width:900px){.bl-tbl{display:block}.bl-cards{display:none}}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb tbody{display:table-row-group!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb tr{display:table-row!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb th,
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal) .bl-tb .r{text-align:right!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb tbody{display:table-row-group!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb tr{display:table-row!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb th,
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb .r{text-align:right!important}
 .bl-tb tbody tr.row{cursor:pointer}
 .bl-tb tbody tr.row:hover td{background:var(--surface)}
 .bl-tb tfoot td{font-weight:700}
@@ -6496,13 +6496,13 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 .bl-toast-i.ok{background:var(--green);color:#06210f}
 
 /* ── Full-screen sheets (unit editor + importer) ── */
-#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
+#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
 #unit-modal{z-index:700}
 #wc-import-modal{z-index:720}
 .bl-sheet{background:var(--surface);width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;animation:bl-up .22s ease-out}
 @keyframes bl-up{from{transform:translateY(22px);opacity:0}to{transform:none;opacity:1}}
 @media(min-width:768px){
-  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal{align-items:center}
+  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal{align-items:center}
   .bl-sheet{width:min(900px,94vw);height:min(90vh,920px);border-radius:20px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,.5)}
 }
 @media(prefers-reduced-motion:reduce){.bl-sheet,.bl-dlg-card,.bl-menu-panel,.bl-toast-i{animation:none!important}}
@@ -6540,10 +6540,10 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Form fields ── */
 .bl-f{display:flex;flex-direction:column;gap:6px;min-width:0}
 .bl-lbl{font:600 12px var(--sans);color:var(--muted)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .bl-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .bl-grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bl-grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -6692,7 +6692,15 @@ body.bl-ro #unit-modal [onclick*="deleteLedgerLine"]{display:none!important}
 body.bl-ro #unit-modal .bl-in:disabled{opacity:1;-webkit-text-fill-color:currentColor;background:transparent}
 
 /* ═══ Billing v2 — charge schedule, invoice lifecycle, monthly run, settings ═══ */
-#binv-modal{z-index:730}#run-modal{z-index:710}#bset-modal{z-index:715}
+#binv-modal{z-index:730}#run-modal{z-index:710}#bset-modal{z-index:715}#plan-modal{z-index:712}
+.bl-qrow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border)}
+.bl-qrow:first-of-type{border-top:none}
+.bl-qrow .who b{display:block;font:600 13px var(--sans);color:var(--text2)}
+.bl-qrow .who small{display:block;font:400 11px var(--sans);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl-qrow .bl-in{min-height:40px;text-align:right}
+.bl-qrow.tot{font:700 13px var(--sans);color:var(--text2)}
+.bl-qrow.tot span{text-align:right}
+.bl-qrow.tot .bad{color:var(--bl-owe)}
 @media(min-width:768px){:is(#binv-modal,#run-modal,#bset-modal) .bl-back{order:3;font-size:0}:is(#binv-modal,#run-modal,#bset-modal) .bl-back::before{content:'✕';font-size:19px}}
 :is(#binv-modal,#run-modal,#bset-modal) .bl-sf{justify-content:space-between}
 :is(#binv-modal,#run-modal,#bset-modal) .bl-sf .bl-btn.pri,:is(#binv-modal,#run-modal,#bset-modal) .bl-sf .bl-btn.ok{min-width:0;flex:1 1 auto}
@@ -6862,7 +6870,8 @@ body.bl-ro #unit-modal [data-ro-hide]{display:none!important}
     <div class="bl-menu-h">Billing actions</div>
     <button class="bl-mi" onclick="blMenuDo('wc')"><span class="i">📥</span><span><b>Import PDFs</b><small>Load a month’s Davies / WeconnectU invoices, statements and credit notes</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('run')"><span class="i">🧾</span><span><b>Monthly invoice run</b><small>Month → readings → review every draft → finalise &amp; email</small></span></button>
-    <button class="bl-mi" onclick="blMenuDo('set')"><span class="i">⚙️</span><span><b>Billing settings</b><small>Letterhead, bank details, invoice numbering</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('plans')"><span class="i">🧮</span><span><b>Shared charges &amp; recoveries</b><small>Levies, municipal fixed charges, backdated recoveries and special levies split across the houses</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('set')"><span class="i">⚙️</span><span><b>Billing settings</b><small>Letterhead, bank details, quotas &amp; splits, invoice numbering</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('tar')"><span class="i">💧</span><span><b>Tariffs &amp; rates</b><small>Water, sewerage and electricity tariffs — check them against the imports</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('csv')"><span class="i">⬇️</span><span><b>Export register (CSV)</b><small>Owners, levies and balances — opens in Excel or Sheets</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('stmts')" id="stmts-seed-btn"><span class="i">📄</span><span><b>Load statement snapshot</b><small>Re-load the 14 Sep 2026 Davies statements onto the matching units</small></span></button>
@@ -7099,6 +7108,18 @@ async function wcExtractItems(file){
   </div>
 </div>
 
+<!-- Shared charges & recoveries -->
+<div id="plan-modal" onclick="if(event.target===this)closeSharedCharges()">
+  <div class="bl-sheet" role="dialog" aria-modal="true" aria-label="Shared charges and recoveries">
+    <div class="bl-sh">
+      <button class="bl-back" aria-label="Close" onclick="closeSharedCharges()">←</button>
+      <div class="bl-sh-t"><b>Shared charges &amp; recoveries</b><span>Levies, municipal fixed charges, backdated recoveries, special levies</span></div>
+    </div>
+    <div class="bl-body" id="plan-body"></div>
+    <div class="bl-sf" id="plan-foot"></div>
+  </div>
+</div>
+
 <!-- Billing settings: letterhead & bank, tariffs, numbering -->
 <div id="bset-modal" onclick="if(event.target===this)closeBillingSettings()">
   <div class="bl-sheet" role="dialog" aria-modal="true" aria-label="Billing settings">
@@ -7109,6 +7130,7 @@ async function wcExtractItems(file){
     <div class="bl-tabs" id="bset-tabs" role="tablist">
       <button class="bl-tab on" data-tab="scheme" role="tab" onclick="setBsetTab('scheme')">Letterhead &amp; bank</button>
       <button class="bl-tab" data-tab="tariffs" role="tab" onclick="setBsetTab('tariffs')">Tariffs</button>
+      <button class="bl-tab" data-tab="quotas" role="tab" onclick="setBsetTab('quotas')">Quotas &amp; splits</button>
       <button class="bl-tab" data-tab="numbering" role="tab" onclick="setBsetTab('numbering')">Numbering</button>
     </div>
     <div class="bl-body" id="bset-body"></div>
@@ -7905,6 +7927,7 @@ var BL_SETTINGS_DEFAULT = {
   bank: { name:'FIRST NATIONAL BANK', acc:'63217912145', branch:'250655', branchName:'UNIVERSAL', holder:'PARK MANOR BODY CORPORATE', type:'CURRENT' },
   numbering: { invPrefix:'INV', crnPrefix:'CRN', pad:5 },
   invoice: { day:1, dueDays:0, cc:'' },
+  split: { levyBasis:'pq', fixedBasis:'ratio' },
   footer: 'Generated by the Park Manor billing register'
 };
 var BL_SETTINGS = JSON.parse(JSON.stringify(BL_SETTINGS_DEFAULT));
@@ -8630,7 +8653,7 @@ function blLineSub(l){
   if(l.kind === 'instalment'){ var b = blInstalmentBilled(blUnitFromSheet(), l); p.push(b.n >= Number(l.of || 1) ? 'all ' + (l.of || 1) + ' billed — finished' : 'payment ' + Math.min(b.n + 1, Number(l.of || 1)) + ' of ' + (l.of || 1) + ' next'); if(b.docs.length) p.push('billed on ' + b.docs.join(', ')); }
   if(l.kind === 'water' || l.kind === 'elec' || l.kind === 'sewer') p.push('worked out from readings' + (l.lastAmount ? ' · last ' + blMoney(l.lastAmount) : ''));
   if(l.from) p.push('from ' + blMonthName(l.from)); if(l.to) p.push('until ' + blMonthName(l.to));
-  if(l.source) p.push('from ' + l.source);
+  if(l.planId) p.push('shared charge'); else if(l.source) p.push('from ' + l.source);
   return p.join(' · ');
 }
 
@@ -8792,7 +8815,8 @@ function renderUnitCharges(){
       + '<div class="bl-lam"><b>' + ((l.kind === 'fixed' || l.kind === 'instalment') ? blMoney(l.amount) : 'metered') + '</b><small>' + (l.kind === 'instalment' ? '× ' + (l.of || 1) : (l.kind === 'fixed' ? 'per month' : 'by tariff')) + '</small></div></div>';
   }).join('');
   h += '</div>';
-  h += '<div class="bl-hint">Changes here apply to the <b>next</b> invoice onwards. Finalised invoices never change. Metered lines use the tariffs under ⋯ → Billing settings.</div>';
+  h += '<div class="bl-hint">Changes here apply to the <b>next</b> invoice onwards. Finalised invoices never change. Metered lines use the tariffs under ⋯ → Billing settings. Lines marked <b>shared charge</b> are set for all houses at once.</div>'
+    + '<button type="button" class="bl-btn blk" data-ro-hide onclick="openSharedCharges()">🧮 Shared charges &amp; recoveries</button>';
   el.innerHTML = h;
 }
 function blSlForm(l){
@@ -9501,10 +9525,280 @@ function blRunRenderSend(){
 // Replaces the old one-shot bulk generator.
 function generateAllInvoices(){ openMonthlyRun(); }
 
+// ═══ Shared charges & recoveries — split a scheme-wide amount across houses ══
+// A "plan" is one charge the body corporate raises on every house at once:
+//   • every month        levies (by PQ), the municipal electricity service
+//                        charge (equal), fixed water/sewer basic charges (ratio)
+//   • N instalments      a backdated recovery or a special levy, spread over months
+//   • once               a single once-off charge in one month
+// Applying a plan writes a line onto each house's charge schedule tagged with
+// the plan id, so the Charges tab, drafts and invoices all pick it up. Editing
+// and re-applying updates those lines; instalment progress is unaffected
+// because it is counted from the invoices on file (blInstalmentBilled).
+//
+// Split bases:  pq      participation quota (unit.pq)
+//               equal   same for every house
+//               ratio   the fixed-charge ratio (unit.fixedRatio — Azure's
+//                       historic split, kept by trustee decision 30 Oct 2026)
+//               manual  type each house's amount
+//               csos    CSOS levy rule: 2% of the house's monthly levy above
+//                       R500, capped at R40 (taken from its Levies line)
+
+var BL_PLANS = [];
+var _blPlansLoaded = false;
+// Park Manor's fixed-charge ratio ("Ratio used based on billed amount" in the
+// Davies/Azure sheet of 29 Oct 2026). Garages carry none.
+var PARK_MANOR_FIXED_RATIO = { 1:9.0513, 2:8.0195, 3:8.0195, 4:8.0195, 5:8.0195, 6:8.5663, 7:8.5663, 8:8.5663, 9:8.5663, 10:8.0195, 11:8.0195, 12:8.5663 };
+var BL_BASES = {
+  pq:     { label:'Participation quota', short:'PQ', help:'Each house pays its PQ share — how levies are split.' },
+  equal:  { label:'Equal split', short:'equal', help:'The same amount for every house.' },
+  ratio:  { label:'Fixed-charge ratio', short:'ratio', help:'The historic water/sanitation split carried over from Azure (Quotas & splits).' },
+  manual: { label:'Type per house', short:'manual', help:'Enter each house’s amount yourself.' },
+  csos:   { label:'CSOS levy rule', short:'CSOS', help:'2% of the house’s monthly levy above R 500, capped at R 40.' }
+};
+
+async function loadBillingPlans(){
+  try { var ls = localStorage.getItem('pm_billing_plans'); if(ls){ var a = JSON.parse(ls); if(Array.isArray(a)) BL_PLANS = a; } } catch(e){}
+  try { var remote = await sbGetSetting('billing_plans'); if(remote){ var r = typeof remote === 'string' ? JSON.parse(remote) : remote; if(Array.isArray(r)){ BL_PLANS = r; try { localStorage.setItem('pm_billing_plans', JSON.stringify(r)); } catch(e){} } } } catch(e){ console.warn('loadBillingPlans', e); }
+  _blPlansLoaded = true;
+}
+async function saveBillingPlans(){
+  try { localStorage.setItem('pm_billing_plans', JSON.stringify(BL_PLANS)); } catch(e){}
+  try { await sbSetSetting('billing_plans', BL_PLANS); } catch(e){ console.warn('saveBillingPlans', e); }
+}
+function blPlanId(){ return 'pl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function blHouses(){ return Object.values(UNITS).filter(function(u){ return !blIsGarage(u); }).sort(function(a, b){ return (a.section || 0) - (b.section || 0); }); }
+function blUnitRatio(u){ if(u.fixedRatio != null && u.fixedRatio !== '') return Number(u.fixedRatio) || 0; return PARK_MANOR_FIXED_RATIO[Number(u.section)] || 0; }
+// Split `total` across `houses` by `basis`; cents are balanced with the
+// largest-remainder rule so the shares add up to the total exactly.
+function blSplit(total, houses, basis, manual){
+  total = Math.round((Number(total) || 0) * 100) / 100;
+  var w = {}, sum = 0, out = {};
+  houses.forEach(function(u){
+    var x = basis === 'pq' ? Number(u.pq) || 0 : basis === 'ratio' ? blUnitRatio(u) : basis === 'equal' ? 1 : 0;
+    w[u.id] = x; sum += x;
+  });
+  if(basis === 'manual'){ houses.forEach(function(u){ out[u.id] = Math.round((Number((manual || {})[u.id]) || 0) * 100) / 100; }); return out; }
+  if(basis === 'csos'){
+    houses.forEach(function(u){
+      var levy = 0; blSchedule(u).forEach(function(l){ if(l.kind === 'fixed' && l.active !== false && /^levies$/i.test(l.desc || '') ) levy += Number(l.amount) || 0; });
+      out[u.id] = Math.min(40, Math.max(0, Math.round((levy - 500) * 0.02 * 100) / 100));
+    });
+    return out;
+  }
+  if(!sum){ houses.forEach(function(u){ out[u.id] = 0; }); return out; }
+  var cents = Math.round(total * 100), given = 0, rem = [];
+  houses.forEach(function(u){ var exact = cents * w[u.id] / sum, fl = Math.floor(exact); out[u.id] = fl; given += fl; rem.push({ id:u.id, r:exact - fl }); });
+  rem.sort(function(a, b){ return b.r - a.r; });
+  for(var i = 0; i < cents - given && i < rem.length; i++) out[rem[i].id]++;
+  houses.forEach(function(u){ out[u.id] = out[u.id] / 100; });
+  return out;
+}
+function blPlanShares(p){ return blSplit(p.total, blHouses(), p.basis, p.manual); }
+// Monthly amount per house for a plan (instalments divide the share).
+function blPlanMonthly(p, share){ var n = p.kind === 'instalments' ? Math.max(1, Number(p.of) || 1) : 1; return Math.round(share / n * 100) / 100; }
+function blPlanTotalMonthly(p){ var sh = blPlanShares(p), t = 0; Object.keys(sh).forEach(function(k){ t += blPlanMonthly(p, sh[k]); }); return Math.round(t * 100) / 100; }
+function blInstalmentBaseText(s){ return String(s || '').toLowerCase().replace(/\s*[-–]?\s*payment\s+\d+\s+of\s+\d+\s*$/i, '').trim(); }
+// Write the plan onto every house. An existing unplanned line with the same
+// description (e.g. one learned from a Davies invoice) is adopted, not duplicated.
+function blApplyPlan(p){
+  var shares = blPlanShares(p), touched = 0;
+  blHouses().forEach(function(u){
+    var L = blSchedule(u), amt = blPlanMonthly(p, shares[u.id] || 0);
+    var line = L.filter(function(l){ return l.planId === p.id; })[0];
+    if(!line){ var base = blInstalmentBaseText(p.desc); line = L.filter(function(l){ return !l.planId && blInstalmentBaseText(l.desc) === base && (l.kind === 'fixed' || l.kind === 'instalment'); })[0]; }
+    if(!(amt > 0)){ if(line){ line.active = false; touched++; } return; }
+    if(!line){ line = { id:blLineId(), active:true }; L.push(line); }
+    line.planId = p.id; line.account = p.account || ''; line.desc = p.desc || p.title || ''; line.amount = amt; line.active = true; line.source = 'shared charge';
+    line.kind = p.kind === 'monthly' ? 'fixed' : 'instalment';
+    if(p.kind === 'instalments'){ line.of = Math.max(1, Number(p.of) || 1); line.from = p.from || ''; delete line.to; }
+    else if(p.kind === 'once'){ line.of = 1; line.from = p.from || ''; line.to = p.from || ''; }
+    else { delete line.of; line.from = p.from || ''; line.to = p.to || ''; }
+    blSyncLegacyCharges(u); u.updated = Date.now(); touched++;
+  });
+  return touched;
+}
+function blRemovePlanLines(p){
+  var n = 0;
+  Object.values(UNITS).forEach(function(u){ var L = blSchedule(u), before = L.length; u.chargeLines = L.filter(function(l){ return l.planId !== p.id; }); n += before - u.chargeLines.length; if(before !== u.chargeLines.length){ blSyncLegacyCharges(u); u.updated = Date.now(); } });
+  return n;
+}
+// Progress of an instalment plan across houses, from the invoices on file.
+function blPlanProgress(p){
+  var done = 0, n = 0, of = Math.max(1, Number(p.of) || 1);
+  blHouses().forEach(function(u){ var l = blSchedule(u).filter(function(x){ return x.planId === p.id; })[0]; if(!l) return; n++; done += Math.min(of, blInstalmentBilled(u, l).n); });
+  return { houses:n, billed:done, total:n * of };
+}
+// Build plans from what the houses already carry (first run on Park Manor):
+// one plan per distinct shared line, with each house's current amount kept
+// as a manual split so nothing on the next invoice changes.
+function blDiscoverPlans(){
+  var groups = {}, houses = blHouses();
+  houses.forEach(function(u){
+    blSchedule(u).forEach(function(l){
+      if(l.planId || l.active === false || (l.kind !== 'fixed' && l.kind !== 'instalment')) return;
+      var key = (l.kind === 'instalment' ? 'I|' : 'F|') + blInstalmentBaseText(l.desc) + '|' + (l.account || '').toLowerCase();
+      (groups[key] = groups[key] || { lines:[], l:l }).lines.push({ u:u, l:l });
+    });
+  });
+  var out = [];
+  Object.keys(groups).forEach(function(k){
+    var g = groups[k]; if(g.lines.length < 2) return;   // shared = on more than one house
+    var amounts = g.lines.map(function(x){ return Number(x.l.amount) || 0; }), allSame = amounts.every(function(a){ return Math.abs(a - amounts[0]) < 0.005; });
+    var inst = g.l.kind === 'instalment', of = inst ? Math.max(1, Number(g.l.of) || 1) : 1, manual = {};
+    g.lines.forEach(function(x){ manual[x.u.id] = Math.round((Number(x.l.amount) || 0) * of * 100) / 100; });
+    var total = 0; Object.keys(manual).forEach(function(id){ total += manual[id]; });
+    // Adopted as typed-per-house so not a cent changes; we only note what split it looks like.
+    var looks = '';
+    if(allSame) looks = 'equal';
+    else { var byRatio = blSplit(total, houses, 'ratio'), byPq = blSplit(total, houses, 'pq'), okR = true, okP = true;
+      g.lines.forEach(function(x){ if(Math.abs((byRatio[x.u.id] || 0) - manual[x.u.id]) > 0.06) okR = false; if(Math.abs((byPq[x.u.id] || 0) - manual[x.u.id]) > 0.06) okP = false; });
+      if(okR) looks = 'ratio'; else if(okP) looks = 'pq'; }
+    var basis = 'manual';
+    var desc = g.l.desc.replace(/\s*[-–]?\s*payment\s+\d+\s+of\s+\d+\s*$/i, '');
+    out.push({ id:blPlanId(), title:desc, account:g.l.account || '', desc:desc, kind:inst ? 'instalments' : 'monthly', of:of, from:inst ? (g.l.from || '') : '', total:Math.round(total * 100) / 100,
+      basis:basis, manual:manual, looks:looks, discovered:true, createdAt:Date.now(), updatedAt:Date.now(), note:'Found on ' + g.lines.length + ' houses' + (g.l.source && /^INV/.test(g.l.source) ? ' (learned from ' + g.l.source + ')' : '') + (looks ? ' — amounts match a ' + (BL_BASES[looks] || {}).label.toLowerCase() + ' split; switch the basis to that if you want it recalculated automatically' : '') });
+  });
+  return out;
+}
+
+// ── Sheet ───────────────────────────────────────────────────────────────────
+var PLAN = { open:false, nav:false, editing:null, d:null };
+async function openSharedCharges(){
+  await blEnsureBillingLoaded();
+  if(!_blPlansLoaded) await loadBillingPlans();
+  PLAN.open = true; PLAN.editing = null; PLAN.d = null;
+  var m = blEl('plan-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  if(!PLAN.nav){ PLAN.nav = true; blNavPush(function(){ PLAN.nav = false; closeSharedCharges(true); }); }
+  renderPlans();
+}
+function closeSharedCharges(fromBack){
+  var m = blEl('plan-modal'); if(m) m.style.display = 'none';
+  if(!BL.open) document.body.style.overflow = '';
+  PLAN.open = false;
+  if(PLAN.nav && fromBack !== true){ PLAN.nav = false; blNavPop(); }
+  renderUnits(); if(BL.open) blRefreshUnitView();
+}
+function blPlanKindLabel(p){ return p.kind === 'monthly' ? 'Every month' + (p.from ? ' from ' + blMonthName(p.from) : '') + (p.to ? ' until ' + blMonthName(p.to) : '') : p.kind === 'instalments' ? (p.of || 1) + ' instalments from ' + blMonthName(p.from) : 'Once in ' + blMonthName(p.from); }
+function renderPlans(){
+  var body = blEl('plan-body'), foot = blEl('plan-foot'); if(!body) return;
+  if(PLAN.editing){ renderPlanForm(); return; }
+  var houses = blHouses(), h = '';
+  h += '<div class="bl-note info"><span class="ic">🧮</span><span>One place for every charge the scheme raises on all the houses at once: monthly levies and municipal fixed charges, backdated recoveries paid off over a few months, special levies. Choose how it’s split, apply, and each house’s charge lines are updated.</span></div>';
+  if(!BL_PLANS.length){
+    var found = blDiscoverPlans();
+    h += '<div class="bl-card2"><div class="bl-h"><span>Nothing set up yet</span></div>' + (found.length ? '<p class="bl-hint" style="margin-bottom:10px">The houses already carry ' + found.length + ' shared charges (learned from the Davies invoices): ' + found.map(function(p){ return blEsc(p.title); }).join(', ') + '. Adopt them so they can be managed here — nothing on the next invoice changes.</p><button type="button" class="bl-btn pri blk" data-ro-hide onclick="blAdoptPlans()">Adopt the ' + found.length + ' existing shared charges</button>' : '<p class="bl-hint">Add the first shared charge below.</p>') + '</div>';
+  }
+  var ratioOk = Math.abs(houses.reduce(function(s, u){ return s + blUnitRatio(u); }, 0) - 100) < 0.01, pqOk = Math.abs(Object.values(UNITS).reduce(function(s, u){ return s + (Number(u.pq) || 0); }, 0) - 100) < 0.01;
+  if(!ratioOk || !pqOk) h += '<div class="bl-note"><span class="ic">⚠️</span><span>' + (!pqOk ? 'Participation quotas don’t add up to 100%. ' : '') + (!ratioOk ? 'The fixed-charge ratios don’t add up to 100%. ' : '') + 'Fix them under Billing settings → Quotas &amp; splits.</span><button type="button" class="bl-btn sm" onclick="openBillingSettings(\'quotas\')">Open</button></div>';
+  var monthly = BL_PLANS.filter(function(p){ return p.kind === 'monthly'; }), other = BL_PLANS.filter(function(p){ return p.kind !== 'monthly'; });
+  var card = function(p){
+    var sh = blPlanShares(p), tot = blPlanTotalMonthly(p), prog = p.kind === 'instalments' ? blPlanProgress(p) : null;
+    return '<div class="bl-doc"><div class="bl-doc-h" onclick="this.parentNode.classList.toggle(\'open\')"><div class="bl-lic">' + (p.kind === 'monthly' ? '🔁' : p.kind === 'instalments' ? '🧩' : '1️⃣') + '</div>'
+      + '<div class="bl-ltx"><b>' + blEsc(p.title || p.desc) + '</b><small>' + blEsc(blPlanKindLabel(p)) + ' · split ' + blEsc(BL_BASES[p.basis] ? BL_BASES[p.basis].short : p.basis) + (prog ? ' · ' + prog.billed + ' of ' + prog.total + ' instalments billed' : '') + '</small></div>'
+      + '<div class="bl-lam"><b>' + blMoney(tot) + '</b><small>per month, all houses</small></div><span class="chev">›</span></div>'
+      + '<div class="bl-doc-b">' + houses.map(function(u){ return '<div class="bl-kv"><span>Section ' + u.section + ' · ' + blEsc(blNice(u.ownerName || '')) + '</span><b>' + blMoney(blPlanMonthly(p, sh[u.id] || 0)) + (p.kind === 'instalments' ? ' <small style="color:var(--muted);font-weight:500">× ' + (p.of || 1) + ' = ' + blMoney(sh[u.id] || 0) + '</small>' : '') + '</b></div>'; }).join('')
+      + (p.note ? '<div class="bl-hint" style="margin-top:8px">' + blEsc(p.note) + '</div>' : '')
+      + '<div class="bl-doc-acts" data-ro-hide><button type="button" class="bl-btn" onclick="blPlanEdit(\'' + p.id + '\')">✏️ Edit</button><button type="button" class="bl-btn" onclick="blPlanReapply(\'' + p.id + '\')">↻ Re-apply to houses</button><button type="button" class="bl-btn dng" onclick="blPlanDelete(\'' + p.id + '\')">🗑 Remove</button></div></div></div>';
+  };
+  if(monthly.length) h += '<div class="bl-h" style="margin:4px 2px 0"><span>Every month</span></div>' + monthly.map(card).join('');
+  if(other.length) h += '<div class="bl-h" style="margin:4px 2px 0"><span>Recoveries, special levies &amp; once-offs</span></div>' + other.map(card).join('');
+  body.innerHTML = h;
+  foot.innerHTML = '<button type="button" class="bl-btn ro-ok" onclick="closeSharedCharges()">Close</button><span class="grow"></span><button type="button" class="bl-btn pri" onclick="blPlanEdit(\'new\')">＋ New shared charge</button>';
+}
+async function blAdoptPlans(){
+  if(blRO()){ blRoWarn(); return; }
+  var found = blDiscoverPlans(); if(!found.length) return;
+  found.forEach(function(p){ BL_PLANS.push(p); blApplyPlan(p); });
+  await saveBillingPlans(); await saveUnits();
+  renderPlans(); blToast(found.length + ' shared charges adopted', 'ok');
+}
+function blPlanEdit(id){
+  if(blRO()){ blRoWarn(); return; }
+  var p = id === 'new' ? { id:'new', title:'', account:'', desc:'', kind:'instalments', of:3, from:blSuggestMonth(), to:'', total:'', basis:BL_SETTINGS.split ? BL_SETTINGS.split.fixedBasis : 'ratio', manual:{} } : JSON.parse(JSON.stringify(BL_PLANS.filter(function(x){ return x.id === id; })[0] || {}));
+  if(!p.id) return;
+  PLAN.editing = id; PLAN.d = p; renderPlanForm();
+  var b = blEl('plan-body'); if(b) b.scrollTop = 0;
+}
+function blPlanSet(k, v){ var p = PLAN.d; if(!p) return; if(k === 'of' || k === 'total') v = v === '' ? '' : Number(v); p[k] = v; if(k === 'title' && !p.desc) p.desc = v; renderPlanForm(true); }
+function blPlanSetManual(uid, v){ var p = PLAN.d; p.manual = p.manual || {}; p.manual[uid] = Number(v) || 0; renderPlanForm(true); }
+function blPlanPreset(key){
+  var P = { levies:{ title:'Levies', account:'Levies', desc:'Levies', kind:'monthly', basis:'pq' }, csos:{ title:'CSOS Levies', account:'CSOS Control Account', desc:'CSOS Levies', kind:'monthly', basis:'csos' },
+    reserve:{ title:'Reserve Fund Levies', account:'RFI/001 Reserve Fund Levies', desc:'Reserve Fund Levies', kind:'monthly', basis:'pq' },
+    elecsvc:{ title:'Electricity service charge', account:'Electricity Recovered', desc:'Electricity - service charges as per Eskom', kind:'monthly', basis:'equal' },
+    waterfix:{ title:'Water Fixed Basic Charges', account:'Water Recovered', desc:'Water Fixed Basic Charges', kind:'monthly', basis:'ratio' },
+    sewerfix:{ title:'Sewerage Fixed Basic Charges', account:'Sewerage Recovered', desc:'Sewerage Fixed Basic Charges', kind:'monthly', basis:'ratio' },
+    recovery:{ title:'Backdated recovery', account:'Water Recovered', desc:'Water Fixed Basic Charges - Backdate 2026', kind:'instalments', of:3, basis:'ratio' },
+    special:{ title:'Special levy', account:'Special Levy', desc:'Special levy', kind:'instalments', of:6, basis:'pq' } }[key];
+  if(!P) return; Object.keys(P).forEach(function(k){ PLAN.d[k] = P[k]; }); renderPlanForm();
+}
+function renderPlanForm(keepScroll){
+  var p = PLAN.d, body = blEl('plan-body'), foot = blEl('plan-foot'), houses = blHouses(), isNew = PLAN.editing === 'new';
+  var st = keepScroll ? body.scrollTop : 0;
+  var shares = blSplit(p.total, houses, p.basis, p.manual), tot = 0; houses.forEach(function(u){ tot += blPlanMonthly(p, shares[u.id] || 0); });
+  var sel = function(k, v, label){ return '<button type="button" class="bl-chip' + (p[k] === v ? ' on' : '') + '" onclick="blPlanSet(\'' + k + '\',\'' + v + '\')">' + label + '</button>'; };
+  var h = '<div class="bl-card2"><div class="bl-h"><span>' + (isNew ? 'New shared charge' : 'Edit shared charge') + '</span></div>'
+    + (isNew ? '<div class="bl-presets">' + [['levies', 'Levies'], ['reserve', 'Reserve fund'], ['csos', 'CSOS'], ['elecsvc', 'Elec. service charge'], ['waterfix', 'Water fixed'], ['sewerfix', 'Sewer fixed'], ['recovery', 'Backdated recovery'], ['special', 'Special levy']].map(function(x){ return '<button type="button" class="bl-chip" onclick="blPlanPreset(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>' : '')
+    + '<div style="display:flex;flex-direction:column;gap:12px">'
+    + '<div class="bl-f"><label class="bl-lbl">Name (for you)</label><input class="bl-in" type="text" value="' + blEsc(p.title || '') + '" placeholder="e.g. Backdated water fixed charges" onchange="blPlanSet(\'title\',this.value)"></div>'
+    + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">Account (printed)</label><input class="bl-in" type="text" value="' + blEsc(p.account || '') + '" onchange="blPlanSet(\'account\',this.value)"></div><div class="bl-f"><label class="bl-lbl">Description (printed)</label><input class="bl-in" type="text" value="' + blEsc(p.desc || '') + '" onchange="blPlanSet(\'desc\',this.value)"></div></div>'
+    + '<div class="bl-f"><label class="bl-lbl">How often</label><div class="bl-chipsrow">' + sel('kind', 'monthly', '🔁 Every month') + sel('kind', 'instalments', '🧩 Over N months') + sel('kind', 'once', '1️⃣ Once') + '</div></div>'
+    + '<div class="bl-grid g3">'
+    + (p.kind === 'instalments' ? '<div class="bl-f"><label class="bl-lbl">Instalments</label><input class="bl-in" type="number" inputmode="numeric" min="1" value="' + (p.of || 3) + '" onchange="blPlanSet(\'of\',this.value)"></div>' : '')
+    + '<div class="bl-f"><label class="bl-lbl">' + (p.kind === 'monthly' ? 'From month (optional)' : p.kind === 'once' ? 'In month' : 'First instalment') + '</label><input class="bl-in" type="month" value="' + blEsc(p.from || '') + '" onchange="blPlanSet(\'from\',this.value)"></div>'
+    + (p.kind === 'monthly' ? '<div class="bl-f"><label class="bl-lbl">Until month (optional)</label><input class="bl-in" type="month" value="' + blEsc(p.to || '') + '" onchange="blPlanSet(\'to\',this.value)"></div>' : '')
+    + '</div></div></div>';
+  h += '<div class="bl-card2"><div class="bl-h"><span>Split between the ' + houses.length + ' houses</span></div>'
+    + '<div class="bl-kinds">' + Object.keys(BL_BASES).map(function(k){ return '<button type="button" class="bl-kind' + (p.basis === k ? ' on' : '') + '" onclick="blPlanSet(\'basis\',\'' + k + '\')">' + BL_BASES[k].label + '<small>' + BL_BASES[k].help + '</small></button>'; }).join('') + '</div>'
+    + (p.basis === 'manual' || p.basis === 'csos' ? '' : '<div class="bl-f" style="margin-top:12px"><label class="bl-lbl">' + (p.kind === 'monthly' ? 'Total per month for the whole scheme (R)' : 'Total amount to recover from the whole scheme (R)') + '</label><input class="bl-in" type="number" inputmode="decimal" step="0.01" value="' + (p.total === '' || p.total == null ? '' : p.total) + '" placeholder="0.00" onchange="blPlanSet(\'total\',this.value)"></div>')
+    + '</div>';
+  h += '<div class="bl-card2"><div class="bl-h"><span>Preview</span><span class="bl-st imp">' + blMoney(tot) + ' / month in total</span></div>'
+    + houses.map(function(u){ var sh = shares[u.id] || 0, m = blPlanMonthly(p, sh);
+        return '<div class="bl-kv"><span>Section ' + u.section + ' · ' + blEsc(blNice(u.ownerName || '')) + (p.basis === 'pq' ? ' <small>' + (Number(u.pq) || 0).toFixed(4) + '%</small>' : p.basis === 'ratio' ? ' <small>' + blUnitRatio(u).toFixed(4) + '%</small>' : '') + '</span>'
+          + (p.basis === 'manual' ? '<input class="bl-in" type="number" inputmode="decimal" step="0.01" style="width:120px;min-height:40px;text-align:right" value="' + ((p.manual || {})[u.id] == null ? '' : (p.manual || {})[u.id]) + '" onchange="blPlanSetManual(\'' + u.id + '\',this.value)">'
+          : '<b>' + blMoney(m) + (p.kind === 'instalments' ? ' <small style="color:var(--muted);font-weight:500">× ' + (p.of || 1) + ' = ' + blMoney(sh) + '</small>' : '') + '</b>') + '</div>'; }).join('')
+    + (p.basis === 'manual' && p.kind === 'instalments' ? '<div class="bl-hint" style="margin-top:8px">Type each house’s <b>total</b> to recover; it is divided by the number of instalments.</div>' : '')
+    + '</div>';
+  body.innerHTML = h; if(keepScroll) body.scrollTop = st;
+  foot.innerHTML = '<button type="button" class="bl-btn" onclick="PLAN.editing=null;PLAN.d=null;renderPlans()">Cancel</button><span class="grow"></span><button type="button" class="bl-btn pri" onclick="blPlanSave()">' + (isNew ? '＋ Apply to houses' : '💾 Save & re-apply') + '</button>';
+}
+async function blPlanSave(){
+  var p = PLAN.d; if(!p) return;
+  if(!p.desc && !p.title){ blToast('Give it a description.', 'err'); return; }
+  if(!p.desc) p.desc = p.title; if(!p.title) p.title = p.desc; if(!p.account) p.account = p.desc;
+  if(p.kind !== 'monthly' && !p.from){ blToast('Choose the month it starts.', 'err'); return; }
+  if(p.basis !== 'manual' && p.basis !== 'csos' && !(Number(p.total) > 0)){ blToast('Enter the total amount.', 'err'); return; }
+  var houses = blHouses(), n = houses.length;
+  var ok = await blConfirm(PLAN.editing === 'new' ? 'Apply to ' + n + ' houses?' : 'Save and re-apply to ' + n + ' houses?', '<p>Each house gets ' + (p.kind === 'monthly' ? 'a monthly line' : p.kind === 'instalments' ? 'an instalment line (“payment n of ' + (p.of || 1) + '”)' : 'a once-off line') + ' <b>' + blEsc(p.desc) + '</b> on its Charges tab, from the next draft onwards. Invoices already issued don’t change.</p>', PLAN.editing === 'new' ? 'Apply' : 'Save & re-apply');
+  if(!ok) return;
+  if(PLAN.editing === 'new'){ p.id = blPlanId(); p.createdAt = Date.now(); BL_PLANS.push(p); }
+  else { var i = BL_PLANS.findIndex(function(x){ return x.id === p.id; }); if(i >= 0) BL_PLANS[i] = p; else BL_PLANS.push(p); }
+  p.updatedAt = Date.now(); delete p.discovered;
+  var touched = blApplyPlan(p);
+  await saveBillingPlans(); await saveUnits();
+  PLAN.editing = null; PLAN.d = null; renderPlans();
+  blToast('Applied to ' + touched + ' house' + (touched === 1 ? '' : 's'), 'ok');
+}
+async function blPlanReapply(id){
+  if(blRO()){ blRoWarn(); return; }
+  var p = BL_PLANS.filter(function(x){ return x.id === id; })[0]; if(!p) return;
+  var touched = blApplyPlan(p); await saveUnits(); renderPlans(); blToast('Re-applied to ' + touched + ' houses', 'ok');
+}
+async function blPlanDelete(id){
+  if(blRO()){ blRoWarn(); return; }
+  var p = BL_PLANS.filter(function(x){ return x.id === id; })[0]; if(!p) return;
+  var ok = await blConfirm('Remove “' + blEsc(p.title) + '”?', '<p>Its line is taken off every house’s charges from the next draft onwards. Invoices already issued keep it.</p>', 'Remove', { danger:true });
+  if(!ok) return;
+  blRemovePlanLines(p); BL_PLANS = BL_PLANS.filter(function(x){ return x.id !== id; });
+  await saveBillingPlans(); await saveUnits(); renderPlans(); blToast('Removed');
+}
+
 // ═══ Billing settings sheet — letterhead & bank, tariffs, numbering ══════════
-var BSET = { open:false, tab:'scheme', nav:false, s:null, t:null, snap:'' };
+var BSET = { open:false, tab:'scheme', nav:false, s:null, t:null, q:null, snap:'' };
 function openBillingSettings(tab){
-  BSET.open = true; BSET.s = JSON.parse(JSON.stringify(BL_SETTINGS)); BSET.t = JSON.parse(JSON.stringify(BL_TARIFFS)); BSET.snap = JSON.stringify([BSET.s, BSET.t]);
+  BSET.open = true; BSET.s = JSON.parse(JSON.stringify(BL_SETTINGS)); BSET.t = JSON.parse(JSON.stringify(BL_TARIFFS));
+  BSET.q = {}; Object.values(UNITS).forEach(function(u){ BSET.q[u.id] = { pq:Number(u.pq) || 0, ratio:blIsGarage(u) ? 0 : blUnitRatio(u) }; });
+  BSET.snap = JSON.stringify([BSET.s, BSET.t, BSET.q]);
   var m = blEl('bset-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
   if(!BSET.nav){ BSET.nav = true; blNavPush(function(){ BSET.nav = false; closeBillingSettings(true); }); }
   setBsetTab(tab || 'scheme');
@@ -9521,7 +9815,7 @@ function setBsetTab(k){
   renderBset();
   var b = blEl('bset-body'); if(b) b.scrollTop = 0;
 }
-function blBsetDirty(){ return BSET.open && JSON.stringify([BSET.s, BSET.t]) !== BSET.snap; }
+function blBsetDirty(){ return BSET.open && JSON.stringify([BSET.s, BSET.t, BSET.q]) !== BSET.snap; }
 function blBsetMark(){ var d = blEl('bset-dirty'); if(d){ var on = blBsetDirty(); d.classList.toggle('on', on); d.textContent = on ? 'Unsaved changes' : 'No changes'; } }
 function bsIn(id, label, val, attrs){ return '<div class="bl-f"><label class="bl-lbl" for="' + id + '">' + label + '</label><input id="' + id + '" class="bl-in" type="text" value="' + blEsc(val == null ? '' : val) + '" ' + (attrs || '') + '></div>'; }
 function renderBset(){
@@ -9556,6 +9850,8 @@ function renderBset(){
         + '</div>';
     }).join('');
     h += '<button type="button" class="bl-btn blk" onclick="blTariffAddEra()">＋ Add a tariff year (copies the latest)</button>';
+  } else if(BSET.tab === 'quotas'){
+    h += renderBsetQuotas();
   } else {
     h += '<div class="bl-card2"><div class="bl-h"><span>Document numbers</span></div><div class="bl-grid g3">' + bsIn('bs-ip', 'Invoice prefix', s.numbering.invPrefix, 'oninput="BSET.s.numbering.invPrefix=this.value.trim();blBsetMark()"') + bsIn('bs-cp', 'Credit note prefix', s.numbering.crnPrefix, 'oninput="BSET.s.numbering.crnPrefix=this.value.trim();blBsetMark()"') + '<div class="bl-f"><label class="bl-lbl" for="bs-pad">Digits</label><input id="bs-pad" class="bl-in" type="number" inputmode="numeric" min="3" max="8" value="' + (s.numbering.pad || 5) + '" onchange="BSET.s.numbering.pad=Math.max(3,Math.min(8,Number(this.value)||5));blBsetMark()"></div></div>'
       + '<div class="bl-hint" style="margin-top:10px">Numbers carry on from the highest one on file, including the imported Davies invoices — the next invoice is <b>' + blEsc(blNextNumber('inv').no) + '</b> and the next credit note <b>' + blEsc(blNextNumber('crn').no) + '</b>. Statements stay continuous for owners.</div></div>';
@@ -9579,11 +9875,32 @@ async function saveBillingSettingsFromSheet(){
   var bad = BSET.t.filter(function(e){ return !e.from || !(e.water.steps || []).length; });
   if(bad.length){ blToast('Each tariff year needs a from-date and at least one water step.', 'err'); return; }
   BL_SETTINGS = blMergeSettings(BSET.s); BL_TARIFFS = JSON.parse(JSON.stringify(BSET.t));
-  await saveBillingSettings(); await saveBillingTariffs();
-  BSET.snap = JSON.stringify([BSET.s, BSET.t]); blBsetMark();
+  Object.keys(BSET.q || {}).forEach(function(id){ var u = UNITS[id]; if(!u) return; u.pq = BSET.q[id].pq; if(!blIsGarage(u)) u.fixedRatio = BSET.q[id].ratio; });
+  await saveBillingSettings(); await saveBillingTariffs(); await saveUnits();
+  BSET.snap = JSON.stringify([BSET.s, BSET.t, BSET.q]); blBsetMark();
   renderUnits(); if(BL.open) blRefreshUnitView();
   blToast('Billing settings saved', 'ok');
 }
+function renderBsetQuotas(){
+  var all = Object.values(UNITS).sort(function(a, b){ return (a.section || 0) - (b.section || 0); }), q = BSET.q || {}, s = BSET.s;
+  var pqT = 0, rT = 0; all.forEach(function(u){ pqT += Number((q[u.id] || {}).pq) || 0; if(!blIsGarage(u)) rT += Number((q[u.id] || {}).ratio) || 0; });
+  var chip = function(k, v, label){ return '<button type="button" class="bl-chip' + (s.split[k] === v ? ' on' : '') + '" onclick="BSET.s.split.' + k + '=\'' + v + '\';blBsetMark();renderBset()">' + label + '</button>'; };
+  var h = '<div class="bl-note info"><span class="ic">📐</span><span><b>Participation quotas</b> come from the sectional plan and drive the levies. The <b>fixed-charge ratio</b> is the historic water/sanitation split carried over from Azure, which the trustees chose to keep (30 Oct 2026). Shared charges use whichever basis you pick; these are the defaults.</span></div>';
+  h += '<div class="bl-card2"><div class="bl-h"><span>Default split</span></div>'
+    + '<div class="bl-f" style="margin-bottom:12px"><label class="bl-lbl">Levies &amp; reserve fund</label><div class="bl-chipsrow">' + chip('levyBasis', 'pq', 'Participation quota') + chip('levyBasis', 'equal', 'Equal between houses') + '</div></div>'
+    + '<div class="bl-f"><label class="bl-lbl">Municipal fixed charges (water &amp; sanitation basic)</label><div class="bl-chipsrow">' + chip('fixedBasis', 'ratio', 'Fixed-charge ratio') + chip('fixedBasis', 'pq', 'Participation quota') + chip('fixedBasis', 'equal', 'Equal') + '</div></div></div>';
+  h += '<div class="bl-card2"><div class="bl-h"><span>Per section</span><button type="button" class="lnk" onclick="blQuotasLoadParkManor()">Load Park Manor ratios</button></div>'
+    + '<div class="bl-qrow" style="border-top:none;padding-top:0"><span class="bl-lbl">Section</span><span class="bl-lbl" style="text-align:right">PQ %</span><span class="bl-lbl" style="text-align:right">Fixed-charge ratio %</span></div>'
+    + all.map(function(u){ var g = blIsGarage(u), v = q[u.id] || { pq:0, ratio:0 };
+        return '<div class="bl-qrow"><div class="who"><b>' + u.section + (g ? ' · garage' : ' · House ' + (u.houseNo || u.section)) + '</b><small>' + blEsc(blNice(u.ownerName || '')) + (u.daviesRef ? ' · ' + blEsc(u.daviesRef) : '') + '</small></div>'
+          + '<input class="bl-in" type="number" inputmode="decimal" step="0.0001" value="' + v.pq + '" onchange="BSET.q[\'' + u.id + '\'].pq=Number(this.value)||0;blBsetMark();renderBsetTotals()">'
+          + (g ? '<div class="bl-hint" style="text-align:right">—</div>' : '<input class="bl-in" type="number" inputmode="decimal" step="0.0001" value="' + v.ratio + '" onchange="BSET.q[\'' + u.id + '\'].ratio=Number(this.value)||0;blBsetMark();renderBsetTotals()">') + '</div>'; }).join('')
+    + '<div class="bl-qrow tot" id="bset-qtot">' + blQuotaTotalsHtml(pqT, rT) + '</div></div>';
+  return h;
+}
+function blQuotaTotalsHtml(pqT, rT){ var okP = Math.abs(pqT - 100) < 0.01, okR = Math.abs(rT - 100) < 0.01; return '<span>Totals (must be 100)</span><span class="' + (okP ? '' : 'bad') + '">' + pqT.toFixed(4) + (okP ? ' ✓' : ' ⚠') + '</span><span class="' + (okR ? '' : 'bad') + '">' + rT.toFixed(4) + (okR ? ' ✓' : ' ⚠') + '</span>'; }
+function renderBsetTotals(){ var q = BSET.q || {}, pqT = 0, rT = 0; Object.keys(q).forEach(function(id){ var u = UNITS[id]; if(!u) return; pqT += Number(q[id].pq) || 0; if(!blIsGarage(u)) rT += Number(q[id].ratio) || 0; }); var e = blEl('bset-qtot'); if(e) e.innerHTML = blQuotaTotalsHtml(pqT, rT); }
+function blQuotasLoadParkManor(){ Object.keys(BSET.q).forEach(function(id){ var u = UNITS[id]; if(u && !blIsGarage(u) && PARK_MANOR_FIXED_RATIO[Number(u.section)] != null) BSET.q[id].ratio = PARK_MANOR_FIXED_RATIO[Number(u.section)]; }); blBsetMark(); renderBset(); }
 // Recompute every imported metered line with the tariffs being edited.
 async function blTariffCheckUi(){
   var saved = BL_TARIFFS; BL_TARIFFS = JSON.parse(JSON.stringify(BSET.t));
@@ -9608,12 +9925,12 @@ function unitTotal(u){
 // Menu dispatcher (adds the new entries).
 function blMenuDo(k){
   blCloseMenu();
-  var fn = { wc:openWeconnectImport, inv:openMonthlyRun, run:openMonthlyRun, csv:blExportCsv, stmts:seedParkManorStatements, seed:seedParkManorUnits, set:function(){ openBillingSettings('scheme'); }, tar:function(){ openBillingSettings('tariffs'); } }[k];
+  var fn = { wc:openWeconnectImport, inv:openMonthlyRun, run:openMonthlyRun, csv:blExportCsv, stmts:seedParkManorStatements, seed:seedParkManorUnits, plans:openSharedCharges, set:function(){ openBillingSettings('scheme'); }, tar:function(){ openBillingSettings('tariffs'); } }[k];
   setTimeout(function(){ if(fn) fn(); }, 90);
 }
 // Settings + tariffs load the first time billing is opened.
 async function blEnsureBillingLoaded(){
-  if(!_blSettingsLoaded) await Promise.all([loadBillingSettings(), loadBillingTariffs()]);
+  if(!_blSettingsLoaded) await Promise.all([loadBillingSettings(), loadBillingTariffs(), loadBillingPlans()]);
   if(!_unitsLoaded) await loadUnits();
 }
 async function openBillingTab(){
@@ -9662,6 +9979,8 @@ async function wcApplyImport(){
         var manual = (u.chargeLines || []).filter(function(l){ return l.source === 'manual'; });
         u.chargeLines = blScheduleFromInvoice(latest).concat(manual);
         u.scheduleSource = { no:latest.invoiceNo, date:latest.date };
+        // keep the link to shared charges set up in the app
+        (typeof BL_PLANS !== 'undefined' ? BL_PLANS : []).forEach(function(p){ var base = blInstalmentBaseText(p.desc); u.chargeLines.forEach(function(l){ if(!l.planId && blInstalmentBaseText(l.desc) === base) l.planId = p.id; }); });
       }
       // Drafts for months Davies has invoiced are redundant now.
       var months = {}; src.invoices.forEach(function(i){ months[String(i.date || '').slice(0, 7)] = i.invoiceNo; });
