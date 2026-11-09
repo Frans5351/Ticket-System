@@ -1,5 +1,9 @@
 # Billing changelog
 
+## v2.3 — quotas: load all 20 sections
+- Quotas & splits says exactly why the PQs do not total 100 (which sections are missing or blank) and **Load Park Manor figures** fills PQ and fixed-charge ratio for all 20 sections from the Davies/Azure sheet, creating the garage sections if the register only has doors 1–12. Save, and the warning goes.
+
+
 ## v2.2 — shared charges, quotas & splits
 - ⋯ → **Shared charges & recoveries**: set up any charge for all houses at once
   (every month / over N months / once), split by participation quota, equally,

@@ -9548,6 +9548,9 @@ var BL_PLANS = [];
 var _blPlansLoaded = false;
 // Park Manor's fixed-charge ratio ("Ratio used based on billed amount" in the
 // Davies/Azure sheet of 29 Oct 2026). Garages carry none.
+// Participation quotas per section (sectional plan; same figures as the Davies sheet).
+var PARK_MANOR_PQ = { 1:10.8385, 2:5.5380, 3:5.6171, 4:5.5380, 5:5.5380, 6:11.1550, 7:7.0411, 8:7.1994, 9:11.8670, 10:5.6171, 11:5.5380, 12:7.1994, 13:1.4241, 14:1.4241, 15:1.4241, 16:1.4241, 17:1.4241, 18:1.3449, 19:1.3449, 20:1.5031 };
+var PARK_MANOR_GARAGE_HOUSE = { 13:'1', 14:'3', 15:'5', 16:'7', 17:'8', 18:'9', 19:'10', 20:'6' };
 var PARK_MANOR_FIXED_RATIO = { 1:9.0513, 2:8.0195, 3:8.0195, 4:8.0195, 5:8.0195, 6:8.5663, 7:8.5663, 8:8.5663, 9:8.5663, 10:8.0195, 11:8.0195, 12:8.5663 };
 var BL_BASES = {
   pq:     { label:'Participation quota', short:'PQ', help:'Each house pays its PQ share — how levies are split.' },
@@ -9679,6 +9682,17 @@ function closeSharedCharges(fromBack){
   if(PLAN.nav && fromBack !== true){ PLAN.nav = false; blNavPop(); }
   renderUnits(); if(BL.open) blRefreshUnitView();
 }
+// Why the PQs don't total 100: missing sections or blank quotas, named.
+function blPqProblem(){
+  var have = {}; Object.values(UNITS).forEach(function(u){ have[Number(u.section)] = Number(u.pq) || 0; });
+  var missing = [], blank = [], sum = 0;
+  for(var s = 1; s <= 20; s++){ if(have[s] == null) missing.push(s); else if(!have[s]) blank.push(s); }
+  Object.keys(have).forEach(function(k){ sum += have[k]; });
+  var msg = 'Participation quotas add up to ' + sum.toFixed(4) + '%, not 100%';
+  if(missing.length) msg += ' — sections ' + missing.join(', ') + ' aren’t in the register';
+  if(blank.length) msg += (missing.length ? ';' : ' —') + ' sections ' + blank.join(', ') + ' have no PQ';
+  return msg + '.';
+}
 function blPlanKindLabel(p){ return p.kind === 'monthly' ? 'Every month' + (p.from ? ' from ' + blMonthName(p.from) : '') + (p.to ? ' until ' + blMonthName(p.to) : '') : p.kind === 'instalments' ? (p.of || 1) + ' instalments from ' + blMonthName(p.from) : 'Once in ' + blMonthName(p.from); }
 function renderPlans(){
   var body = blEl('plan-body'), foot = blEl('plan-foot'); if(!body) return;
@@ -9690,7 +9704,7 @@ function renderPlans(){
     h += '<div class="bl-card2"><div class="bl-h"><span>Nothing set up yet</span></div>' + (found.length ? '<p class="bl-hint" style="margin-bottom:10px">The houses already carry ' + found.length + ' shared charges (learned from the Davies invoices): ' + found.map(function(p){ return blEsc(p.title); }).join(', ') + '. Adopt them so they can be managed here — nothing on the next invoice changes.</p><button type="button" class="bl-btn pri blk" data-ro-hide onclick="blAdoptPlans()">Adopt the ' + found.length + ' existing shared charges</button>' : '<p class="bl-hint">Add the first shared charge below.</p>') + '</div>';
   }
   var ratioOk = Math.abs(houses.reduce(function(s, u){ return s + blUnitRatio(u); }, 0) - 100) < 0.01, pqOk = Math.abs(Object.values(UNITS).reduce(function(s, u){ return s + (Number(u.pq) || 0); }, 0) - 100) < 0.01;
-  if(!ratioOk || !pqOk) h += '<div class="bl-note"><span class="ic">⚠️</span><span>' + (!pqOk ? 'Participation quotas don’t add up to 100%. ' : '') + (!ratioOk ? 'The fixed-charge ratios don’t add up to 100%. ' : '') + 'Fix them under Billing settings → Quotas &amp; splits.</span><button type="button" class="bl-btn sm" onclick="openBillingSettings(\'quotas\')">Open</button></div>';
+  if(!ratioOk || !pqOk) h += '<div class="bl-note"><span class="ic">⚠️</span><span>' + (!pqOk ? blPqProblem() + ' ' : '') + (!ratioOk ? 'The fixed-charge ratios don’t add up to 100%. ' : '') + 'Open Billing settings → Quotas &amp; splits and tap <b>Load Park Manor figures</b>.</span><button type="button" class="bl-btn sm" onclick="openBillingSettings(\'quotas\')">Open</button></div>';
   var monthly = BL_PLANS.filter(function(p){ return p.kind === 'monthly'; }), other = BL_PLANS.filter(function(p){ return p.kind !== 'monthly'; });
   var card = function(p){
     var sh = blPlanShares(p), tot = blPlanTotalMonthly(p), prog = p.kind === 'instalments' ? blPlanProgress(p) : null;
@@ -9797,7 +9811,7 @@ async function blPlanDelete(id){
 var BSET = { open:false, tab:'scheme', nav:false, s:null, t:null, q:null, snap:'' };
 function openBillingSettings(tab){
   BSET.open = true; BSET.s = JSON.parse(JSON.stringify(BL_SETTINGS)); BSET.t = JSON.parse(JSON.stringify(BL_TARIFFS));
-  BSET.q = {}; Object.values(UNITS).forEach(function(u){ BSET.q[u.id] = { pq:Number(u.pq) || 0, ratio:blIsGarage(u) ? 0 : blUnitRatio(u) }; });
+  BSET.q = {}; BSET.newUnits = {}; Object.values(UNITS).forEach(function(u){ BSET.q[u.id] = { pq:Number(u.pq) || 0, ratio:blIsGarage(u) ? 0 : blUnitRatio(u) }; });
   BSET.snap = JSON.stringify([BSET.s, BSET.t, BSET.q]);
   var m = blEl('bset-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
   if(!BSET.nav){ BSET.nav = true; blNavPush(function(){ BSET.nav = false; closeBillingSettings(true); }); }
@@ -9875,6 +9889,7 @@ async function saveBillingSettingsFromSheet(){
   var bad = BSET.t.filter(function(e){ return !e.from || !(e.water.steps || []).length; });
   if(bad.length){ blToast('Each tariff year needs a from-date and at least one water step.', 'err'); return; }
   BL_SETTINGS = blMergeSettings(BSET.s); BL_TARIFFS = JSON.parse(JSON.stringify(BSET.t));
+  Object.keys(BSET.newUnits || {}).forEach(function(id){ if(!UNITS[id]) UNITS[id] = BSET.newUnits[id]; }); BSET.newUnits = {};
   Object.keys(BSET.q || {}).forEach(function(id){ var u = UNITS[id]; if(!u) return; u.pq = BSET.q[id].pq; if(!blIsGarage(u)) u.fixedRatio = BSET.q[id].ratio; });
   await saveBillingSettings(); await saveBillingTariffs(); await saveUnits();
   BSET.snap = JSON.stringify([BSET.s, BSET.t, BSET.q]); blBsetMark();
@@ -9882,25 +9897,40 @@ async function saveBillingSettingsFromSheet(){
   blToast('Billing settings saved', 'ok');
 }
 function renderBsetQuotas(){
-  var all = Object.values(UNITS).sort(function(a, b){ return (a.section || 0) - (b.section || 0); }), q = BSET.q || {}, s = BSET.s;
+  var all = Object.values(UNITS).concat(Object.values(BSET.newUnits || {}).filter(function(n){ return !UNITS[n.id]; })).sort(function(a, b){ return (a.section || 0) - (b.section || 0); }), q = BSET.q || {}, s = BSET.s;
+  var pqProblem = Math.abs(Object.values(UNITS).reduce(function(t, u){ return t + (Number(u.pq) || 0); }, 0) - 100) >= 0.01 ? blPqProblem() : '';
   var pqT = 0, rT = 0; all.forEach(function(u){ pqT += Number((q[u.id] || {}).pq) || 0; if(!blIsGarage(u)) rT += Number((q[u.id] || {}).ratio) || 0; });
   var chip = function(k, v, label){ return '<button type="button" class="bl-chip' + (s.split[k] === v ? ' on' : '') + '" onclick="BSET.s.split.' + k + '=\'' + v + '\';blBsetMark();renderBset()">' + label + '</button>'; };
-  var h = '<div class="bl-note info"><span class="ic">📐</span><span><b>Participation quotas</b> come from the sectional plan and drive the levies. The <b>fixed-charge ratio</b> is the historic water/sanitation split carried over from Azure, which the trustees chose to keep (30 Oct 2026). Shared charges use whichever basis you pick; these are the defaults.</span></div>';
+  var h = (pqProblem ? '<div class="bl-note"><span class="ic">⚠️</span><span>' + blEsc(pqProblem) + ' Tap <b>Load Park Manor figures</b> below to fill all 20 sections from the sectional plan, then save.</span></div>' : '')
+    + '<div class="bl-note info"><span class="ic">📐</span><span><b>Participation quotas</b> come from the sectional plan and drive the levies. The <b>fixed-charge ratio</b> is the historic water/sanitation split carried over from Azure, which the trustees chose to keep (30 Oct 2026). Shared charges use whichever basis you pick; these are the defaults.</span></div>';
   h += '<div class="bl-card2"><div class="bl-h"><span>Default split</span></div>'
     + '<div class="bl-f" style="margin-bottom:12px"><label class="bl-lbl">Levies &amp; reserve fund</label><div class="bl-chipsrow">' + chip('levyBasis', 'pq', 'Participation quota') + chip('levyBasis', 'equal', 'Equal between houses') + '</div></div>'
     + '<div class="bl-f"><label class="bl-lbl">Municipal fixed charges (water &amp; sanitation basic)</label><div class="bl-chipsrow">' + chip('fixedBasis', 'ratio', 'Fixed-charge ratio') + chip('fixedBasis', 'pq', 'Participation quota') + chip('fixedBasis', 'equal', 'Equal') + '</div></div></div>';
-  h += '<div class="bl-card2"><div class="bl-h"><span>Per section</span><button type="button" class="lnk" onclick="blQuotasLoadParkManor()">Load Park Manor ratios</button></div>'
+  h += '<div class="bl-card2"><div class="bl-h"><span>Per section</span><button type="button" class="lnk" onclick="blQuotasLoadParkManor()">Load Park Manor figures</button></div>'
     + '<div class="bl-qrow" style="border-top:none;padding-top:0"><span class="bl-lbl">Section</span><span class="bl-lbl" style="text-align:right">PQ %</span><span class="bl-lbl" style="text-align:right">Fixed-charge ratio %</span></div>'
     + all.map(function(u){ var g = blIsGarage(u), v = q[u.id] || { pq:0, ratio:0 };
-        return '<div class="bl-qrow"><div class="who"><b>' + u.section + (g ? ' · garage' : ' · House ' + (u.houseNo || u.section)) + '</b><small>' + blEsc(blNice(u.ownerName || '')) + (u.daviesRef ? ' · ' + blEsc(u.daviesRef) : '') + '</small></div>'
+        return '<div class="bl-qrow"><div class="who"><b>' + u.section + (g ? ' · garage' : ' · House ' + (u.houseNo || u.section)) + (UNITS[u.id] ? '' : ' <span class="bl-st draft">new</span>') + '</b><small>' + blEsc(blNice(u.ownerName || '')) + (u.daviesRef ? ' · ' + blEsc(u.daviesRef) : '') + '</small></div>'
           + '<input class="bl-in" type="number" inputmode="decimal" step="0.0001" value="' + v.pq + '" onchange="BSET.q[\'' + u.id + '\'].pq=Number(this.value)||0;blBsetMark();renderBsetTotals()">'
           + (g ? '<div class="bl-hint" style="text-align:right">—</div>' : '<input class="bl-in" type="number" inputmode="decimal" step="0.0001" value="' + v.ratio + '" onchange="BSET.q[\'' + u.id + '\'].ratio=Number(this.value)||0;blBsetMark();renderBsetTotals()">') + '</div>'; }).join('')
     + '<div class="bl-qrow tot" id="bset-qtot">' + blQuotaTotalsHtml(pqT, rT) + '</div></div>';
   return h;
 }
 function blQuotaTotalsHtml(pqT, rT){ var okP = Math.abs(pqT - 100) < 0.01, okR = Math.abs(rT - 100) < 0.01; return '<span>Totals (must be 100)</span><span class="' + (okP ? '' : 'bad') + '">' + pqT.toFixed(4) + (okP ? ' ✓' : ' ⚠') + '</span><span class="' + (okR ? '' : 'bad') + '">' + rT.toFixed(4) + (okR ? ' ✓' : ' ⚠') + '</span>'; }
-function renderBsetTotals(){ var q = BSET.q || {}, pqT = 0, rT = 0; Object.keys(q).forEach(function(id){ var u = UNITS[id]; if(!u) return; pqT += Number(q[id].pq) || 0; if(!blIsGarage(u)) rT += Number(q[id].ratio) || 0; }); var e = blEl('bset-qtot'); if(e) e.innerHTML = blQuotaTotalsHtml(pqT, rT); }
-function blQuotasLoadParkManor(){ Object.keys(BSET.q).forEach(function(id){ var u = UNITS[id]; if(u && !blIsGarage(u) && PARK_MANOR_FIXED_RATIO[Number(u.section)] != null) BSET.q[id].ratio = PARK_MANOR_FIXED_RATIO[Number(u.section)]; }); blBsetMark(); renderBset(); }
+function renderBsetTotals(){ var q = BSET.q || {}, pqT = 0, rT = 0; Object.keys(q).forEach(function(id){ var u = UNITS[id] || (BSET.newUnits || {})[id]; if(!u) return; pqT += Number(q[id].pq) || 0; if(!blIsGarage(u)) rT += Number(q[id].ratio) || 0; }); var e = blEl('bset-qtot'); if(e) e.innerHTML = blQuotaTotalsHtml(pqT, rT); }
+// Fill every section's PQ and ratio from the Park Manor figures; sections that
+// aren't in the register yet (usually the garages) are added on save.
+function blQuotasLoadParkManor(){
+  BSET.newUnits = BSET.newUnits || {};
+  for(var s = 1; s <= 20; s++){
+    var id = 'unit_' + s, u = UNITS[id];
+    if(!u && !BSET.newUnits[id]) BSET.newUnits[id] = { id:id, section:s, type:s > 12 ? 'store' : 'house', houseNo:s > 12 ? (PARK_MANOR_GARAGE_HOUSE[s] || '') : String(s), area:'', ownerName:'', ownerEmail:'', ownerPhone:'', charges:{}, meterReadings:[], chargeLines:[], added:Date.now() };
+    BSET.q[id] = BSET.q[id] || { pq:0, ratio:0 };
+    BSET.q[id].pq = PARK_MANOR_PQ[s];
+    BSET.q[id].ratio = s <= 12 ? PARK_MANOR_FIXED_RATIO[s] : 0;
+  }
+  blBsetMark(); renderBset();
+  blToast('Park Manor quotas and ratios loaded — save to keep them');
+}
 // Recompute every imported metered line with the tariffs being edited.
 async function blTariffCheckUi(){
   var saved = BL_TARIFFS; BL_TARIFFS = JSON.parse(JSON.stringify(BSET.t));
