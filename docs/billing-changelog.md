@@ -1,5 +1,20 @@
 # Billing changelog
 
+## v2.10 — residents see the photo on file
+- Water form status panel: the photo that goes with the reading shown (this month, else the last one) appears beside the date and reading; tap to enlarge. Served from the copy in the database (Drive files are private).
+
+
+## v2.9 — water photos to Google Drive; meter read from the photo
+- New server function `functions/water-reading.js` + Apps Script `docs/water-readings-drive.gs`: every water-meter photo (from the forms or attached in the register) is filed as `Park Manor Water Meter Readings / <Month Year> / Unit N.jpg`, and Claude reads the meter from the first photo. Setup in `docs/WATER_PHOTOS_SETUP.md` (three Netlify env vars).
+- Register: Drive link per reading; "The photo reads X (confidence)" suggestion with **Use**; a flag when the typed reading and the photo disagree; **Save to Drive & read** for older entries; chips showing whether each feature is on.
+- Public form: after sending, the resident sees that the photo was filed and what the meter was read as (to be confirmed).
+
+
+## v2.8 — imported invoice readings never count; Water readings in the sidebar
+- Meter rows that came in with a Davies invoice (dated by the invoice, e.g. 1 November) are recognised even without an invoice number on the row — by matching the reading to the imported invoice — and never count as a reading received. Rows an earlier build wrongly ticked off are removed the next time the register is opened. On the Meters tab they are labelled "Davies invoice · billing date".
+- "Water readings" is now an item in the desktop sidebar as well as the burger menu (admin, trustees, management).
+
+
 ## v2.7 — Billing meter readings count as received
 - A water reading saved on a unit’s Meters tab in Billing (or captured on an invoice issued here) now ticks that house off on the Water readings register and shows as received on the resident’s status panel. Readings that arrived with imported Davies invoices do not count. Deleting the reading in Billing takes the tick off again.
 - Existing Billing readings are picked up the next time the register is opened.

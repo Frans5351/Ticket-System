@@ -4842,7 +4842,6 @@ function buildNavDrawer(){
       +badge
     +'</button>';
   });
-  if(typeof wrCanOpen === 'function' && wrCanOpen()) html += '<button class="nav-drawer-item" onclick="closeNavDrawer();openWaterRegister()"><span class="nav-icon">\ud83d\udca7</span><span>Water readings</span></button>';
   list.innerHTML = html || '<div style="padding:16px 20px;font-size:12px;color:var(--muted);font-family:var(--mono)">No sections available.</div>';
 }
 
@@ -6818,6 +6817,9 @@ body.bl-ro #unit-modal [data-ro-hide]{display:none!important}
 #binv-modal .bl-sf .bl-dirty{display:flex}
 .bl-rdcard .top small{min-width:0}
 @media(max-width:420px){#binv-modal .bl-sf .bl-btn{flex:1 1 0;min-width:0;padding:0 8px;font-size:13px}#binv-modal .bl-sf .bl-btn.dng{flex:0 0 auto}}
+
+/* Water readings in the main navigation (desktop sidebar + burger menu) */
+@media(min-width:900px){.tab[data-tab="water"]::before{content:'💧'}}
 </style>
 
 
@@ -8993,12 +8995,15 @@ function renderMeters(){
     blRefreshUnitView(); return;
   }
   var order = R.map(function(r, i){ return i; }).reverse();
+  // Rows that came in with a Davies invoice carry the billing date, not the day the meter was read — say so.
+  var cu = UNITS[_currentUnitId] || {};
+  function tag(r){ var imp = typeof wrIsImportedReading === 'function' && r.water != null && wrIsImportedReading(cu, r); return imp ? 'Davies invoice' + (r.src ? ' ' + r.src : '') + ' · billing date' : (r.src || ''); }
   function usage(v, unit){ if(v == null) return '<span class="bl-use">first reading</span>'; return '<span class="bl-use' + (v < 0 ? ' neg' : '') + '">Used <b>' + blRound3(v) + '</b> ' + unit + '</span>'; }
   function when(r, k){ var d = k === 'water' ? r.wDate : r.eDate; return d && d !== r.date ? '<div class="bl-hint">read ' + blEsc(blDate(d, true)) + '</div>' : ''; }
   var cards = '<div class="bl-meter-cards">' + order.map(function(i){
     var r = R[i], wu = _meterUsage(R, i, 'water'), eu = _meterUsage(R, i, 'elec');
-    return '<div class="bl-mc"><div class="bl-mc-h"><input type="date" class="bl-in" aria-label="Reading date" value="' + blEsc(r.date || '') + '" onchange="updateMeterReading(' + i + ',\'date\',this.value)">' + (r.src ? '<span class="bl-st imp">' + blEsc(r.src) + '</span>' : '')
-      + '<button type="button" class="bl-ibtn" data-ro-hide aria-label="Remove reading" onclick="deleteMeterReading(' + i + ')">🗑</button></div>'
+    return '<div class="bl-mc"><div class="bl-mc-h"><input type="date" class="bl-in" aria-label="Reading date" value="' + blEsc(r.date || '') + '" onchange="updateMeterReading(' + i + ',\'date\',this.value)">' + '<button type="button" class="bl-ibtn" data-ro-hide aria-label="Remove reading" onclick="deleteMeterReading(' + i + ')">🗑</button></div>'
+      + (tag(r) ? '<div style="margin:-2px 0 8px"><span class="bl-st imp">' + blEsc(tag(r)) + '</span></div>' : '')
       + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">💧 Water (kL)</label><input type="number" inputmode="decimal" step="0.0001" class="bl-in" value="' + (r.water == null ? '' : r.water) + '" placeholder="—" onchange="updateMeterReading(' + i + ',\'water\',this.value)">' + usage(wu, 'kL') + when(r, 'water') + '</div>'
       + '<div class="bl-f"><label class="bl-lbl">⚡ Electricity (kWh)</label><input type="number" inputmode="decimal" step="0.001" class="bl-in" value="' + (r.elec == null ? '' : r.elec) + '" placeholder="—" onchange="updateMeterReading(' + i + ',\'elec\',this.value)">' + usage(eu, 'kWh') + when(r, 'elec') + '</div></div></div>';
   }).join('') + '</div>';
@@ -9009,7 +9014,7 @@ function renderMeters(){
         return '<tr><td><input type="date" class="bl-in" style="min-height:38px;width:160px" value="' + blEsc(r.date || '') + '" onchange="updateMeterReading(' + i + ',\'date\',this.value)"></td>'
           + '<td class="r"><input type="number" step="0.0001" class="bl-in" style="min-height:38px;width:120px;text-align:right" value="' + (r.water == null ? '' : r.water) + '" onchange="updateMeterReading(' + i + ',\'water\',this.value)">' + (r.wDate && r.wDate !== r.date ? '<div class="bl-hint">' + blEsc(blDate(r.wDate, true)) + '</div>' : '') + '</td><td class="r mono">' + u2(wu) + '</td>'
           + '<td class="r"><input type="number" step="0.001" class="bl-in" style="min-height:38px;width:120px;text-align:right" value="' + (r.elec == null ? '' : r.elec) + '" onchange="updateMeterReading(' + i + ',\'elec\',this.value)">' + (r.eDate && r.eDate !== r.date ? '<div class="bl-hint">' + blEsc(blDate(r.eDate, true)) + '</div>' : '') + '</td><td class="r mono">' + u2(eu) + '</td>'
-          + '<td style="color:var(--muted);font-size:12px">' + blEsc(r.src || '') + '</td>'
+          + '<td style="color:var(--muted);font-size:12px">' + blEsc(tag(r)) + '</td>'
           + '<td class="r"><button type="button" class="bl-ibtn" data-ro-hide style="width:36px;height:36px;font-size:14px" aria-label="Remove reading" onclick="deleteMeterReading(' + i + ')">✕</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   wrap.innerHTML = cards + tbl;
@@ -10170,11 +10175,15 @@ async function submitWaterReading(){
         value:wrParseValue(valueRaw) != null ? wrParseValue(valueRaw) : wrParseValue(note), valueRaw:valueRaw, note:note, source:'form',
         photos:await Promise.all(notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await wrShrink(a.dataUrl) }; })),
         photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) });
-    } catch(e){ console.warn('water reading not recorded', e); }
+      var toFile = notifyAtt.filter(function(a){ return a.dataUrl; }).map(function(a){ return { name:a.name, type:a.type, dataUrl:a.dataUrl }; });
+      if(toFile.length) wrFile(id, toFile).then(function(j){ wrPubFiled(j, !!valueRaw); });
+      else setTimeout(function(){ wrPubFiled(null); }, 0);
+    } catch(e){ console.warn('water reading not recorded', e); setTimeout(function(){ wrPubFiled(null); }, 0); }
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
-      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.</div></div>'
+      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.</div>'
+      + '<div id="wr-filed" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.6;max-width:420px;margin:12px auto 0">' + (files.length ? 'Filing your photo in the Park Manor records… you can close this page.' : '') + '</div></div>'
       + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap"><button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
       + '<button onclick="renderPublicReportForm()" style="padding:11px 22px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Report something else</button></div>';
     window.scrollTo(0, 0);
@@ -10183,6 +10192,34 @@ async function submitWaterReading(){
     showPublicErr('Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
     if(btn){ btn.disabled = false; btn.textContent = '💧 Send my reading'; btn.style.opacity = ''; }
   }
+}
+
+// ── Filing photos in Google Drive + reading the meter from the photo ────────
+// The server function (functions/water-reading.js) does both for a reading
+// that has just been saved; it writes the results onto the row itself, so the
+// work still completes if the page is closed once the upload has gone.
+async function wrFile(id, photos, opts){
+  try {
+    var r = await fetch('/api/water-reading', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ rowId:scopedId(id), photos:photos, read:!(opts && opts.read === false), drive:!(opts && opts.drive === false) }) });
+    var j = null; try { j = await r.json(); } catch(e){}
+    if(!r.ok) return { ok:false, error:(j && j.error) || ('status ' + r.status) };
+    return j || { ok:false, error:'no answer' };
+  } catch(e){ return { ok:false, error:String(e && e.message || e) }; }
+}
+// What's switched on (asked once): { drive:bool, read:bool } or null when the function isn't reachable.
+async function wrConfig(){
+  if(WR.cfg !== undefined) return WR.cfg;
+  try { var r = await fetch('/api/water-reading'); WR.cfg = r.ok ? await r.json() : null; } catch(e){ WR.cfg = null; }
+  return WR.cfg;
+}
+function wrPubFiled(j, typed){
+  var el = document.getElementById('wr-filed'); if(!el) return;
+  if(!j || !j.ok){ el.textContent = ''; return; }
+  var parts = [];
+  if(j.drive && j.drive.files && j.drive.files.length) parts.push('✓ Your photo is filed in the Park Manor records.');
+  if(j.read && j.read.value != null && !typed) parts.push('We read your meter as <b>' + blEsc(String(j.read.value)) + '</b> — the managing agent will confirm it.');
+  el.innerHTML = parts.join('<br>');
 }
 
 // ── "When did you last get my reading?" on the public form ─────────────────
@@ -10195,13 +10232,13 @@ function wrPubUnitInput(){ clearTimeout(_wrLookupT); _wrLookupT = setTimeout(wrP
 async function wrPubFetch(unit){
   var out = [], ok = true;
   try {
-    var r = await supa.from('water_readings').select('id, unit:data->>unit, month:data->>month, date:data->>date, value:data->value, source:data->>source, removed:data->removed, submittedAt:data->submittedAt').eq('data->>unit', unit).order('updated_at', { ascending:false }).limit(36);
+    var r = await supa.from('water_readings').select('id, unit:data->>unit, month:data->>month, date:data->>date, value:data->value, source:data->>source, removed:data->removed, submittedAt:data->submittedAt, photoName:data->photos->0->>name').eq('data->>unit', unit).order('updated_at', { ascending:false }).limit(36);
     if(r && r.error) ok = false;
     else ((r && r.data) || []).forEach(function(row){
       var d = row.data || row;
       if(typeof idBelongsToCurrentScheme === 'function' && row.id && !idBelongsToCurrentScheme(row.id)) return;
       if(d.removed === true || d.removed === 'true' || wrUnitKey(d.unit) !== unit || !d.month) return;
-      out.push({ month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', at:Number(d.submittedAt) || 0 });
+      out.push({ id:row.id || '', hasPhoto:!!(d.photoName || (d.photos && d.photos[0])), month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', at:Number(d.submittedAt) || 0 });
     });
   } catch(e){ ok = false; }
   try {
@@ -10219,11 +10256,38 @@ async function wrPubLookup(){
   var list = await wrPubFetch(unit);
   if(seq !== _wrLookupSeq) return;                // a newer keystroke won
   wrPubRender({ unit:unit, list:list });
+  // The photo that goes with the reading shown (this month's, else the last one).
+  var shown = wrPubShown(list);
+  if(shown && shown.hasPhoto && shown.id){
+    var src = await wrPubPhoto(shown.id);
+    if(seq !== _wrLookupSeq) return;
+    var ph = document.getElementById('wr-last-photo');
+    if(ph) ph.innerHTML = src ? '<button type="button" onclick="wrPubZoom(this.firstChild.src)" aria-label="Enlarge the photo we have on file" style="padding:0;border:none;background:none;cursor:zoom-in;display:block"><img src="' + src + '" alt="Meter photo on file" style="width:92px;height:92px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);display:block"></button><div style="font-size:10.5px;color:var(--muted);font-family:var(--sans);text-align:center;margin-top:3px">tap to enlarge</div>' : '';
+  }
+}
+function wrPubShown(list){ if(!list || !list.length) return null; var thisMonth = wrLocalDate().slice(0, 7); return list.filter(function(e){ return e.month === thisMonth; })[0] || list[0]; }
+// Fetch just the first photo of one reading (the list query leaves photos out to stay light).
+async function wrPubPhoto(rowId){
+  try {
+    var r = await supa.from('water_readings').select('id, photo:data->photos->0->>data').eq('id', rowId).limit(1);
+    var hit = ((r && r.data) || []).filter(function(x){ return x.id === rowId; })[0]; if(!hit) return '';
+    var src = hit.photo || (hit.data && hit.data.photos && hit.data.photos[0] && hit.data.photos[0].data) || '';
+    return /^data:image\//.test(src) ? src : '';
+  } catch(e){ return ''; }
+}
+function wrPubZoom(src){
+  var host = document.getElementById('public-view') || document.body, o = document.createElement('div');
+  o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'Meter photo');
+  o.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
+  o.innerHTML = '<img src="' + src + '" alt="Meter photo" style="max-width:100%;max-height:100%;border-radius:8px"><div style="position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:16px;color:#fff;font:600 15px var(--sans);background:rgba(255,255,255,.16);border-radius:99px;padding:8px 14px">Close ✕</div>';
+  o.onclick = function(){ if(o.parentNode) o.parentNode.removeChild(o); };
+  host.appendChild(o);
 }
 function wrLongMonth(ym){ var p = String(ym || '').split('-'), N = ['January','February','March','April','May','June','July','August','September','October','November','December']; return p.length < 2 ? '' : N[Number(p[1]) - 1] + ' ' + p[0]; }
 function wrPubRender(st){
   var host = document.getElementById('wr-last'); if(!host) return;
-  var box = function(bg, bd, inner){ return '<div style="border:1px solid ' + bd + ';background:' + bg + ';border-radius:12px;padding:12px 14px;font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--text2)">' + inner + '</div>'; };
+  var shown = st && st.list ? wrPubShown(st.list) : null, slot = (shown && shown.hasPhoto && shown.id) ? '<div id="wr-last-photo" style="flex:0 0 92px;min-height:92px"><div style="width:92px;height:92px;border-radius:10px;background:rgba(127,127,127,.15)"></div></div>' : '';
+  var box = function(bg, bd, inner){ return '<div style="border:1px solid ' + bd + ';background:' + bg + ';border-radius:12px;padding:12px 14px;font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--text2);display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0">' + inner + '</div>' + slot + '</div>'; };
   if(!st){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Type your unit number to see when we last received your reading.</div>'; return; }
   if(st.loading){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Checking what we have for Unit ' + blEsc(st.unit) + '…</div>'; return; }
   if(st.list == null){ host.innerHTML = ''; return; }           // lookup unavailable — say nothing rather than something wrong
@@ -10296,16 +10360,32 @@ async function wrLoad(force){
 // invoice issued here) is a reading received, so it counts in the register and
 // on the residents' status panel. Readings that came in with imported Davies
 // invoices don't count — they are Davies' billing of an older reading.
+// Did this meter row come in with an imported Davies invoice? Those carry the
+// invoice (billing) date, not the day the meter was read, and the reading is
+// an older one — so they never count as "received". Recognised by the invoice
+// number on the row, the import's separate reading date, or — for rows from
+// earlier imports that kept neither — the value/date matching an imported invoice.
+function wrIsImportedReading(u, r){
+  var invs = u.importedInvoices || [];
+  if(r.wDate && r.wDate !== r.date) return true;
+  for(var i = 0; i < invs.length; i++){
+    var inv = invs[i];
+    if(r.src && r.src === inv.invoiceNo) return true;
+    var w = (inv.lines || []).filter(function(l){ return l.kind === 'water' && l.meter && l.meter.curr != null; })[0];
+    if(w && Math.abs(Number(w.meter.curr) - Number(r.water)) < 0.00051) return true;
+    if(!w && inv.date && inv.date === r.date) return true;
+  }
+  return false;
+}
 function wrBillingReadings(month){
   var out = [];
   if(typeof UNITS === 'undefined') return out;
   Object.values(UNITS).forEach(function(u){
     if(blIsGarage(u)) return;
-    var imported = {}; (u.importedInvoices || []).forEach(function(i){ imported[i.invoiceNo] = 1; });
     (u.meterReadings || []).forEach(function(r){
       if(r.water == null || r.water === '') return;
       var d = r.wDate || r.date || ''; if(d.slice(0, 7) !== month) return;
-      if(r.src && (imported[r.src] || /^water (register|form)$/i.test(r.src))) return;
+      if(/^water (register|form)$/i.test(r.src || '') || wrIsImportedReading(u, r)) return;
       out.push({ id:'wr_b_' + u.section + '_' + d, unit:String(u.section), date:d, value:Number(r.water) });
     });
   });
@@ -10373,7 +10453,7 @@ async function openWaterRegister(month){
   if(!wrCanOpen()){ blToast('Only trustees, management and admin can see the readings register.', 'err'); return; }
   if(typeof blEnsureBillingLoaded === 'function'){ try { await blEnsureBillingLoaded(); } catch(e){} }
   WR.month = month || WR.month || new Date().toISOString().slice(0, 7); if(WR.month < WR_FIRST_MONTH) WR.month = WR_FIRST_MONTH;
-  await wrLoad();
+  await Promise.all([wrLoad(), wrConfig()]);
   WR.open = true;
   var m = blEl('wr-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
   if(!WR.nav){ WR.nav = true; blNavPush(function(){ WR.nav = false; closeWaterRegister(true); }); }
@@ -10395,7 +10475,8 @@ function renderWaterRegister(){
   if(WR.tableMissing) h += '<div class="bl-note"><span class="ic">⚠️</span><span>The readings table isn’t set up yet, so readings sent through the form aren’t recorded here and photos can’t be saved. Run <b>WATER_READINGS_SETUP.sql</b> once in Supabase. Until then you can still tick houses off by hand.</span></div>';
   h += '<div class="bl-card2"><div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="wr-month">Month</label><select id="wr-month" class="bl-in" onchange="wrSetMonth(this.value)">' + wrMonths().map(function(m){ return '<option value="' + m + '"' + (m === WR.month ? ' selected' : '') + '>' + blMonthName(m) + '</option>'; }).join('') + '</select></div>'
     + '<div class="bl-tile' + (got === n ? ' ok' : (got ? '' : ' owe')) + '" style="padding:10px 14px"><div class="k">Received</div><div class="v">' + got + ' / ' + n + '</div><div class="s">' + (got === n ? 'everyone’s in' : (n - got) + ' outstanding') + '</div></div></div>'
-    + '<div class="bl-hint" style="margin-top:10px">Readings sent through the water-meter form tick themselves off. For anything that came by WhatsApp, email or a walk-around, tap <b>Add reading</b> on the house: type the reading, attach the photo, save.</div></div>';
+    + '<div class="bl-hint" style="margin-top:10px">Readings sent through the water-meter form tick themselves off. For anything that came by WhatsApp, email or a walk-around, tap <b>Add reading</b> on the house: type the reading, attach the photo, save.</div>'
+    + (WR.cfg ? '<div class="bl-chipsrow" style="margin-top:10px"><span class="bl-st ' + (WR.cfg.drive ? 'final' : 'imp') + '">📁 Photos to Google Drive: ' + (WR.cfg.drive ? 'on' : 'not set up') + '</span><span class="bl-st ' + (WR.cfg.read ? 'final' : 'imp') + '">🔍 Read meter from photo: ' + (WR.cfg.read ? 'on' : 'not set up') + '</span></div>' : '') + '</div>';
   var outstanding = data.houses.filter(function(x){ return !x.received; });
   if(outstanding.length && got) h += '<div class="bl-card2"><div class="bl-h"><span>Still outstanding</span><button type="button" class="lnk" onclick="wrCopyReminder()">Copy reminder</button></div><div class="bl-chipsrow">' + outstanding.map(function(x){ return '<button type="button" class="bl-chip" style="height:36px" ' + (canMark ? 'onclick="wrEdit(\'' + blEsc(x.house.key) + '\')"' : '') + '>' + blEsc(x.house.label) + '</button>'; }).join('') + '</div></div>';
   var prev = blAddMonths(WR.month, -1);
@@ -10407,6 +10488,14 @@ function wrHouseRow(x, canMark, prevMonth){
   var e = x.latest, k = x.house.key;
   var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
   var prevVal = e && e.value != null ? wrValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
+  var ai = e && e.ai, drive = (e && e.driveFiles) || [], aiHtml = '';
+  if(ai && ai.value != null){
+    if(e.value == null) aiHtml = '<div class="bl-note info" style="margin-top:8px;padding:10px 12px"><span class="ic">🔍</span><span>The photo reads <b>' + blEsc(String(ai.value)) + ' kL</b> <span style="color:var(--muted)">(' + blEsc(ai.confidence || 'low') + ' confidence' + (ai.note ? ' — ' + blEsc(ai.note) : '') + ')</span></span>' + (canMark && e.id ? '<button type="button" class="bl-btn sm pri" onclick="wrUseAi(\'' + blEsc(e.id) + '\')">✓ Use</button>' : '') + '</div>';
+    else if(Math.abs(Number(e.value) - Number(ai.value)) > 0.5) aiHtml = '<div class="bl-note" style="margin-top:8px;padding:10px 12px"><span class="ic">⚠️</span><span>The photo reads <b>' + blEsc(String(ai.value)) + '</b> but <b>' + blEsc(String(e.value)) + '</b> was typed — worth a look' + (ai.note ? ' (' + blEsc(ai.note) + ')' : '') + '.</span>' + (canMark && e.id ? '<button type="button" class="bl-btn sm" onclick="wrUseAi(\'' + blEsc(e.id) + '\')">Use photo</button>' : '') + '</div>';
+    else aiHtml = '<div class="bl-chk" style="margin-top:4px"><span class="ok">✓</span> matches what the photo shows</div>';
+  } else if(ai && (ai.error || ai.note)) aiHtml = '<div class="bl-chk" style="margin-top:4px">🔍 Couldn’t read the photo' + (ai.note ? ': ' + blEsc(ai.note) : '') + '</div>';
+  var driveHtml = drive.length ? '<div class="row"><span>Drive</span><b style="text-align:right">' + drive.map(function(f){ return '<a href="' + blEsc(f.url) + '" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">📁 ' + blEsc(f.name) + '</a>'; }).join('<br>') + '</b></div>' : (e && e.driveError ? '<div class="row"><span>Drive</span><b style="text-align:right;color:var(--bl-owe);font-weight:500">not filed: ' + blEsc(e.driveError) + '</b></div>' : '');
+  var canFile = canMark && e && e.id && (e.kind === 'form' || e.kind === 'manual') && (e.photos || []).length && WR.cfg && (WR.cfg.drive || WR.cfg.read) && ((WR.cfg.drive && !drive.length) || (WR.cfg.read && !ai));
   var photos = (e && e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);cursor:pointer" onclick="wrPhoto(\'' + blEsc(e.id || '') + '\',' + i + ')">'; }).join('');
   var more = '';
   if(e){
@@ -10416,8 +10505,11 @@ function wrHouseRow(x, canMark, prevMonth){
       + '<div class="row"><span>How</span><b style="text-align:right">' + blEsc(src) + '</b></div>'
       + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
       + (x.entries.length > 1 ? '<div class="row"><span>Also</span><b>' + (x.entries.length - 1) + ' earlier submission' + (x.entries.length > 2 ? 's' : '') + ' this month</b></div>' : '')
+      + driveHtml
       + (photos ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + photos + '</div>' : '')
+      + aiHtml
       + (canMark ? '<div class="bl-doc-acts"><button type="button" class="bl-btn sm" onclick="wrEdit(\'' + blEsc(k) + '\',true)">✏️ Edit' + (e.value == null ? ' · type the reading' : '') + '</button>'
+        + (canFile ? '<button type="button" class="bl-btn sm" onclick="wrFileExisting(\'' + blEsc(e.id) + '\')">' + (WR.cfg.drive && !drive.length ? '📁 Save to Drive' + (WR.cfg.read && !ai ? ' &amp; read' : '') : '🔍 Read the photo') + '</button>' : '')
         + (e.value != null && x.house.uid && typeof blRO === 'function' && !blRO() ? '<button type="button" class="bl-btn sm" onclick="wrToBilling(\'' + x.house.uid + '\',\'' + blEsc(e.date || '') + '\',' + Number(e.value) + ')">📥 To billing</button>' : '') + '</div>' : '')
       + '</div>';
   } else if(canMark){
@@ -10443,7 +10535,7 @@ async function wrEditAddFiles(files){
   ed.busy = true; if(host) host.innerHTML = wrEditPhotosHtml();
   for(var i = 0; i < list.length; i++){
     if(ed.photos.length >= WR_MAX_PHOTOS){ blToast('Up to ' + WR_MAX_PHOTOS + ' photos per reading.', 'err'); break; }
-    try { var c = await publicCompressPhoto(list[i]); var small = await wrShrink(c.data); ed.photos.push({ name:c.name || list[i].name || 'meter.jpg', type:'image/jpeg', data:small }); }
+    try { var c = await publicCompressPhoto(list[i]); var small = await wrShrink(c.data); ed.photos.push({ name:c.name || list[i].name || 'meter.jpg', type:'image/jpeg', data:small, _new:true, _full:c.data }); }
     catch(e){ blToast('Couldn’t read that photo.', 'err'); }
   }
   ed.busy = false; if(host) host.innerHTML = wrEditPhotosHtml();
@@ -10466,6 +10558,7 @@ async function wrEdit(unit, editLatest){
     + '<div style="display:flex;gap:8px"><label class="bl-btn" style="flex:1" for="wre-cam">📷 Take photo</label><label class="bl-btn" style="flex:1" for="wre-gal">🖼 Choose</label></div>'
     + '<input id="wre-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="wrEditAddFiles(this.files);this.value=\'\'"><input id="wre-gal" type="file" accept="image/*" multiple style="display:none" onchange="wrEditAddFiles(this.files);this.value=\'\'"></div>'
     + '<div class="bl-f" style="margin-top:10px"><label class="bl-lbl" for="wre-note">Note (optional)</label><input id="wre-note" type="text" class="bl-in" placeholder="e.g. sent by WhatsApp" value="' + blEsc((existing && existing.note) || '') + '"></div>'
+    + (WR.cfg && WR.cfg.read ? '<div class="bl-hint" style="margin-top:8px">Tip: leave the reading blank and it’s read from the photo for you to confirm.</div>' : '')
     + (WR.tableMissing ? '<div class="warn" style="margin-top:10px">Photos can’t be saved until WATER_READINGS_SETUP.sql has been run — the reading and note will be.</div>' : '');
   var picked = null, collect = function(){ picked = { unit:unit || (blEl('wre-unit') || {}).value || '', date:(blEl('wre-date') || {}).value || inMonth, value:_mrNum((blEl('wre-value') || {}).value), note:_uStr('wre-note') }; };
   var buttons = [{ label:existing ? 'Save changes' : 'Save reading', kind:'pri', value:'save', onClick:collect }];
@@ -10480,6 +10573,8 @@ async function wrEdit(unit, editLatest){
   await wrSaveEntry(picked, existing, ed.photos || []);
 }
 async function wrSaveEntry(p, existing, photos){
+  var fresh = (photos || []).filter(function(x){ return x._new; }).map(function(x){ return { name:x.name, type:x.type, dataUrl:x._full || x.data }; });
+  photos = (photos || []).map(function(x){ return { name:x.name, type:x.type, data:x.data }; });
   var month = WR.month, isRow = existing && (existing.kind === 'form' || existing.kind === 'manual') && existing.id;
   var id = isRow ? existing.id : 'wr_m_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   var base = isRow ? Object.assign({}, (WR.cache[month] || {})[id] || {}) : { source:'manual', by:wrWho(), submittedAt:Date.now() };
@@ -10491,6 +10586,7 @@ async function wrSaveEntry(p, existing, photos){
     WR.cache[month] = WR.cache[month] || {}; WR.cache[month][id] = data; WR.tableMissing = false;
     if((WR.marks[month] || {})[p.unit]){ delete WR.marks[month][p.unit]; await wrSaveMarks(); }      // superseded tick
     renderWaterRegister(); blToast('House ' + p.unit + (isRow ? ' updated' : ' recorded'), 'ok');
+    if(fresh.length && WR.cfg && (WR.cfg.drive || WR.cfg.read)) wrFileAndRefresh(id, fresh, month);
   } else {
     WR.tableMissing = true;
     WR.marks[month] = WR.marks[month] || {};
@@ -10498,6 +10594,34 @@ async function wrSaveEntry(p, existing, photos){
     await wrSaveMarks(); renderWaterRegister();
     blToast('House ' + p.unit + ' ticked off' + (photos.length ? ' — the photo wasn’t saved (table not set up)' : ''), photos.length ? 'err' : 'ok');
   }
+}
+// File photos / read the meter for a saved row, then show what came back.
+async function wrFileAndRefresh(id, photos, month){
+  blToast((WR.cfg && WR.cfg.drive ? 'Saving the photo to Drive' : 'Reading the photo') + '…');
+  var j = await wrFile(id, photos);
+  await wrLoadMonth(month, true); if(WR.open) renderWaterRegister();
+  if(!j || !j.ok){ blToast('Couldn’t file the photo: ' + ((j && j.error) || 'no connection'), 'err'); return; }
+  var bits = [];
+  if(j.drive && j.drive.files && j.drive.files.length) bits.push('saved to Drive as ' + j.drive.files.map(function(f){ return f.name; }).join(', '));
+  else if(j.drive && j.drive.error) bits.push('Drive: ' + j.drive.error);
+  if(j.read && j.read.value != null) bits.push('photo reads ' + j.read.value);
+  else if(j.read && j.read.error) bits.push('reading: ' + j.read.error);
+  if(bits.length) blToast(bits.join(' · '), (j.drive && j.drive.error) || (j.read && j.read.error) ? 'err' : 'ok');
+}
+// Older entries (photo stored, never filed): touch the row so the server accepts it, then file.
+async function wrFileExisting(id){
+  if(!wrCanMark()) return;
+  var month = WR.month, row = (WR.cache[month] || {})[id]; if(!row || !(row.photos || []).length) return;
+  if(!(await wrUpsert(id, row))){ blToast('Couldn’t reach the database.', 'err'); return; }
+  await wrFileAndRefresh(id, row.photos.map(function(p){ return { name:p.name, type:p.type, dataUrl:p.data }; }), month);
+}
+// Accept the reading taken from the photo.
+async function wrUseAi(id){
+  if(!wrCanMark()) return;
+  var month = WR.month, row = (WR.cache[month] || {})[id]; if(!row || !row.ai || row.ai.value == null) return;
+  var data = Object.assign({}, row, { value:Number(row.ai.value), valueRaw:String(row.ai.value), valueFrom:'photo', confirmedBy:wrWho(), confirmedAt:Date.now() });
+  if(await wrUpsert(id, data)){ WR.cache[month][id] = data; renderWaterRegister(); blToast('Reading set to ' + data.value, 'ok'); }
+  else blToast('Couldn’t save — try again.', 'err');
 }
 async function wrRemoveEntry(unit, e){
   if(!e) return;
@@ -10522,8 +10646,21 @@ function wrCopyReminder(){
   if(typeof copyTextToClipboard === 'function') copyTextToClipboard(text); else { try { navigator.clipboard.writeText(text); } catch(e){} }
   blToast('Reminder copied — paste it into WhatsApp', 'ok');
 }
-// Show the Tracker button for the roles that may use the register.
-function wrApplyAccess(){ var b = blEl('wr-open-btn'); if(b) b.style.display = wrCanOpen() ? '' : 'none'; }
+// Navigation: a "Water readings" item in the desktop sidebar and the burger
+// menu (both are built from the .tabs buttons), plus the Tracker header button.
+(function(){
+  var nav = document.querySelector('.tabs'); if(!nav || nav.querySelector('[data-tab="water"]')) return;
+  var b = document.createElement('button'); b.className = 'tab'; b.id = 'wr-tab'; b.setAttribute('data-tab', 'water'); b.textContent = 'Water readings'; b.style.display = 'none';
+  b.addEventListener('click', function(){ openWaterRegister(); });      // opens the register sheet; it isn't a panel
+  var after = nav.querySelector('[data-tab="billing"]');
+  if(after && after.nextSibling) nav.insertBefore(b, after.nextSibling); else nav.appendChild(b);
+  if(typeof NAV_MENU_META !== 'undefined') NAV_MENU_META.water = { label:'Water readings', icon:'\ud83d\udca7' };
+})();
+function wrApplyAccess(){
+  var on = wrCanOpen(), b = blEl('wr-open-btn'), t = blEl('wr-tab');
+  if(b) b.style.display = on ? '' : 'none';
+  if(t) t.style.display = on ? 'inline-flex' : 'none';
+}
 (function(){ var o = applyBillingAccess; applyBillingAccess = function(u){ var r = o.apply(this, arguments); wrApplyAccess(); return r; }; })();
 
 </script>

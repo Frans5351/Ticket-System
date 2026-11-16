@@ -191,9 +191,16 @@ back to a tick in `settings.water_marks` (no photos) and the register says so.
 Residents see their own status on the water form: after typing the unit number
 (remembered on the device after the first submission) a panel shows whether
 this month's reading has been received, and the date, value and route of the
-last one on file — form submissions and hand-captured entries alike. Photos and
-notes are never shown publicly. Each form submission is stored whole: unit,
+last one on file — form submissions and hand-captured entries alike. The first
+photo of that reading is shown beside it (tap to enlarge) — served from the
+copy stored in `water_readings`, because the Drive files are private to the
+owner's Google account. Notes are never shown publicly. Each form submission is stored whole: unit,
 date, reading, note and every attached photo (shrunk).
+
+Photos can be filed in Google Drive and the meter read from the photo —
+`functions/water-reading.js` (`/api/water-reading`), an Apps Script web app
+(`docs/water-readings-drive.gs`) and three env vars (`WATER_DRIVE_URL`,
+`WATER_DRIVE_SECRET`, `ANTHROPIC_API_KEY`). Setup: `docs/WATER_PHOTOS_SETUP.md`.
 
 ## Billing (levies)
 
