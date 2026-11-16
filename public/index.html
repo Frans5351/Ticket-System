@@ -6313,15 +6313,15 @@ document.getElementById('tbody').addEventListener('click', function(e){
 <style id="bl-css">
 /* ═══ Billing UI — mobile-first. Everything is scoped to the billing surfaces
    so it can't leak into the rest of the app. ═══════════════════════════════ */
-#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu,#bl-toast{
+#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu,#bl-toast{
   --bl-owe:#f0a06f;--bl-owe-bg:rgba(240,160,111,.12);--bl-owe-bd:rgba(240,160,111,.40);
   --bl-a1:#e6b34a;--bl-a2:#e8873a;--bl-a3:#e05c4a;--bl-a4:#b32d3a;
 }
-body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu,#bl-toast){
+body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu,#bl-toast){
   --bl-owe:#b4570f;--bl-owe-bg:rgba(180,87,15,.09);--bl-owe-bd:rgba(180,87,15,.35);
 }
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── Buttons ── */
 .bl-btn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 14px var(--sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .12s,border-color .12s,transform .06s}
@@ -6421,14 +6421,14 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Unit table (desktop) ── */
 .bl-tbl{display:none}
 @media(min-width:900px){.bl-tbl{display:block}.bl-cards{display:none}}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb tbody{display:table-row-group!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb tr{display:table-row!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb th,
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal) .bl-tb .r{text-align:right!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb tbody{display:table-row-group!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb tr{display:table-row!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb th,
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb .r{text-align:right!important}
 .bl-tb tbody tr.row{cursor:pointer}
 .bl-tb tbody tr.row:hover td{background:var(--surface)}
 .bl-tb tfoot td{font-weight:700}
@@ -6496,13 +6496,13 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 .bl-toast-i.ok{background:var(--green);color:#06210f}
 
 /* ── Full-screen sheets (unit editor + importer) ── */
-#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
+#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
 #unit-modal{z-index:700}
 #wc-import-modal{z-index:720}
 .bl-sheet{background:var(--surface);width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;animation:bl-up .22s ease-out}
 @keyframes bl-up{from{transform:translateY(22px);opacity:0}to{transform:none;opacity:1}}
 @media(min-width:768px){
-  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal{align-items:center}
+  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal{align-items:center}
   .bl-sheet{width:min(900px,94vw);height:min(90vh,920px);border-radius:20px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,.5)}
 }
 @media(prefers-reduced-motion:reduce){.bl-sheet,.bl-dlg-card,.bl-menu-panel,.bl-toast-i{animation:none!important}}
@@ -6540,10 +6540,10 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Form fields ── */
 .bl-f{display:flex;flex-direction:column;gap:6px;min-width:0}
 .bl-lbl{font:600 12px var(--sans);color:var(--muted)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .bl-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .bl-grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bl-grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -6692,7 +6692,8 @@ body.bl-ro #unit-modal [onclick*="deleteLedgerLine"]{display:none!important}
 body.bl-ro #unit-modal .bl-in:disabled{opacity:1;-webkit-text-fill-color:currentColor;background:transparent}
 
 /* ═══ Billing v2 — charge schedule, invoice lifecycle, monthly run, settings ═══ */
-#binv-modal{z-index:730}#run-modal{z-index:710}#bset-modal{z-index:715}#plan-modal{z-index:712}
+#binv-modal{z-index:730}#run-modal{z-index:710}#bset-modal{z-index:715}#plan-modal{z-index:712}#wr-modal{z-index:705}
+#wr-modal .bl-lr-more .row b{font-weight:600}
 .bl-qrow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border)}
 .bl-qrow:first-of-type{border-top:none}
 .bl-qrow .who b{display:block;font:600 13px var(--sans);color:var(--text2)}
@@ -6870,6 +6871,7 @@ body.bl-ro #unit-modal [data-ro-hide]{display:none!important}
     <div class="bl-menu-h">Billing actions</div>
     <button class="bl-mi" onclick="blMenuDo('wc')"><span class="i">📥</span><span><b>Import PDFs</b><small>Load a month’s Davies / WeconnectU invoices, statements and credit notes</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('run')"><span class="i">🧾</span><span><b>Monthly invoice run</b><small>Month → readings → review every draft → finalise &amp; email</small></span></button>
+    <button class="bl-mi" onclick="blMenuDo('water')"><span class="i">💧</span><span><b>Water meter readings</b><small>Who has sent this month’s reading — ticks itself off from the form, mark the rest by hand</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('plans')"><span class="i">🧮</span><span><b>Shared charges &amp; recoveries</b><small>Levies, municipal fixed charges, backdated recoveries and special levies split across the houses</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('set')"><span class="i">⚙️</span><span><b>Billing settings</b><small>Letterhead, bank details, quotas &amp; splits, invoice numbering</small></span></button>
     <button class="bl-mi" onclick="blMenuDo('tar')"><span class="i">💧</span><span><b>Tariffs &amp; rates</b><small>Water, sewerage and electricity tariffs — check them against the imports</small></span></button>
@@ -7105,6 +7107,18 @@ async function wcExtractItems(file){
     </div>
     <div class="bl-body" id="run-body"></div>
     <div class="bl-sf" id="run-foot"></div>
+  </div>
+</div>
+
+<!-- Water meter readings register -->
+<div id="wr-modal" onclick="if(event.target===this)closeWaterRegister()">
+  <div class="bl-sheet" role="dialog" aria-modal="true" aria-label="Water meter readings">
+    <div class="bl-sh">
+      <button class="bl-back" aria-label="Close" onclick="closeWaterRegister()">←</button>
+      <div class="bl-sh-t"><b>💧 Water meter readings</b><span id="wr-sub"></span></div>
+    </div>
+    <div class="bl-body" id="wr-body"></div>
+    <div class="bl-sf" id="wr-foot"></div>
   </div>
 </div>
 
@@ -9955,7 +9969,7 @@ function unitTotal(u){
 // Menu dispatcher (adds the new entries).
 function blMenuDo(k){
   blCloseMenu();
-  var fn = { wc:openWeconnectImport, inv:openMonthlyRun, run:openMonthlyRun, csv:blExportCsv, stmts:seedParkManorStatements, seed:seedParkManorUnits, plans:openSharedCharges, set:function(){ openBillingSettings('scheme'); }, tar:function(){ openBillingSettings('tariffs'); } }[k];
+  var fn = { wc:openWeconnectImport, inv:openMonthlyRun, run:openMonthlyRun, csv:blExportCsv, stmts:seedParkManorStatements, seed:seedParkManorUnits, plans:openSharedCharges, water:openWaterRegister, set:function(){ openBillingSettings('scheme'); }, tar:function(){ openBillingSettings('tariffs'); } }[k];
   setTimeout(function(){ if(fn) fn(); }, 90);
 }
 // Settings + tariffs load the first time billing is opened.
@@ -10043,6 +10057,234 @@ async function wcApplyImport(){
   blToast('Imported ' + applied + ' unit' + (applied === 1 ? '' : 's') + ' from ' + (window._wcFileCount || 0) + ' file' + (window._wcFileCount === 1 ? '' : 's'), 'ok');
   if(notes.length) await blAlert('Import notes', '<ul>' + notes.map(function(n){ return '<li><span>' + blEsc(n) + '</span></li>'; }).join('') + '</ul>');
 }
+
+// ═══ Water meter readings — public form (dedicated + inside the general form),
+// stored submissions, and the monthly "who has sent theirs" register ═════════
+//
+// Submissions are emailed exactly as before (managing agent + Park Manor inbox,
+// never the trustees) AND saved as a row in the `water_readings` table
+// (`{id, data}` like everything else) so the register fills itself in. If the
+// table doesn't exist yet the email still goes and the register can be marked
+// by hand — see docs/WATER_READINGS_SETUP.sql.
+var WR = { open:false, nav:false, month:'', rows:{}, marks:{}, loaded:false };
+var WR_FIRST_MONTH = '2026-11';
+var WR_HOUSES = 12;
+
+// ── Public form ─────────────────────────────────────────────────────────────
+// The general report form's "Water Reading" tile swaps the whole form for the
+// water-meter one (unit · photo · reading · note), with a way back.
+function pubSelectCategory(btn){
+  var cat = btn.getAttribute('data-cat');
+  if(cat === 'Water Reading'){ window._pubCategory = ''; renderWaterReadingForm({ embedded:true }); return; }
+  window._pubCategory = (window._pubCategory === cat) ? '' : cat;
+  var host = document.getElementById('pub-cat-tiles');
+  if(host){
+    host.querySelectorAll('button').forEach(function(b){
+      var on = b.getAttribute('data-cat') === window._pubCategory;
+      b.style.borderColor = on ? 'var(--accent)' : 'var(--border2)';
+      b.style.background = on ? 'var(--accent-bg)' : 'var(--surface)';
+    });
+  }
+  var hints = PUB_CAT_HINTS[window._pubCategory] || PUB_CAT_HINTS['Other'];
+  var titleEl = document.getElementById('pub-title'), descEl = document.getElementById('pub-desc');
+  if(titleEl) titleEl.placeholder = hints[0];
+  if(descEl) descEl.placeholder = hints[1];
+  if(titleEl && !titleEl.value) titleEl.focus();
+}
+function renderWaterReadingForm(opts){
+  opts = opts || {};
+  var host = document.getElementById('public-view-content');
+  if(!host) return;
+  window._pubFiles = [];
+  function showForm(){
+    if(!PUBLIC_REPORTS_ENABLED){
+      host.innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:14px">🔒</div><div style="font-size:16px;color:var(--text2);font-weight:600;margin-bottom:8px">Submissions currently disabled</div><div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.6">The body corporate has temporarily turned off public submissions. Please contact a trustee directly.</div></div>';
+      return;
+    }
+    var inputCss = 'width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;font-family:var(--sans);outline:none;box-sizing:border-box';
+    var lbl = function(t){ return '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + t + '</label>'; };
+    host.innerHTML = ''
+      + '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">💧 Submit your water meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>'
+      + (opts.embedded ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
+      + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Your unit</b></span></div>' + lbl('Unit number *') + '<input id="wr-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" style="' + inputCss + '"></div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Photo of your meter</b><i>point your camera at the meter and snap</i></span></div>'
+      +   '<div style="display:flex;gap:8px;margin-bottom:8px">'
+      +     '<button type="button" onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">📷 Take photo</button>'
+      +     '<button type="button" onclick="document.getElementById(\'pub-photos\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">🖼 Choose from gallery</button>'
+      +   '</div><div id="pub-file-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"></div>'
+      +   '<input id="pub-photos-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
+      +   '<input id="pub-photos" type="file" accept="image/*" multiple style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'"></div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>The reading</b><i>optional if the photo is clear</i></span></div>'
+      +   lbl('Digits shown on the meter') + '<input id="wr-value" type="text" inputmode="decimal" placeholder="e.g. 03457.2" maxlength="20" style="' + inputCss + '">'
+      +   lbl('Anything to add? (optional)') + '<textarea id="wr-note" rows="2" placeholder="e.g. the meter is hard to reach, or the date you read it" maxlength="500" style="' + inputCss + ';resize:vertical"></textarea></div>'
+      + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
+      + '<div id="pub-submit-bar"><button id="pub-submit-btn" onclick="submitWaterReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer">💧 Send my reading</button></div>';
+    var uEl = document.getElementById('wr-unit'); if(uEl && !opts.embedded) setTimeout(function(){ uEl.focus(); }, 60);
+    if(opts.embedded) window.scrollTo(0, 0);
+  }
+  if(typeof PUBLIC_REPORTS_ENABLED === 'undefined'){ return setTimeout(showForm, 300); }
+  showForm();
+}
+function wrParseValue(s){ var m = /(\d[\d ]{1,8}(?:[.,]\d+)?)/.exec(String(s || '')); if(!m) return null; var n = parseFloat(m[1].replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : null; }
+async function submitWaterReading(){
+  clearPublicErr();
+  var honey = document.getElementById('pub-honey');
+  if(honey && honey.value){ document.getElementById('public-view-content').innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>'; return; }
+  if(!publicRateLimitOk()){ showPublicErr('You’ve submitted several times recently. Please wait a bit before submitting another.'); return; }
+  var unit = (document.getElementById('wr-unit').value || '').trim().replace(/^unit\s*/i, '');
+  var note = (document.getElementById('wr-note').value || '').trim();
+  var valueRaw = ((document.getElementById('wr-value') || {}).value || '').trim();
+  var files = (window._pubFiles || []).filter(function(f){ return !!f; });
+  if(!unit){ showPublicErr('Please enter your unit number.'); return; }
+  if(!files.length && !valueRaw && !note){ showPublicErr('Please add a photo of your meter (or type the reading).'); return; }
+  if(files.length > MAX_PUBLIC_PHOTOS){ showPublicErr('A maximum of ' + MAX_PUBLIC_PHOTOS + ' photos can be attached.'); return; }
+  var btn = document.getElementById('pub-submit-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; btn.style.opacity = '0.7'; }
+  try {
+    var notifyAtt = [], NOTIFY_BUDGET = 4200000, notifyUsed = 0;
+    for(var i = 0; i < files.length; i++){
+      var compressed = await publicCompressPhoto(files[i]);
+      var attSize = (compressed.data || '').length;
+      if(notifyUsed + attSize <= NOTIFY_BUDGET){ notifyAtt.push({ name:compressed.name, type:compressed.type, dataUrl:compressed.data }); notifyUsed += attSize; }
+      else notifyAtt.push({ name:compressed.name, type:compressed.type, skipped:true, sizeMB:(attSize * 0.75 / 1048576).toFixed(1) });
+    }
+    var descLines = [];
+    if(valueRaw) descLines.push('Reading: ' + valueRaw);
+    if(note) descLines.push(note);
+    if(!descLines.length) descLines.push('(Photo of meter submitted — see attachment.)');
+    var r = await fetch('/api/send-edit-link', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ notifyOnly:true, title:'Water meter reading', desc:descLines.join('\n'), unit:unit, reporter:'', phone:'', email:'', category:'Water Reading',
+        bcInbox:(typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '', attachments:notifyAtt }) });
+    if(!r.ok) throw new Error('send failed: ' + r.status);
+    // Record it for the register (best effort — the email is the thing that must not fail).
+    try {
+      var now = new Date(), id = 'wr_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+      await sbUpsert('water_readings', id, { unit:String(unit), month:now.toISOString().slice(0, 7), date:now.toISOString().slice(0, 10), submittedAt:now.getTime(),
+        value:wrParseValue(valueRaw) != null ? wrParseValue(valueRaw) : wrParseValue(note), valueRaw:valueRaw, note:note, source:'form',
+        photos:notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, 2).map(function(a){ return { name:a.name, type:a.type, data:a.dataUrl }; }) });
+    } catch(e){ console.warn('water reading not recorded', e); }
+    document.getElementById('public-view-content').innerHTML = ''
+      + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
+      + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
+      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.</div></div>'
+      + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap"><button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
+      + '<button onclick="renderPublicReportForm()" style="padding:11px 22px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Report something else</button></div>';
+    window.scrollTo(0, 0);
+  } catch(e){
+    console.warn('water reading submit', e);
+    showPublicErr('Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
+    if(btn){ btn.disabled = false; btn.textContent = '💧 Send my reading'; btn.style.opacity = ''; }
+  }
+}
+
+// ── Register ────────────────────────────────────────────────────────────────
+function wrCanOpen(){ return _currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management'; }
+function wrCanMark(){ return wrCanOpen(); }
+function wrMonths(){ var out = [], m = WR_FIRST_MONTH, now = new Date(), last = blAddMonths(now.toISOString().slice(0, 7), 1); while(m <= last){ out.push(m); m = blAddMonths(m, 1); } return out.reverse(); }
+async function wrLoad(force){
+  if(WR.loaded && !force) return;
+  try { WR.rows = await sbLoadAll('water_readings') || {}; } catch(e){ WR.rows = {}; }
+  try { var m = await sbGetSetting('water_marks'); WR.marks = (m && typeof m === 'object') ? (typeof m === 'string' ? JSON.parse(m) : m) : {}; } catch(e){ WR.marks = {}; }
+  WR.loaded = true;
+}
+async function wrSaveMarks(){ try { await sbSetSetting('water_marks', WR.marks); } catch(e){ console.warn('water marks', e); } }
+function wrUnitKey(u){ return String(u || '').trim().replace(/^unit\s*/i, '').replace(/^0+(\d)/, '$1'); }
+// Everything known for a month: form submissions, manual marks, old-style tickets.
+function wrRowsFor(month){
+  var byUnit = {};
+  var add = function(unit, e){ var k = wrUnitKey(unit); if(!k) return; (byUnit[k] = byUnit[k] || []).push(e); };
+  Object.keys(WR.rows || {}).forEach(function(id){ var r = WR.rows[id]; if(!r || r.month !== month) return; add(r.unit, Object.assign({ id:id, kind:'form' }, r)); });
+  var mk = (WR.marks || {})[month] || {};
+  Object.keys(mk).forEach(function(unit){ var m = mk[unit]; if(m && m.received) add(unit, Object.assign({ kind:'manual' }, m)); });
+  if(typeof TICKETS !== 'undefined'){
+    Object.values(TICKETS || {}).forEach(function(t){ if(!t || t.category !== 'Water Reading') return; var d = String(t.dateOpen || (t.added ? new Date(t.added).toISOString().slice(0, 10) : '')); if(d.slice(0, 7) !== month) return; add(t.unit, { kind:'ticket', id:t.id, date:d, value:wrParseValue(t.desc) != null ? wrParseValue(t.desc) : wrParseValue(t.title), note:t.title, ticketNumber:t.ticketNumber }); });
+  }
+  var houses = [];
+  var fromUnits = (typeof UNITS !== 'undefined' && Object.keys(UNITS).length) ? Object.values(UNITS).filter(function(u){ return !blIsGarage(u); }).sort(function(a, b){ return a.section - b.section; }).map(function(u){ return { key:String(u.section), label:'House ' + (u.houseNo || u.section), owner:u.ownerName || '', uid:u.id }; }) : null;
+  if(!fromUnits) for(var i = 1; i <= WR_HOUSES; i++) fromUnits = (fromUnits || []).concat([{ key:String(i), label:'House ' + i, owner:'' }]);
+  fromUnits.forEach(function(h){ var es = (byUnit[h.key] || []).sort(function(a, b){ return (b.submittedAt || 0) - (a.submittedAt || 0); }); houses.push({ house:h, entries:es, received:es.length > 0, latest:es[0] || null }); delete byUnit[h.key]; });
+  var stray = Object.keys(byUnit).map(function(k){ return { house:{ key:k, label:'Unit ' + k, owner:'', unknown:true }, entries:byUnit[k], received:true, latest:byUnit[k][0] }; });
+  return { houses:houses, stray:stray };
+}
+async function openWaterRegister(month){
+  if(!wrCanOpen()){ blToast('Only trustees, management and admin can see the readings register.', 'err'); return; }
+  if(typeof blEnsureBillingLoaded === 'function'){ try { await blEnsureBillingLoaded(); } catch(e){} }
+  await wrLoad();
+  WR.open = true; WR.month = month || new Date().toISOString().slice(0, 7); if(WR.month < WR_FIRST_MONTH) WR.month = WR_FIRST_MONTH;
+  var m = blEl('wr-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  if(!WR.nav){ WR.nav = true; blNavPush(function(){ WR.nav = false; closeWaterRegister(true); }); }
+  renderWaterRegister();
+}
+function closeWaterRegister(fromBack){
+  var m = blEl('wr-modal'); if(m) m.style.display = 'none';
+  if(!BL.open) document.body.style.overflow = '';
+  WR.open = false;
+  if(WR.nav && fromBack !== true){ WR.nav = false; blNavPop(); }
+}
+function wrSetMonth(v){ WR.month = v; renderWaterRegister(); }
+function renderWaterRegister(){
+  var body = blEl('wr-body'), foot = blEl('wr-foot'); if(!body) return;
+  var data = wrRowsFor(WR.month), got = data.houses.filter(function(h){ return h.received; }).length, n = data.houses.length, canMark = wrCanMark();
+  var sub = blEl('wr-sub'); if(sub) sub.textContent = blMonthName(WR.month) + ' · ' + got + ' of ' + n + ' received';
+  var h = '<div class="bl-card2"><div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="wr-month">Month</label><select id="wr-month" class="bl-in" onchange="wrSetMonth(this.value)">' + wrMonths().map(function(m){ return '<option value="' + m + '"' + (m === WR.month ? ' selected' : '') + '>' + blMonthName(m) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="bl-tile' + (got === n ? ' ok' : (got ? '' : ' owe')) + '" style="padding:10px 14px"><div class="k">Received</div><div class="v">' + got + ' / ' + n + '</div><div class="s">' + (got === n ? 'everyone’s in' : (n - got) + ' outstanding') + '</div></div></div>'
+    + '<div class="bl-hint" style="margin-top:10px">Readings sent through the water-meter form (and the Water Reading tile on the general form) tick themselves off here as soon as they arrive. Anything that came in another way — WhatsApp, email, a phone call — gets marked by hand.</div></div>';
+  var outstanding = data.houses.filter(function(x){ return !x.received; });
+  if(outstanding.length) h += '<div class="bl-card2"><div class="bl-h"><span>Still outstanding</span><button type="button" class="lnk" onclick="wrCopyReminder()">Copy reminder</button></div><div class="bl-chipsrow">' + outstanding.map(function(x){ return '<span class="bl-stat">' + blEsc(x.house.label) + '</span>'; }).join('') + '</div></div>';
+  h += '<div class="bl-card2">' + data.houses.concat(data.stray).map(function(x){ return wrHouseRow(x, canMark); }).join('') + '</div>';
+  body.innerHTML = h;
+  foot.innerHTML = '<button type="button" class="bl-btn" onclick="closeWaterRegister()">Close</button><span class="grow"></span><button type="button" class="bl-btn" onclick="wrLoad(true).then(renderWaterRegister)">↻ Refresh</button>';
+}
+function wrHouseRow(x, canMark){
+  var e = x.latest, k = x.house.key;
+  var srcLabel = !e ? '' : e.kind === 'form' ? '💧 via the form' : e.kind === 'manual' ? '✍️ marked by ' + (e.by || 'admin') : '🎫 ticket #' + (e.ticketNumber || '');
+  var val = e && e.value != null ? '<b>' + blEsc(String(e.value)) + '</b> kL' : (e && e.valueRaw ? '<b>' + blEsc(e.valueRaw) + '</b>' : '');
+  var photos = (e && e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border2);cursor:pointer" onclick="wrPhoto(\'' + blEsc(e.id) + '\',' + i + ')">'; }).join('');
+  var more = e ? '<div class="bl-lr-more" style="display:block;margin-top:8px">'
+      + (val ? '<div class="row"><span>Reading</span>' + val + '</div>' : '')
+      + '<div class="row"><span>Received</span><b>' + blEsc(blDate(e.date || '', true)) + '</b></div>'
+      + '<div class="row"><span>Source</span><b>' + srcLabel + '</b></div>'
+      + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
+      + (x.entries.length > 1 ? '<div class="row"><span>Also</span><b>' + (x.entries.length - 1) + ' more submission' + (x.entries.length > 2 ? 's' : '') + ' this month</b></div>' : '')
+      + (photos ? '<div style="display:flex;gap:8px;margin-top:8px">' + photos + '</div>' : '')
+      + '<div class="bl-doc-acts">' + (canMark ? (e.kind === 'manual' ? '<button type="button" class="bl-btn sm" onclick="wrUnmark(\'' + blEsc(k) + '\')">Undo mark</button>' : '<button type="button" class="bl-btn sm" onclick="wrMark(\'' + blEsc(k) + '\')">✍️ Add a note / correct</button>') : '')
+      + (e.value != null && x.house.uid && typeof blRO === 'function' && !blRO() ? '<button type="button" class="bl-btn sm" onclick="wrToBilling(\'' + x.house.uid + '\',\'' + blEsc(e.date || '') + '\',' + Number(e.value) + ')">📥 Add to billing readings</button>' : '') + '</div></div>'
+    : (canMark ? '<div class="bl-doc-acts" style="margin-top:8px"><button type="button" class="bl-btn sm pri" onclick="wrMark(\'' + blEsc(k) + '\')">✓ Mark as received</button></div>' : '');
+  return '<div class="bl-lr" style="cursor:default"><div class="bl-lr-main"><div class="bl-lic">' + (x.received ? '✅' : '⬜') + '</div><div class="bl-ltx"><b>' + blEsc(x.house.label) + (x.house.unknown ? ' <span class="bl-st warn">not a house</span>' : '') + '</b><small>' + blEsc(blNice(x.house.owner || '')) + '</small></div>'
+    + '<div class="bl-lam"><b style="color:' + (x.received ? 'var(--green)' : 'var(--bl-owe)') + '">' + (x.received ? 'Received' : 'Outstanding') + '</b><small>' + (e ? blEsc(blDate(e.date || '')) + (e.value != null ? ' · ' + blEsc(String(e.value)) : '') : '—') + '</small></div></div>' + more + '</div>';
+}
+function wrPhoto(id, i){ var r = WR.rows[id]; var p = r && r.photos && r.photos[i]; if(!p) return; var w = window.open('', '_blank'); if(w){ w.document.write('<title>Meter photo</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="' + p.data + '" style="max-width:100%;max-height:100vh"></body>'); } }
+async function wrMark(unit){
+  if(!wrCanMark()) return;
+  var cur = ((WR.marks || {})[WR.month] || {})[unit] || {}, today = new Date().toISOString().slice(0, 10);
+  var picked = null;
+  var ok = await blDialog({ title:'House ' + unit + ' · ' + blMonthName(WR.month), body:'<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">Received on</label><input id="wrm-date" type="date" class="bl-in" value="' + blEsc(cur.date || today) + '"></div><div class="bl-f"><label class="bl-lbl">Reading (kL, optional)</label><input id="wrm-value" type="number" step="0.001" inputmode="decimal" class="bl-in" value="' + (cur.value == null ? '' : cur.value) + '"></div></div><div class="bl-f" style="margin-top:10px"><label class="bl-lbl">Note (optional)</label><input id="wrm-note" type="text" class="bl-in" value="' + blEsc(cur.note || '') + '" placeholder="e.g. sent by WhatsApp"></div>', cancel:false,
+    buttons:[{ label:'Save', kind:'pri', value:true, onClick:function(){ picked = { date:(blEl('wrm-date') || {}).value || today, value:_mrNum((blEl('wrm-value') || {}).value), note:_uStr('wrm-note') }; } }, { label:'Cancel', value:false }] });
+  if(ok !== true || !picked) return;
+  WR.marks[WR.month] = WR.marks[WR.month] || {};
+  WR.marks[WR.month][unit] = { received:true, date:picked.date, value:picked.value, note:picked.note, by:(_currentUserObj && (_currentUserObj.name || _currentUserObj.username)) || 'admin', at:Date.now() };
+  await wrSaveMarks(); renderWaterRegister(); blToast('House ' + unit + ' marked as received', 'ok');
+}
+async function wrUnmark(unit){ if(!wrCanMark()) return; if(WR.marks[WR.month]) delete WR.marks[WR.month][unit]; await wrSaveMarks(); renderWaterRegister(); blToast('Mark removed'); }
+async function wrToBilling(uid, date, value){
+  var u = UNITS[uid]; if(!u) return;
+  var ok = await blConfirm('Add to Section ' + u.section + '’s meter readings?', '<p>Water <b>' + blEsc(String(value)) + '</b> on ' + blEsc(blDate(date, true)) + ' is added to the unit’s reading history, ready for the next invoice.</p>', 'Add');
+  if(!ok) return;
+  u.meterReadings = u.meterReadings || []; var row = u.meterReadings.filter(function(r){ return r.date === date; })[0];
+  if(!row){ row = { date:date }; u.meterReadings.push(row); }
+  row.water = value; row.src = row.src || 'water form'; u.meterReadings.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); }); u.updated = Date.now();
+  await saveUnits(); blToast('Added to Section ' + u.section, 'ok');
+}
+function wrCopyReminder(){
+  var data = wrRowsFor(WR.month), out = data.houses.filter(function(x){ return !x.received; }).map(function(x){ return x.house.label; });
+  var text = 'Hi all — water meter readings for ' + blMonthName(WR.month) + ' still outstanding: ' + out.join(', ') + '. Please send a photo of your meter via the Park Manor link: ' + location.origin + location.pathname + '?water  Thanks!';
+  if(typeof copyTextToClipboard === 'function') copyTextToClipboard(text); else { try { navigator.clipboard.writeText(text); } catch(e){} }
+  blToast('Reminder copied — paste it into WhatsApp', 'ok');
+}
+// Show the Tracker button for the roles that may use the register.
+function wrApplyAccess(){ var b = blEl('wr-open-btn'); if(b) b.style.display = wrCanOpen() ? '' : 'none'; }
+(function(){ var o = applyBillingAccess; applyBillingAccess = function(u){ var r = o.apply(this, arguments); wrApplyAccess(); return r; }; })();
 
 </script>
 
@@ -10608,6 +10850,7 @@ async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
       </span>
       <button id="tkt-overview-btn" onclick="shareOverview()" title="Share a read-only overview of all open tickets" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">🔗 Share overview</button>
       <button id="tkt-export-btn" onclick="exportTicketsExcel()" title="Export open tickets, sub-tickets &amp; quotes to Excel" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⬇ Export</button>
+      <button id="wr-open-btn" onclick="openWaterRegister()" title="Water meter readings register" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">💧 Readings</button>
       <button id="new-tkt-btn" onclick="openTrackerTypeChooser()" style="padding:8px 16px;background:var(--accent);border:none;border-radius:20px;color:#fff;font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:18px;line-height:1">+</span> New</button>
     </div>
   </div>
@@ -24722,35 +24965,6 @@ var PUB_CAT_HINTS = {
   'Other':      ['e.g. Question about parking', 'Tell us what\'s going on or what you\'d like to know \u2014 as much detail as helps.']
 };
 
-function pubSelectCategory(btn){
-  var cat = btn.getAttribute('data-cat');
-  window._pubCategory = (window._pubCategory === cat) ? '' : cat;
-  var host = document.getElementById('pub-cat-tiles');
-  if(host){
-    host.querySelectorAll('button').forEach(function(b){
-      var on = b.getAttribute('data-cat') === window._pubCategory;
-      b.style.borderColor = on ? 'var(--accent)' : 'var(--border2)';
-      b.style.background = on ? 'var(--accent-bg)' : 'var(--surface)';
-    });
-  }
-  var hints = PUB_CAT_HINTS[window._pubCategory] || PUB_CAT_HINTS['Other'];
-  var titleEl = document.getElementById('pub-title');
-  var descEl = document.getElementById('pub-desc');
-  if(titleEl) titleEl.placeholder = hints[0];
-  if(descEl) descEl.placeholder = hints[1];
-  // Water readings: pre-fill the subject so the resident only types the
-  // reading itself; clear it again if they switch away without editing.
-  if(titleEl){
-    if(window._pubCategory === 'Water Reading' && !titleEl.value){
-      titleEl.value = 'Water meter reading';
-      pubDraftSave();
-    } else if(window._pubCategory !== 'Water Reading' && titleEl.value === 'Water meter reading'){
-      titleEl.value = '';
-      pubDraftSave();
-    }
-  }
-  if(titleEl && !titleEl.value) titleEl.focus(); else if(descEl && window._pubCategory === 'Water Reading') descEl.focus();
-}
 
 function pubAddFiles(fileList){
   var previews = document.getElementById('pub-file-previews');
@@ -25129,142 +25343,7 @@ async function submitPublicReport(){
   }
 }
 
-// ── Dedicated water-meter reading form (?water) ───────────────────────────
-// A deliberately stripped-down cousin of the public report form: unit number,
-// a photo of the meter, and an optional note — nothing else. Submissions are
-// tagged category "Water Reading", which the server-side notifier routes to
-// the managing agent only (not the trustees). Reuses the same photo helpers
-// (pubAddFiles / publicCompressPhoto / _pubFiles) and rate limiter as the
-// main public form.
-function renderWaterReadingForm(){
-  var host = document.getElementById('public-view-content');
-  if(!host) return;
-  window._pubFiles = [];   // fresh staging area every time the form renders
-  function showForm(){
-    if(!PUBLIC_REPORTS_ENABLED){
-      host.innerHTML = ''
-        + '<div style="text-align:center;padding:60px 20px">'
-        +   '<div style="font-size:48px;margin-bottom:14px">🔒</div>'
-        +   '<div style="font-size:16px;color:var(--text2);font-weight:600;margin-bottom:8px">Submissions currently disabled</div>'
-        +   '<div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.6">The body corporate has temporarily turned off public submissions. Please contact a trustee directly.</div>'
-        + '</div>';
-      return;
-    }
-    host.innerHTML = ''
-      + '<div class="pub-hero">'
-      +   '<img src="park-manor-entrance.jpg" alt="">'
-      +   '<div class="pub-hero-shade"></div>'
-      +   '<div class="pub-hero-text">'
-      +     '<div class="pub-hero-brand">PARK MANOR</div>'
-      +     '<div class="pub-hero-sub">💧 Submit your water meter reading</div>'
-      +     '<div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div>'
-      +   '</div>'
-      + '</div>'
-      // Honeypot — bots fill this in, humans don\'t see it.
-      + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
-      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Your unit</b></span></div>'
-      +   '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">Unit number *</label>'
-      +   '<input id="wr-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;font-family:var(--sans)">'
-      + '</div>'
-      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Photo of your meter</b><i>point your camera at the meter and snap</i></span></div>'
-      +   '<div style="display:flex;gap:8px;margin-bottom:8px">'
-      +     '<button type="button" onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:14px;font-family:var(--sans);font-weight:700;cursor:pointer">📷 Take a photo</button>'
-      +     '<button type="button" onclick="document.getElementById(\'pub-photos\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:14px;font-family:var(--sans);font-weight:600;cursor:pointer">🖼 From gallery</button>'
-      +   '</div>'
-      +   '<div id="pub-file-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"></div>'
-      +   '<input id="pub-photos-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
-      +   '<input id="pub-photos" type="file" accept="image/*" multiple style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
-      + '</div>'
-      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>Anything to add?</b><i>optional</i></span></div>'
-      +   '<textarea id="wr-note" rows="2" placeholder="e.g. the reading is 03457, or a note about the meter" maxlength="500" style="width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;outline:none;box-sizing:border-box;font-family:var(--sans);resize:vertical;min-height:60px"></textarea>'
-      + '</div>'
-      + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
-      + '<div id="pub-submit-bar">'
-      +   '<button id="pub-submit-btn" onclick="submitWaterReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer;letter-spacing:.3px;box-shadow:0 2px 10px rgba(25,39,60,.14)">Send my reading</button>'
-      + '</div>';
-    var uEl = document.getElementById('wr-unit'); if(uEl) setTimeout(function(){ uEl.focus(); }, 60);
-  }
-  if(typeof PUBLIC_REPORTS_ENABLED === 'undefined'){
-    return setTimeout(showForm, 300);
-  }
-  showForm();
-}
 
-async function submitWaterReading(){
-  clearPublicErr();
-  // Honeypot — if a bot filled this, silently pretend success.
-  var honey = document.getElementById('pub-honey');
-  if(honey && honey.value){
-    document.getElementById('public-view-content').innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>';
-    return;
-  }
-  if(!publicRateLimitOk()){
-    showPublicErr('You\'ve submitted several times recently. Please wait a bit before submitting another.');
-    return;
-  }
-  var unit = (document.getElementById('wr-unit').value || '').trim();
-  var note = (document.getElementById('wr-note').value || '').trim();
-  var files = (window._pubFiles || []).filter(function(f){ return !!f; });
-  if(!unit){ showPublicErr('Please enter your unit number.'); return; }
-  if(!files.length && !note){ showPublicErr('Please add a photo of your meter (or type the reading in the note).'); return; }
-  if(files.length > MAX_PUBLIC_PHOTOS){ showPublicErr('A maximum of ' + MAX_PUBLIC_PHOTOS + ' photos can be attached.'); return; }
-  var btn = document.getElementById('pub-submit-btn');
-  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; btn.style.opacity = '0.7'; }
-  try {
-    // Water meter readings are NOT logged as tickets — we only email the photo
-    // and reading to the Park Manor inbox + managing agent, so we compress the
-    // photos straight into email attachments and never touch TICKETS/INVOICES.
-    var notifyAtt = [];
-    var NOTIFY_BUDGET = 4200000;  // ~4.2 MB of base64 across all attachments
-    var notifyUsed = 0;
-    for(var i = 0; i < files.length; i++){
-      var compressed = await publicCompressPhoto(files[i]);
-      var attSize = (compressed.data || '').length;
-      if(notifyUsed + attSize <= NOTIFY_BUDGET){
-        notifyAtt.push({ name: compressed.name, type: compressed.type, dataUrl: compressed.data });
-        notifyUsed += attSize;
-      } else {
-        notifyAtt.push({ name: compressed.name, type: compressed.type, skipped: true,
-                         sizeMB: (attSize * 0.75 / 1048576).toFixed(1) });
-      }
-    }
-    // Email only — server routes Water Reading submissions to the Park Manor
-    // inbox + managing agent (never the trustees). We await so we can tell the
-    // resident whether it actually went out.
-    var r = await fetch('/api/send-edit-link', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        notifyOnly: true,
-        title: 'Water meter reading',
-        desc: note || '(Photo of meter submitted — see attachment.)',
-        unit: unit,
-        reporter: '',
-        phone: '',
-        email: '',
-        category: 'Water Reading',
-        bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
-        attachments: notifyAtt
-      })
-    });
-    if(!r.ok) throw new Error('send failed: ' + r.status);
-
-    document.getElementById('public-view-content').innerHTML = ''
-      + '<div style="text-align:center;padding:48px 16px 24px">'
-      +   '<svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
-      +   '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
-      +   '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has been emailed to Park Manor.</div>'
-      + '</div>'
-      + '<div style="text-align:center;margin-top:8px">'
-      +   '<button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
-      + '</div>';
-    if(typeof pubCelebrate === 'function') pubCelebrate();
-  } catch(e){
-    console.warn('submitWaterReading: failed', e);
-    showPublicErr('Could not send your reading. Please check your connection and try again.');
-    if(btn){ btn.disabled = false; btn.textContent = 'Send my reading'; btn.style.opacity = '1'; }
-  }
-}
 
 // Edit-an-existing-public-submission flow.
 async function renderPublicEditView(token){
