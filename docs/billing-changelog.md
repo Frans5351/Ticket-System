@@ -1,5 +1,11 @@
 # Billing changelog
 
+## v2.12 — test a water reading without emailing anyone
+- Water reading form (`?water` and the Water Reading tile): a tick box **Email this reading to the managing agent**, ticked by default. Untick it and nothing is emailed; the reading is still saved, the photo filed in Google Drive and the meter read from it. The register marks such a reading "test, not emailed".
+- The box only appears when someone is signed in to the app on that device, or the link ends in `&test` (e.g. `…/?water&test`). Residents never see it, so their readings are always emailed.
+- After a test send the page shows exactly what happened: saved or not, the Drive file (or why it wasn't filed), and what the photo was read as (or why not).
+- Zip carries complete folders (as from v2.11).
+
 ## v2.11 — repair: complete folders
 - No app changes. The v2.10 zip carried only the changed files, and replacing the `functions/` folder with it in Finder removed the other 17 server functions, so the Netlify build failed (`Could not resolve "./_passkey-shared.js"`). This zip carries the **complete** `functions/`, `public/` and `docs/` folders, so replacing those folders is safe. It also restores `public/park-manor-entrance.jpg`, `public/deploy.txt` and the architecture docs that went missing the same way.
 - From now on every zip contains complete folders.

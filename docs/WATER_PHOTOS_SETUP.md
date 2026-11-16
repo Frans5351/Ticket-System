@@ -56,3 +56,15 @@ Send yourself a test reading through the water link and check the Drive folder.
 - "Couldn't read the photo" → blurry / glare / not a meter; type the reading.
 - `Claude API 404` in the message → the model name in `WATER_READ_MODEL` is wrong.
 - Requires the `water_readings` table (`WATER_READINGS_SETUP.sql`).
+
+## Testing without emailing anyone
+
+Open the water link while signed in to the app on the same device (or add `&test` to the link: `https://park-manor-bc.netlify.app/?water&test`). A tick box **Email this reading to the managing agent** appears above the Send button. Untick it, attach a photo and send: no email goes out, and the page lists what happened —
+
+- `✓ Filed in Google Drive as Unit N.jpg` — working.
+- `✕ Not filed in Google Drive: Drive script: unauthorised` — `WATER_DRIVE_SECRET` in Netlify differs from `SECRET` in the deployed script (after editing the script: Deploy → Manage deployments → New version).
+- `✕ … did not return JSON` — wrong/old `WATER_DRIVE_URL`, or the web app's access is not "Anyone".
+- `✕ Photo not read: Claude API 401` — `ANTHROPIC_API_KEY` is wrong; `404` — unknown model name in `WATER_READ_MODEL`.
+- "The test reading could not be saved" — the `water_readings` table has not been created; run `WATER_READINGS_SETUP.sql` in Supabase.
+
+Remove test readings afterwards from Water readings → the house → Edit → Remove.

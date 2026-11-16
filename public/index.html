@@ -10097,6 +10097,19 @@ function pubSelectCategory(btn){
   if(descEl) descEl.placeholder = hints[1];
   if(titleEl && !titleEl.value) titleEl.focus();
 }
+// Testing aid: someone signed in on this device (or using a link with &test)
+// gets a tick box to send a reading WITHOUT emailing the managing agent.
+// Residents (not signed in) never see it — their readings are always emailed.
+function wrCanSkipEmail(){
+  try { if(/[?&]test\b/i.test(location.search)) return true; } catch(e){}
+  try { return typeof getLocalSession === 'function' && !!getLocalSession(); } catch(e){ return false; }
+}
+function wrEmailToggle(){
+  var el = document.getElementById('wr-email'), btn = document.getElementById('pub-submit-btn'), n = document.getElementById('wr-email-note');
+  var on = !el || el.checked;
+  if(btn) btn.textContent = on ? '💧 Send my reading' : '🧪 Save test reading (no email)';
+  if(n) n.innerHTML = on ? 'The managing agent and the Park Manor inbox will get this reading by email, as normal.' : '<b style="color:var(--amber,#d9a441)">Test mode — nobody will be emailed.</b> The reading is still saved, the photo filed in Google Drive and the meter read from it.';
+}
 function renderWaterReadingForm(opts){
   opts = opts || {};
   var host = document.getElementById('public-view-content');
@@ -10124,10 +10137,12 @@ function renderWaterReadingForm(opts){
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>The reading</b><i>optional if the photo is clear</i></span></div>'
       +   lbl('Digits shown on the meter') + '<input id="wr-value" type="text" inputmode="decimal" placeholder="e.g. 03457.2" maxlength="20" style="' + inputCss + '">'
       +   lbl('Anything to add? (optional)') + '<textarea id="wr-note" rows="2" placeholder="e.g. the meter is hard to reach, or the date you read it" maxlength="500" style="' + inputCss + ';resize:vertical"></textarea></div>'
+      + (wrCanSkipEmail() ? '<div class="pub-card" style="border-style:dashed"><label for="wr-email" style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer"><input id="wr-email" type="checkbox" checked onchange="wrEmailToggle()" style="width:22px;height:22px;flex:none;accent-color:var(--accent)"><span style="font-size:14px;font-weight:600;color:var(--text2);font-family:var(--sans)">Email this reading to the managing agent</span></label><div id="wr-email-note" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin-top:6px"></div><div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.5;margin-top:6px">Shown only when you are signed in on this device, or on a link ending in &amp;test. Residents don’t see it.</div></div>' : '')
       + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
       + '<div id="pub-submit-bar"><button id="pub-submit-btn" onclick="submitWaterReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer">💧 Send my reading</button></div>';
     var uEl = document.getElementById('wr-unit'), remembered = '';
     try { remembered = localStorage.getItem('pm_wr_unit') || ''; } catch(e){}
+    wrEmailToggle();
     if(uEl && remembered){ uEl.value = remembered; wrPubLookup(); }
     else { wrPubRender(null); if(uEl && !opts.embedded) setTimeout(function(){ uEl.focus(); }, 60); }
     if(opts.embedded) window.scrollTo(0, 0);
@@ -10149,7 +10164,8 @@ async function submitWaterReading(){
   if(!files.length && !valueRaw && !note){ showPublicErr('Please add a photo of your meter (or type the reading).'); return; }
   if(files.length > MAX_PUBLIC_PHOTOS){ showPublicErr('A maximum of ' + MAX_PUBLIC_PHOTOS + ' photos can be attached.'); return; }
   var btn = document.getElementById('pub-submit-btn');
-  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; btn.style.opacity = '0.7'; }
+  var emailEl = document.getElementById('wr-email'), sendEmail = !emailEl || emailEl.checked, saved = false, saveErr = '';
+  if(btn){ btn.disabled = true; btn.textContent = sendEmail ? 'Sending…' : 'Saving…'; btn.style.opacity = '0.7'; }
   try {
     var notifyAtt = [], NOTIFY_BUDGET = 4200000, notifyUsed = 0;
     for(var i = 0; i < files.length; i++){
@@ -10162,35 +10178,45 @@ async function submitWaterReading(){
     if(valueRaw) descLines.push('Reading: ' + valueRaw);
     if(note) descLines.push(note);
     if(!descLines.length) descLines.push('(Photo of meter submitted — see attachment.)');
-    var r = await fetch('/api/send-edit-link', { method:'POST', headers:{ 'Content-Type':'application/json' },
-      body:JSON.stringify({ notifyOnly:true, title:'Water meter reading', desc:descLines.join('\n'), unit:unit, reporter:'', phone:'', email:'', category:'Water Reading',
-        bcInbox:(typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '', attachments:notifyAtt }) });
-    if(!r.ok) throw new Error('send failed: ' + r.status);
+    if(sendEmail){
+      var r = await fetch('/api/send-edit-link', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ notifyOnly:true, title:'Water meter reading', desc:descLines.join('\n'), unit:unit, reporter:'', phone:'', email:'', category:'Water Reading',
+          bcInbox:(typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '', attachments:notifyAtt }) });
+      if(!r.ok) throw new Error('send failed: ' + r.status);
+    }
     // Record it for the register (best effort — the email is the thing that must not fail).
     try {
       var now = new Date(), id = 'wr_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
       var today = wrLocalDate(now);
       try { localStorage.setItem('pm_wr_unit', wrUnitKey(unit)); } catch(e){}
-      await sbUpsert('water_readings', id, { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:true,
+      await sbUpsert('water_readings', id, { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:sendEmail, emailSkipped:!sendEmail,
         value:wrParseValue(valueRaw) != null ? wrParseValue(valueRaw) : wrParseValue(note), valueRaw:valueRaw, note:note, source:'form',
         photos:await Promise.all(notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await wrShrink(a.dataUrl) }; })),
         photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) });
       var toFile = notifyAtt.filter(function(a){ return a.dataUrl; }).map(function(a){ return { name:a.name, type:a.type, dataUrl:a.dataUrl }; });
-      if(toFile.length) wrFile(id, toFile).then(function(j){ wrPubFiled(j, !!valueRaw); });
-      else setTimeout(function(){ wrPubFiled(null); }, 0);
-    } catch(e){ console.warn('water reading not recorded', e); setTimeout(function(){ wrPubFiled(null); }, 0); }
+      // sbUpsert never throws, so in test mode (no email to fall back on) check the row really landed.
+      if(!sendEmail){
+        var chk = await supa.from('water_readings').select('id').eq('id', scopedId(id)).limit(1);
+        if(!chk || chk.error || !((chk.data || []).length)) throw new Error((chk && chk.error && chk.error.message) || 'the reading was not stored');
+      }
+      saved = true;
+      if(toFile.length) wrFile(id, toFile).then(function(j){ wrPubFiled(j, !!valueRaw, !sendEmail); });
+      else setTimeout(function(){ wrPubFiled(null, false, !sendEmail, 'nophoto'); }, 0);
+    } catch(e){ console.warn('water reading not recorded', e); saveErr = String((e && e.message) || e); setTimeout(function(){ wrPubFiled(null); }, 0); }
+    // Test mode sends no email, so if the reading wasn't stored nothing happened at all — say so.
+    if(!sendEmail && !saved){ var te = new Error('test reading not saved: ' + saveErr); te.wrTest = true; throw te; }
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
-      + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">Reading sent</div>'
-      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.</div>'
-      + '<div id="wr-filed" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.6;max-width:420px;margin:12px auto 0">' + (files.length ? 'Filing your photo in the Park Manor records… you can close this page.' : '') + '</div></div>'
+      + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">' + (sendEmail ? 'Reading sent' : 'Test reading saved') + '</div>'
+      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">' + (sendEmail ? 'Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.' : '🧪 <b>No email was sent.</b> The reading for <b>Unit ' + escHtml(unit) + '</b> is saved on this month’s list.') + '</div>'
+      + '<div id="wr-filed" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.6;max-width:420px;margin:12px auto 0;overflow-wrap:anywhere">' + (files.length ? (sendEmail ? 'Filing your photo in the Park Manor records… you can close this page.' : 'Filing the photo in Google Drive and reading the meter… keep this page open to see the result.') : '') + '</div></div>'
       + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap"><button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
       + '<button onclick="renderPublicReportForm()" style="padding:11px 22px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Report something else</button></div>';
     window.scrollTo(0, 0);
   } catch(e){
     console.warn('water reading submit', e);
-    showPublicErr('Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
-    if(btn){ btn.disabled = false; btn.textContent = '💧 Send my reading'; btn.style.opacity = ''; }
+    showPublicErr(e && e.wrTest ? 'The test reading could not be saved, so nothing was filed. The usual cause is that the water_readings table has not been created yet — run WATER_READINGS_SETUP.sql in Supabase. (' + String(e.message).slice(0, 160) + ')' : 'Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
+    if(btn){ btn.disabled = false; btn.style.opacity = ''; wrEmailToggle(); }
   }
 }
 
@@ -10213,8 +10239,26 @@ async function wrConfig(){
   try { var r = await fetch('/api/water-reading'); WR.cfg = r.ok ? await r.json() : null; } catch(e){ WR.cfg = null; }
   return WR.cfg;
 }
-function wrPubFiled(j, typed){
+function wrPubFiled(j, typed, test, why){
   var el = document.getElementById('wr-filed'); if(!el) return;
+  if(test){
+    var L = [], ok = '<span style="color:var(--bl-paid,#3fb37f)">✓</span> ', no = '<span style="color:var(--bl-owe,#e2685f)">✕</span> ';
+    L.push(ok + 'Saved on the Water readings list');
+    if(why === 'nophoto') L.push('— No photo attached, so nothing to file or read.');
+    else if(!j || !j.ok) L.push(no + 'Photo not processed: ' + blEsc((j && j.error) || 'the server did not answer'));
+    else {
+      var d = j.drive || {}, rd = j.read || {};
+      if(!d.configured) L.push('— Google Drive filing is not switched on (WATER_DRIVE_URL / WATER_DRIVE_SECRET).');
+      else if(d.files && d.files.length) L.push(ok + 'Filed in Google Drive as ' + d.files.map(function(f){ return f.url ? '<a href="' + blEsc(f.url) + '" target="_blank" rel="noopener" style="color:var(--accent2)">' + blEsc(f.name) + '</a>' : blEsc(f.name); }).join(', ') + (d.folder ? ' · <a href="' + blEsc(d.folder) + '" target="_blank" rel="noopener" style="color:var(--accent2)">open the folder</a>' : ''));
+      else L.push(no + 'Not filed in Google Drive: ' + blEsc(d.error || 'no reason given'));
+      if(!rd.configured) L.push('— Reading the photo is not switched on (ANTHROPIC_API_KEY).');
+      else if(rd.error) L.push(no + 'Photo not read: ' + blEsc(rd.error));
+      else if(rd.value != null) L.push(ok + 'The photo reads <b>' + blEsc(String(rd.value)) + '</b> (' + blEsc(rd.confidence || 'low') + ' confidence' + (rd.note ? ' — ' + blEsc(rd.note) : '') + ')');
+      else L.push('— The photo could not be read as a meter' + (rd.note ? ': ' + blEsc(rd.note) : '') + '.');
+    }
+    el.innerHTML = '<div style="text-align:left;border:1px dashed var(--border2);border-radius:10px;padding:12px 14px;line-height:1.8;font-size:13px;color:var(--text2)">' + L.join('<br>') + '</div>';
+    return;
+  }
   if(!j || !j.ok){ el.textContent = ''; return; }
   var parts = [];
   if(j.drive && j.drive.files && j.drive.files.length) parts.push('✓ Your photo is filed in the Park Manor records.');
@@ -10486,7 +10530,7 @@ function renderWaterRegister(){
 }
 function wrHouseRow(x, canMark, prevMonth){
   var e = x.latest, k = x.house.key;
-  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
+  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test, not emailed' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
   var prevVal = e && e.value != null ? wrValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
   var ai = e && e.ai, drive = (e && e.driveFiles) || [], aiHtml = '';
   if(ai && ai.value != null){
