@@ -72,3 +72,11 @@ Remove test readings afterwards from Water readings → the house → Edit → R
 ## File names
 
 Photos are filed as `Unit N - 16 Nov 2026 21h35.jpg`: the date and time the reading reached the app, in South African time (a reading captured by hand for another day carries just that day's date). This needs the v2.13 line in the script — if files are still named plain `Unit N.jpg`, the deployed script is the older one: in the script editor replace the `var name = nextName_(…)` line with the one in `docs/water-readings-drive.gs`, save, then Deploy → Manage deployments → pencil → Version: New version → Deploy (the URL and password stay the same).
+
+## Photos you add to the Drive folder yourself
+
+Drop a photo into `Park Manor Water Meter Readings / <Month Year>` named after the house (`Unit 3.jpg`, `House 3.jpeg`, `3.png`). Open **Water readings** in the app (or press ↻): a card says how many photos in the folder aren't on the list yet. **Add them to the list** shows each file with the house it will be recorded against — change it or skip it — then creates the readings, links the Drive file and reads the meter from the photo for you to confirm with **Use**.
+
+- Needs version 3 of the Google script. Opening the `/exec` link in a browser shows `"v":3` when it is deployed. If the app says the script is an older version: paste the whole of `docs/water-readings-drive.gs` into the script editor, put your password back on the `SECRET` line, save, then Deploy → Manage deployments → pencil → Version: New version → Deploy. The URL and the Netlify settings stay as they are.
+- "Please sign out and sign in again" — the app needs a fresh sign-in to prove who is asking; sign out, sign in, retry.
+- A photo that was removed from the list in the app is not offered again. iPhone `.heic` files are recorded and linked but can't be previewed or read automatically — type the reading in.

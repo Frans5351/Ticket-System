@@ -10285,10 +10285,8 @@ async function wrPubFetch(unit){
       out.push({ id:row.id || '', hasPhoto:!!(d.photoName || (d.photos && d.photos[0])), month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', at:Number(d.submittedAt) || 0 });
     });
   } catch(e){ ok = false; }
-  try {
-    var m = await sbGetSetting('water_marks'); if(typeof m === 'string') m = JSON.parse(m);
-    Object.keys(m || {}).forEach(function(month){ var k = (m[month] || {})[unit]; if(k && k.received){ out.push({ month:month, date:k.date || '', value:k.value == null ? null : Number(k.value), source:'manual', at:Number(k.at) || 0 }); ok = true; } });
-  } catch(e){}
+  // Only the water_readings table counts here. (Older tick marks kept in settings —
+  // some of them copied from Davies invoice dates — are deliberately not shown.)
   out.sort(function(a, b){ return (b.date || '').localeCompare(a.date || '') || b.at - a.at; });
   return ok ? out : null;
 }
@@ -10397,7 +10395,39 @@ async function wrLoad(force){
     WR.loaded = true;
   }
   await Promise.all([wrLoadMonth(WR.month, force), wrLoadMonth(blAddMonths(WR.month, -1), force)]);
-  if(wrCanMark()){ await wrSyncBilling(WR.month); await wrSyncBilling(blAddMonths(WR.month, -1)); }
+  if(wrCanMark()){ await wrMigrateMarks(); await wrSyncBilling(WR.month); await wrSyncBilling(blAddMonths(WR.month, -1)); }
+}
+// Before the water_readings table existed, ticks were kept in settings.water_marks.
+// Now that the table is there it is the only record: ticks copied across from the
+// Billing meters tab are dropped (many carried a Davies invoice date such as the 1st —
+// genuine ones are re-derived from Billing by wrSyncBilling), and ticks made by hand
+// become proper rows.
+async function wrMigrateMarks(){
+  if(WR.tableMissing || !WR.marks) return;
+  var months = Object.keys(WR.marks).filter(function(m){ return WR.marks[m] && Object.keys(WR.marks[m]).length; });
+  if(!months.length) return;
+  var dirty = false;
+  for(var i = 0; i < months.length; i++){
+    var month = months[i], mk = WR.marks[month];
+    await wrLoadMonth(month); if(WR.tableMissing) break;
+    var rows = WR.cache[month] || {}, units = Object.keys(mk);
+    for(var j = 0; j < units.length; j++){
+      var unit = units[j], m = mk[unit] || {};
+      if(m.received && !/Billing meters tab/i.test(m.note || '')){
+        var has = Object.keys(rows).some(function(id){ return rows[id] && !rows[id].removed && wrUnitKey(rows[id].unit) === wrUnitKey(unit); });
+        if(!has){
+          var id = 'wr_k_' + month + '_' + wrUnitKey(unit);
+          var data = { unit:wrUnitKey(unit), month:month, date:m.date || (month + '-01'), value:m.value == null || m.value === '' ? null : Number(m.value), note:m.note || '', source:'manual', by:m.by || 'admin', submittedAt:Number(m.at) || Date.now(), fromTick:true, photos:[] };
+          if(data.value != null) data.valueRaw = String(data.value);
+          if(!(await wrUpsert(id, data))) continue;                    // couldn't save — keep the tick for next time
+          rows[id] = data;
+        }
+      }
+      delete mk[unit]; dirty = true;
+    }
+    if(!Object.keys(mk).length) delete WR.marks[month];
+  }
+  if(dirty) await wrSaveMarks();
 }
 // ── Billing ↔ register ──────────────────────────────────────────────────────
 // A water reading typed on a unit's Meters tab in Billing (or captured on an
@@ -10502,6 +10532,7 @@ async function openWaterRegister(month){
   var m = blEl('wr-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
   if(!WR.nav){ WR.nav = true; blNavPush(function(){ WR.nav = false; closeWaterRegister(true); }); }
   renderWaterRegister();
+  wrDriveCheck(WR.month);                         // in the background: photos added straight into Drive
 }
 function closeWaterRegister(fromBack){
   var m = blEl('wr-modal'); if(m) m.style.display = 'none';
@@ -10509,8 +10540,8 @@ function closeWaterRegister(fromBack){
   WR.open = false;
   if(WR.nav && fromBack !== true){ WR.nav = false; blNavPop(); }
 }
-async function wrSetMonth(v){ WR.month = v; await wrLoad(); renderWaterRegister(); }
-async function wrRefresh(){ await wrLoad(true); renderWaterRegister(); blToast('Up to date'); }
+async function wrSetMonth(v){ WR.month = v; await wrLoad(); renderWaterRegister(); wrDriveCheck(WR.month); }
+async function wrRefresh(){ await wrLoad(true); renderWaterRegister(); if(wrCanMark() && WR.cfg && WR.cfg.drive && !WR.tableMissing) await wrDriveCheck(WR.month, true); else blToast('Up to date'); }
 function renderWaterRegister(){
   var body = blEl('wr-body'), foot = blEl('wr-foot'); if(!body) return;
   var data = wrRowsFor(WR.month), got = data.houses.filter(function(h){ return h.received; }).length, n = data.houses.length, canMark = wrCanMark();
@@ -10521,6 +10552,10 @@ function renderWaterRegister(){
     + '<div class="bl-tile' + (got === n ? ' ok' : (got ? '' : ' owe')) + '" style="padding:10px 14px"><div class="k">Received</div><div class="v">' + got + ' / ' + n + '</div><div class="s">' + (got === n ? 'everyone’s in' : (n - got) + ' outstanding') + '</div></div></div>'
     + '<div class="bl-hint" style="margin-top:10px">Readings sent through the water-meter form tick themselves off. For anything that came by WhatsApp, email or a walk-around, tap <b>Add reading</b> on the house: type the reading, attach the photo, save.</div>'
     + (WR.cfg ? '<div class="bl-chipsrow" style="margin-top:10px"><span class="bl-st ' + (WR.cfg.drive ? 'final' : 'imp') + '">📁 Photos to Google Drive: ' + (WR.cfg.drive ? 'on' : 'not set up') + '</span><span class="bl-st ' + (WR.cfg.read ? 'final' : 'imp') + '">🔍 Read meter from photo: ' + (WR.cfg.read ? 'on' : 'not set up') + '</span></div>' : '') + '</div>';
+  var dv = (WR.drive || {})[WR.month];
+  if(canMark && dv && dv.files && dv.files.length) h += '<div class="bl-card2"><div class="bl-note info" style="margin:0"><span class="ic">📁</span><span><b>' + dv.files.length + ' photo' + (dv.files.length > 1 ? 's' : '') + '</b> in the Google Drive folder ' + (dv.files.length > 1 ? 'aren’t' : 'isn’t') + ' on this list yet: <span style="overflow-wrap:anywhere">' + dv.files.slice(0, 8).map(function(f){ return blEsc(f.name); }).join(', ') + (dv.files.length > 8 ? ' …' : '') + '</span></span></div><button type="button" class="bl-btn pri" style="width:100%;margin-top:10px" onclick="wrDriveImportUi()">＋ Add ' + (dv.files.length > 1 ? 'them' : 'it') + ' to the list</button></div>';
+  else if(canMark && dv && dv.error && !dv.outdated) h += '<div class="bl-card2"><div class="bl-hint" style="overflow-wrap:anywhere">📁 Couldn’t check the Drive folder for photos added by hand: ' + blEsc(dv.error) + '</div></div>';
+  else if(canMark && dv && dv.outdated) h += '<div class="bl-card2"><div class="bl-hint">📁 To pick up photos you drop straight into the Drive folder, the Google script needs its newer version — paste in <b>docs/water-readings-drive.gs</b> and deploy a New version.</div></div>';
   var outstanding = data.houses.filter(function(x){ return !x.received; });
   if(outstanding.length && got) h += '<div class="bl-card2"><div class="bl-h"><span>Still outstanding</span><button type="button" class="lnk" onclick="wrCopyReminder()">Copy reminder</button></div><div class="bl-chipsrow">' + outstanding.map(function(x){ return '<button type="button" class="bl-chip" style="height:36px" ' + (canMark ? 'onclick="wrEdit(\'' + blEsc(x.house.key) + '\')"' : '') + '>' + blEsc(x.house.label) + '</button>'; }).join('') + '</div></div>';
   var prev = blAddMonths(WR.month, -1);
@@ -10530,7 +10565,7 @@ function renderWaterRegister(){
 }
 function wrHouseRow(x, canMark, prevMonth){
   var e = x.latest, k = x.house.key;
-  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test, not emailed' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
+  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test, not emailed' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : e.via === 'drive' ? '📁 photo added in the Drive folder · picked up by ' + (e.by || 'admin') : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
   var prevVal = e && e.value != null ? wrValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
   var ai = e && e.ai, drive = (e && e.driveFiles) || [], aiHtml = '';
   if(ai && ai.value != null){
@@ -10640,9 +10675,9 @@ async function wrSaveEntry(p, existing, photos){
   }
 }
 // File photos / read the meter for a saved row, then show what came back.
-async function wrFileAndRefresh(id, photos, month){
-  blToast((WR.cfg && WR.cfg.drive ? 'Saving the photo to Drive' : 'Reading the photo') + '…');
-  var j = await wrFile(id, photos);
+async function wrFileAndRefresh(id, photos, month, opts){
+  blToast((WR.cfg && WR.cfg.drive && !(opts && opts.drive === false) ? 'Saving the photo to Drive' : 'Reading the photo') + '…');
+  var j = await wrFile(id, photos, opts);
   await wrLoadMonth(month, true); if(WR.open) renderWaterRegister();
   if(!j || !j.ok){ blToast('Couldn’t file the photo: ' + ((j && j.error) || 'no connection'), 'err'); return; }
   var bits = [];
@@ -10657,7 +10692,99 @@ async function wrFileExisting(id){
   if(!wrCanMark()) return;
   var month = WR.month, row = (WR.cache[month] || {})[id]; if(!row || !(row.photos || []).length) return;
   if(!(await wrUpsert(id, row))){ blToast('Couldn’t reach the database.', 'err'); return; }
-  await wrFileAndRefresh(id, row.photos.map(function(p){ return { name:p.name, type:p.type, dataUrl:p.data }; }), month);
+  await wrFileAndRefresh(id, row.photos.map(function(p){ return { name:p.name, type:p.type, dataUrl:p.data }; }), month, { drive:!(row.driveFiles || []).length });
+}
+
+// ── Photos added straight into the Google Drive folder ──────────────────────
+// A photo dropped into "Park Manor Water Meter Readings / <Month Year>" by hand
+// (named "Unit 3.jpg") is a reading too. The register asks the server what is in
+// the folder, shows the ones it doesn't know yet, and adds them as readings:
+// house from the file name, date from when the file was added, the meter read
+// from the photo. The file stays where it is in Drive — nothing is uploaded again.
+async function wrDriveCall(payload){
+  try {
+    var tok = (typeof getSessionToken === 'function') ? (getSessionToken() || '') : '';
+    var r = await fetch('/api/water-reading', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(Object.assign({ token:tok }, payload)) });
+    var j = null; try { j = await r.json(); } catch(e){}
+    if(!j) return { ok:false, error:'status ' + r.status };
+    if(!r.ok) return { ok:false, error:j.error || ('status ' + r.status) };
+    return j;
+  } catch(e){ return { ok:false, error:String((e && e.message) || e) }; }
+}
+function wrUnitFromName(name){
+  var s = String(name || ''), m = /^\s*(?:unit|house|door|no\.?|#)?[\s_\-]*0*(\d{1,3})(?!\d)/i.exec(s) || /(?:unit|house|door)[\s_\-#]*0*(\d{1,3})(?!\d)/i.exec(s);
+  if(!m) return '';
+  var k = String(Number(m[1]));
+  return wrHouseList().some(function(h){ return h.key === k; }) ? k : '';
+}
+function wrDriveKnown(month){
+  var known = {}, rows = (WR.cache || {})[month] || {};
+  Object.keys(rows).forEach(function(id){ if(id.indexOf('wr_d_') === 0) known[id.slice(5)] = 1; ((rows[id] || {}).driveFiles || []).forEach(function(f){ if(f && f.id) known[f.id] = 1; }); });
+  return known;
+}
+async function wrDriveCheck(month, announce){
+  if(!wrCanMark() || !WR.cfg || !WR.cfg.drive || WR.tableMissing) return;
+  WR.drive = WR.drive || {};
+  var j = await wrDriveCall({ action:'driveList', month:month });
+  if(!j.ok) WR.drive[month] = { files:[], error:j.error || 'failed', outdated:!!j.outdated };
+  else {
+    var known = wrDriveKnown(month);
+    WR.drive[month] = { folder:j.folder || '', total:(j.files || []).length, files:(j.files || []).filter(function(f){ return f && f.id && !known[f.id]; }).sort(function(a, b){ return String(a.name).localeCompare(String(b.name), undefined, { numeric:true }); }) };
+  }
+  if(WR.open && WR.month === month) renderWaterRegister();
+  if(announce){ var d = WR.drive[month]; if(d.error) blToast('Drive: ' + d.error, 'err'); else blToast(d.files.length ? d.files.length + ' new photo' + (d.files.length > 1 ? 's' : '') + ' in the Drive folder' : 'Up to date'); }
+}
+function wrImgOk(dataUrl){ return new Promise(function(res){ try { var i = new Image(); i.onload = function(){ res(i.width > 0 && i.height > 0); }; i.onerror = function(){ res(false); }; i.src = dataUrl; } catch(e){ res(false); } }); }
+async function wrDriveDownload(f){
+  var b64 = '', parts = 1, mime = '';
+  for(var p = 0; p < parts; p++){
+    var j = await wrDriveCall({ action:'driveGet', id:f.id, part:p });
+    if(!j.ok) return { error:j.error || 'download failed' };
+    parts = Math.min(12, Number(j.parts) || 1); mime = j.mime || mime; b64 += j.data || '';
+  }
+  if(!/^image\//i.test(mime)) mime = /\.png$/i.test(f.name) ? 'image/png' : /\.webp$/i.test(f.name) ? 'image/webp' : /\.hei[cf]$/i.test(f.name) ? 'image/heic' : 'image/jpeg';
+  return { dataUrl:'data:' + mime + ';base64,' + b64, mime:mime };
+}
+async function wrDriveImportUi(){
+  if(!wrCanMark()) return;
+  var month = WR.month, d = (WR.drive || {})[month]; if(!d || !d.files.length) return;
+  var files = d.files.slice(), houses = wrHouseList(), data = wrRowsFor(month), have = {};
+  data.houses.forEach(function(x){ if(x.received) have[x.house.key] = 1; });
+  var body = '<div class="bl-hint" style="margin-bottom:10px">Each photo becomes a reading for ' + blEsc(blMonthName(month)) + '. The house comes from the file name — change it if it’s wrong, or choose “Skip”.' + (WR.cfg && WR.cfg.read ? ' The meter is read from the photo for you to confirm.' : '') + '</div>'
+    + files.map(function(f, i){
+        var guess = wrUnitFromName(f.name), when = f.created ? blDate(wrLocalDate(new Date(f.created)), true) : '';
+        return '<div class="bl-f" style="margin-bottom:12px"><label class="bl-lbl" for="wrd-u-' + i + '" style="overflow-wrap:anywhere">📁 ' + blEsc(f.name) + (when ? ' · added ' + blEsc(when) : '') + '</label><select id="wrd-u-' + i + '" class="bl-in"><option value="">Skip this photo</option>'
+          + houses.map(function(hh){ return '<option value="' + blEsc(hh.key) + '"' + (guess === hh.key ? ' selected' : '') + '>' + blEsc(hh.label) + (hh.owner ? ' · ' + blEsc(blNice(hh.owner)) : '') + (have[hh.key] ? ' ✓ has a reading' : '') + '</option>'; }).join('') + '</select></div>';
+      }).join('');
+  var picks = null, collect = function(){ picks = files.map(function(f, i){ return { f:f, unit:(blEl('wrd-u-' + i) || {}).value || '' }; }).filter(function(x){ return x.unit; }); };
+  var res = await blDialog({ title:'Photos in the Drive folder', body:body, cancel:false, buttons:[{ label:'Add to the list', kind:'pri', value:'go', onClick:collect }, { label:'Cancel', value:false }] });
+  if(res !== 'go' || !picks) return;
+  if(!picks.length){ blToast('Nothing chosen.'); return; }
+  blProgressOpen('Adding photos from Drive', 'Starting…');
+  var done = 0, added = [], failed = [], today = wrLocalDate(), fallbackDate = today.slice(0, 7) === month ? today : blLastOfMonth(month);
+  for(var i = 0; i < picks.length; i++){
+    var f = picks[i].f, unit = picks[i].unit, id = 'wr_d_' + f.id;
+    blProgress(done, picks.length, 'House ' + unit + ' — fetching ' + f.name + '…');
+    var got = await wrDriveDownload(f);
+    if(got.error){ failed.push(f.name + ' (' + got.error + ')'); done++; continue; }
+    var ok = await wrImgOk(got.dataUrl), small = ok ? await wrShrink(got.dataUrl) : '', full = ok ? await wrShrink(got.dataUrl, 2000, 0.85) : '';
+    var made = f.created ? wrLocalDate(new Date(f.created)) : '';
+    var row = { unit:String(unit), unitTyped:String(unit), month:month, date:made.slice(0, 7) === month ? made : fallbackDate, submittedAt:Number(f.created) || Date.now(), value:null, note:ok ? '' : 'Photo is in Google Drive (this file type can’t be shown here).',
+      source:'manual', via:'drive', by:wrWho(), photos:ok ? [{ name:f.name, type:'image/jpeg', data:small }] : [], photoCount:1,
+      driveFiles:[{ name:f.name, id:f.id, url:f.url }], driveFolder:d.folder || '' };
+    if(!(await wrUpsert(id, row))){ failed.push(f.name + ' (couldn’t save)'); done++; continue; }
+    WR.cache[month] = WR.cache[month] || {}; WR.cache[month][id] = row; added.push(unit);
+    if(ok && WR.cfg && WR.cfg.read){
+      blProgress(done + 0.5, picks.length, 'House ' + unit + ' — reading the meter…');
+      await wrFile(id, [{ name:f.name, type:'image/jpeg', dataUrl:full }], { drive:false });
+    }
+    done++; blProgress(done, picks.length);
+  }
+  await wrLoadMonth(month, true);
+  var known = wrDriveKnown(month); if(WR.drive[month]) WR.drive[month].files = WR.drive[month].files.filter(function(x){ return !known[x.id]; });
+  blDialogClose(); if(WR.open) renderWaterRegister();
+  if(failed.length) blAlert('Some photos weren’t added', '<p>' + (added.length ? 'Added: house ' + added.map(blEsc).join(', ') + '.</p><p>' : '') + 'Not added: ' + failed.map(blEsc).join('; ') + '.</p>');
+  else blToast(added.length + ' reading' + (added.length > 1 ? 's' : '') + ' added from Drive', 'ok');
 }
 // Accept the reading taken from the photo.
 async function wrUseAi(id){

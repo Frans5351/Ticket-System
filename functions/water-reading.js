@@ -22,7 +22,7 @@
 //   ANTHROPIC_API_KEY   key from console.anthropic.com
 //   WATER_READ_MODEL    optional, default claude-sonnet-5-5
 
-import { jsonResponse, errorResponse, getConfig } from "./_passkey-shared.js";
+import { jsonResponse, errorResponse, getConfig, verifySessionJwt } from "./_passkey-shared.js";
 
 export const config = { path: "/api/water-reading" };
 
@@ -67,6 +67,51 @@ async function supa(cfg, path, init = {}) {
   if (!r.ok) throw new Error("Supabase " + r.status + ": " + (await r.text()).slice(0, 200));
   const t = await r.text();
   return t ? JSON.parse(t) : null;
+}
+
+// ── Photos added straight into the Drive folder ─────────────────────────────
+// The register asks what is in a month folder ("driveList") and fetches a
+// photo in parts ("driveGet") so the browser can shrink it and save it as a
+// reading. Trustees / managing agent only: needs the signed-in session token
+// whenever the site has PASSKEY_JWT_SECRET configured.
+function staffOnly(cfg, token) {
+  if (!cfg.jwtSecret) return null;                       // site has no server sessions — same openness as the rest of the app
+  const s = verifySessionJwt(cfg, String(token || ""));
+  if (!s) return "Please sign out and sign in again, then retry.";
+  if (!["admin", "trustee", "management"].includes(String(s.role || ""))) return "Not allowed for this user.";
+  return null;
+}
+async function driveScript(payload, ms) {
+  const url = process.env.WATER_DRIVE_URL, secret = process.env.WATER_DRIVE_SECRET;
+  if (!url || !secret) return { ok: false, error: "Google Drive filing is not set up" };
+  const to = withTimeout(ms || 22000);
+  try {
+    const r = await fetch(url, { method: "POST", redirect: "follow", signal: to.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret, ...payload }) });
+    const text = await r.text();
+    let j = null; try { j = JSON.parse(text); } catch (e) {}
+    if (!j) return { ok: false, error: "Drive script did not return JSON (status " + r.status + "). Check the web app is deployed with access 'Anyone'." };
+    if (!j.ok) return { ok: false, error: "Drive script: " + (j.error || "failed") };
+    return j;
+  } catch (e) {
+    return { ok: false, error: e.name === "AbortError" ? "Drive script timed out" : String(e.message || e) };
+  } finally { to.done(); }
+}
+const OLD_SCRIPT = "The Google script is an older version. Paste in the new docs/water-readings-drive.gs and deploy a New version (see docs/WATER_PHOTOS_SETUP.md).";
+async function driveList(body) {
+  const m = /^(\d{4})-(\d\d)$/.exec(String(body.month || ""));
+  if (!m) return errorResponse(400, "month missing");
+  const j = await driveScript({ action: "list", month: monthLabel(body.month) });
+  if (!j.ok) return jsonResponse(200, { ok: false, error: j.error });
+  if (!j.listed) return jsonResponse(200, { ok: false, outdated: true, error: OLD_SCRIPT });
+  return jsonResponse(200, { ok: true, folder: j.folder || "", files: (j.files || []).map((f) => ({ id: String(f.id), name: String(f.name || ""), url: String(f.url || ""), mime: String(f.mime || ""), size: Number(f.size) || 0, created: Number(f.created) || 0 })) });
+}
+async function driveGet(body) {
+  const id = String(body.id || "");
+  if (!/^[\w-]{10,100}$/.test(id)) return errorResponse(400, "id missing");
+  const j = await driveScript({ action: "get", id, part: Math.max(0, Number(body.part) || 0) });
+  if (!j.ok) return jsonResponse(200, { ok: false, error: j.error });
+  if (!j.got) return jsonResponse(200, { ok: false, outdated: true, error: OLD_SCRIPT });
+  return jsonResponse(200, { ok: true, id: j.id, name: j.name, mime: j.mime, parts: j.parts, part: j.part, data: j.data });
 }
 
 async function saveToDrive(photos, row, rowId) {
@@ -129,6 +174,11 @@ export default async function handler(req) {
   if (req.method === "GET") return jsonResponse(200, { drive: !!(process.env.WATER_DRIVE_URL && process.env.WATER_DRIVE_SECRET), read: !!process.env.ANTHROPIC_API_KEY });
   if (req.method !== "POST") return errorResponse(405, "POST only");
   let body; try { body = await req.json(); } catch (e) { return errorResponse(400, "Invalid JSON"); }
+  if (body.action === "driveList" || body.action === "driveGet") {
+    const denied = staffOnly(getConfig(), body.token);
+    if (denied) return errorResponse(401, denied);
+    return body.action === "driveList" ? driveList(body) : driveGet(body);
+  }
   const rowId = String(body.rowId || "");
   if (!/^[\w:.-]{3,120}$/.test(rowId)) return errorResponse(400, "rowId missing");
   const photos = (Array.isArray(body.photos) ? body.photos : []).slice(0, MAX_PHOTOS).map((p) => splitDataUrl(p && p.dataUrl)).filter(Boolean);

@@ -1,5 +1,12 @@
 # Billing changelog
 
+## v2.14 — photos dropped into Drive are picked up; status panel uses only the readings table
+- **Photos added straight into the Drive folder.** Water readings checks `Park Manor Water Meter Readings / <Month Year>` each time it is opened (and on ↻). Photos it doesn't know yet are listed with **Add them to the list**: the house comes from the file name (`Unit 3.jpg`), the date from when the file was added, the meter is read from the photo for confirmation, and the Drive file is linked (nothing is uploaded twice). Files with other names can be assigned to a house or skipped. Needs version 3 of the Google script (`docs/water-readings-drive.gs`: paste, put the password back, Deploy → Manage deployments → New version).
+- **Residents' status panel** ("when did you last get my reading?") now reads only the `water_readings` table. Old tick marks kept in settings — some copied from Davies invoice dates such as 1 November — are no longer shown.
+- **Register clean-up** (once, on opening): ticks copied from the Billing meters tab before the table existed are dropped (genuine Billing readings are re-derived), and ticks made by hand become proper readings.
+- "Save to Drive & read" on a reading that is already in Drive only reads the photo; it no longer uploads a second copy.
+- Server: `/api/water-reading` gains `driveList` / `driveGet` (trustees, admin and managing agent only — checked against the signed-in session when `PASSKEY_JWT_SECRET` is configured). The script only serves files inside the water readings folder.
+
 ## v2.13 — date and time in the Drive file name
 - Water-meter photos are filed as `Unit N - 16 Nov 2026 21h35.jpg` (when the reading reached the app, South African time) instead of plain `Unit N.jpg`. Needs a one-line change in the Google script plus a New version of its deployment; until then files keep the old name and nothing breaks.
 - `WATER_READINGS_SETUP.sql` now also switches row-level security off on `water_readings` and grants the app access, matching the other tables (the cause of "test reading could not be saved").
