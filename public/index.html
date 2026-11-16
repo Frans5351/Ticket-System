@@ -7038,7 +7038,7 @@ async function wcExtractItems(file){
             <div class="bl-f"><label class="bl-lbl" for="mr-elec">⚡ Electricity (kWh)</label><input id="mr-elec" type="number" inputmode="decimal" step="0.001" class="bl-in" placeholder="cumulative"></div>
           </div>
           <button type="button" class="bl-btn pri blk" style="margin-top:12px" data-ro-hide onclick="addMeterReading()">＋ Add reading</button>
-          <div class="bl-hint" style="margin-top:10px">Enter the cumulative meter value each month — usage is the difference from the previous reading. Readings captured on a draft invoice land here automatically when it’s finalised.</div>
+          <div class="bl-hint" style="margin-top:10px">Enter the cumulative meter value each month — usage is the difference from the previous reading. Readings captured on a draft invoice land here automatically when it’s finalised. A water reading saved here also ticks the house off on the 💧 Water readings register, and the resident sees it as received.</div>
         </div>
         <div id="u-meters-wrap"></div>
       </div>
@@ -10289,7 +10289,61 @@ async function wrLoad(force){
     WR.loaded = true;
   }
   await Promise.all([wrLoadMonth(WR.month, force), wrLoadMonth(blAddMonths(WR.month, -1), force)]);
+  if(wrCanMark()){ await wrSyncBilling(WR.month); await wrSyncBilling(blAddMonths(WR.month, -1)); }
 }
+// ── Billing ↔ register ──────────────────────────────────────────────────────
+// A water reading typed on a unit's Meters tab in Billing (or captured on an
+// invoice issued here) is a reading received, so it counts in the register and
+// on the residents' status panel. Readings that came in with imported Davies
+// invoices don't count — they are Davies' billing of an older reading.
+function wrBillingReadings(month){
+  var out = [];
+  if(typeof UNITS === 'undefined') return out;
+  Object.values(UNITS).forEach(function(u){
+    if(blIsGarage(u)) return;
+    var imported = {}; (u.importedInvoices || []).forEach(function(i){ imported[i.invoiceNo] = 1; });
+    (u.meterReadings || []).forEach(function(r){
+      if(r.water == null || r.water === '') return;
+      var d = r.wDate || r.date || ''; if(d.slice(0, 7) !== month) return;
+      if(r.src && (imported[r.src] || /^water (register|form)$/i.test(r.src))) return;
+      out.push({ id:'wr_b_' + u.section + '_' + d, unit:String(u.section), date:d, value:Number(r.water) });
+    });
+  });
+  return out;
+}
+async function wrSyncBilling(month){
+  if(month < WR_FIRST_MONTH || typeof UNITS === 'undefined' || !Object.keys(UNITS).length) return 0;
+  var cache = WR.cache[month] = WR.cache[month] || {}, list = wrBillingReadings(month), live = {}, n = 0, marksDirty = false;
+  for(var i = 0; i < list.length; i++){
+    var b = list[i], cur = cache[b.id]; live[b.id] = 1;
+    var revive = cur && cur.removed && cur.removedBy === 'billing';      // deleted in Billing earlier, typed in again
+    if(cur && !revive && (cur.removed || Number(cur.value) === b.value)) continue;
+    var data = Object.assign({}, cur || { source:'manual', via:'billing', by:wrWho(), submittedAt:Date.now(), photos:[] }, { unit:b.unit, month:month, date:b.date, value:b.value, valueRaw:String(b.value), removed:false });
+    if(await wrUpsert(b.id, data)){ cache[b.id] = data; n++; }
+    else if(!((WR.marks[month] || {})[b.unit])){ WR.marks[month] = WR.marks[month] || {}; WR.marks[month][b.unit] = { received:true, date:b.date, value:b.value, note:'from the Billing meters tab', by:wrWho(), at:Date.now() }; marksDirty = true; }
+  }
+  // a reading deleted in Billing comes off the register again
+  var ids = Object.keys(cache);
+  for(var j = 0; j < ids.length; j++){
+    var id = ids[j], row = cache[id];
+    if(id.indexOf('wr_b_') !== 0 || row.removed || live[id] || row.via !== 'billing') continue;
+    var gone = Object.assign({}, row, { removed:true, removedBy:'billing', removedAt:Date.now() });
+    if(await wrUpsert(id, gone)) cache[id] = gone;
+  }
+  if(marksDirty) await wrSaveMarks();
+  return n;
+}
+// After a unit is saved in Billing, push its readings across straight away.
+async function wrSyncFromBilling(){
+  try {
+    if(!wrCanMark()) return;
+    if(!WR.loaded){ try { var m = await sbGetSetting('water_marks'); WR.marks = (m && typeof m === 'object') ? m : (typeof m === 'string' ? JSON.parse(m) : {}); } catch(e){ WR.marks = {}; } WR.loaded = true; }
+    var now = wrLocalDate().slice(0, 7), months = [now, blAddMonths(now, -1)];
+    for(var i = 0; i < months.length; i++){ await wrLoadMonth(months[i], true); await wrSyncBilling(months[i]); }
+    if(WR.open) renderWaterRegister();
+  } catch(e){ console.warn('wrSyncFromBilling', e); }
+}
+(function(){ var o = saveUnitFromModal; saveUnitFromModal = async function(){ var r = await o.apply(this, arguments); if(r) wrSyncFromBilling(); return r; }; })();
 async function wrSaveMarks(){ try { await sbSetSetting('water_marks', WR.marks); } catch(e){ console.warn('water marks', e); } }
 function wrUnitKey(u){ return String(u || '').trim().replace(/^(unit|house|door)\s*(no\.?)?\s*/i, '').replace(/^0+(\d)/, '$1'); }
 function wrHouseList(){
@@ -10306,6 +10360,7 @@ function wrRowsFor(month){
   Object.keys(rows).forEach(function(id){ var r = rows[id]; if(!r || r.removed) return; add(r.unit, Object.assign({ id:id, kind:r.source === 'manual' ? 'manual' : 'form' }, r)); });
   var mk = (WR.marks || {})[month] || {};
   Object.keys(mk).forEach(function(unit){ var m = mk[unit]; if(m && m.received) add(unit, Object.assign({ kind:'mark', submittedAt:m.at }, m)); });
+  wrBillingReadings(month).forEach(function(b){ if(rows[b.id] || (mk[b.unit] && mk[b.unit].received)) return; add(b.unit, { kind:'billing', date:b.date, value:b.value, submittedAt:0 }); });
   if(typeof TICKETS !== 'undefined'){
     Object.values(TICKETS || {}).forEach(function(t){ if(!t || t.category !== 'Water Reading') return; var d = String(t.dateOpen || (t.added ? new Date(t.added).toISOString().slice(0, 10) : '')); if(d.slice(0, 7) !== month) return; add(t.unit, { kind:'ticket', id:t.id, date:d, submittedAt:t.added || 0, value:wrParseValue(t.desc) != null ? wrParseValue(t.desc) : wrParseValue(t.title), note:t.title, ticketNumber:t.ticketNumber }); });
   }
@@ -10350,7 +10405,7 @@ function renderWaterRegister(){
 }
 function wrHouseRow(x, canMark, prevMonth){
   var e = x.latest, k = x.house.key;
-  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : '✍️ captured by ' + (e.by || 'admin');
+  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
   var prevVal = e && e.value != null ? wrValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
   var photos = (e && e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);cursor:pointer" onclick="wrPhoto(\'' + blEsc(e.id || '') + '\',' + i + ')">'; }).join('');
   var more = '';
@@ -10398,7 +10453,7 @@ async function wrEdit(unit, editLatest){
   if(!wrCanMark()) return;
   var data = wrRowsFor(WR.month), today = new Date().toISOString().slice(0, 10), existing = null;
   if(unit && editLatest){ data.houses.concat(data.stray).forEach(function(x){ if(x.house.key === unit) existing = x.latest; }); }
-  if(existing && existing.kind === 'ticket') existing = null;      // tickets stay as they are; capture a fresh entry instead
+  if(existing && (existing.kind === 'ticket' || existing.kind === 'billing')) existing = null;      // tickets stay as they are; capture a fresh entry instead
   var inMonth = today.slice(0, 7) === WR.month ? today : blLastOfMonth(WR.month);
   WR.edit = { unit:unit, existing:existing, photos:existing && existing.photos ? existing.photos.slice() : [], busy:false };
   var houses = wrHouseList(), outstanding = data.houses.filter(function(x){ return !x.received; }).map(function(x){ return x.house.key; });

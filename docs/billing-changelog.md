@@ -1,5 +1,10 @@
 # Billing changelog
 
+## v2.7 — Billing meter readings count as received
+- A water reading saved on a unit’s Meters tab in Billing (or captured on an invoice issued here) now ticks that house off on the Water readings register and shows as received on the resident’s status panel. Readings that arrived with imported Davies invoices do not count. Deleting the reading in Billing takes the tick off again.
+- Existing Billing readings are picked up the next time the register is opened.
+
+
 ## v2.6 — residents see when their reading was last received
 - Water form (`?water` and the Water Reading tile): typing the unit number shows whether this month has been received and the date/reading of the last one on file, including readings captured by hand in the register. The unit is remembered on the device.
 - Form submissions now store every attached photo (shrunk) plus the full message, and are dated in local time.
