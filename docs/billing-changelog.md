@@ -1,5 +1,9 @@
 # Billing changelog
 
+## v2.13 — date and time in the Drive file name
+- Water-meter photos are filed as `Unit N - 16 Nov 2026 21h35.jpg` (when the reading reached the app, South African time) instead of plain `Unit N.jpg`. Needs a one-line change in the Google script plus a New version of its deployment; until then files keep the old name and nothing breaks.
+- `WATER_READINGS_SETUP.sql` now also switches row-level security off on `water_readings` and grants the app access, matching the other tables (the cause of "test reading could not be saved").
+
 ## v2.12 — test a water reading without emailing anyone
 - Water reading form (`?water` and the Water Reading tile): a tick box **Email this reading to the managing agent**, ticked by default. Untick it and nothing is emailed; the reading is still saved, the photo filed in Google Drive and the meter read from it. The register marks such a reading "test, not emailed".
 - The box only appears when someone is signed in to the app on that device, or the link ends in `&test` (e.g. `…/?water&test`). Residents never see it, so their readings are always emailed.

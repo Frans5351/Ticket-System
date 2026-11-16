@@ -4,9 +4,10 @@
  * The Park Manor app posts each water-meter photo here and this script files
  * it in Drive, mirroring the electricity readings:
  *
- *     Park Manor Water Meter Readings / November 2026 / Unit 3.jpg
+ *     Park Manor Water Meter Readings / November 2026 / Unit 3 - 16 Nov 2026 21h35.jpg
  *
- * A second photo for the same unit in the same month becomes "Unit 3 (2).jpg".
+ * The date and time are when the reading reached the app (South African time).
+ * Two photos in the same minute become "… 21h35 (2).jpg".
  * The folder is created next to "Park Manor Electricity Meter Readings" if
  * that exists, otherwise at the top of My Drive.
  *
@@ -57,7 +58,7 @@ function doPost(e) {
       if (!f || !f.data) return;
       var mime = String(f.mime || 'image/jpeg');
       var ext  = /png/i.test(mime) ? 'png' : (/webp/i.test(mime) ? 'webp' : 'jpg');
-      var name = nextName_(month, 'Unit ' + unit, ext);
+      var name = nextName_(month, 'Unit ' + unit + (clean_(body.stamp, 40) ? ' - ' + clean_(body.stamp, 40) : ''), ext);
       var file = month.createFile(Utilities.newBlob(Utilities.base64Decode(f.data), mime, name));
       if (body.description) file.setDescription(String(body.description).slice(0, 500));
       saved.push({ name: name, id: file.getId(), url: file.getUrl() });

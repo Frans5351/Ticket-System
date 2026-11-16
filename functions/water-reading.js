@@ -43,6 +43,22 @@ const PROMPT = [
 
 function withTimeout(ms) { const c = new AbortController(); const t = setTimeout(() => c.abort(), ms); return { signal: c.signal, done: () => clearTimeout(t) }; }
 function splitDataUrl(u) { const m = /^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i.exec(String(u || "")); return m ? { mime: m[1].toLowerCase(), data: m[2] } : null; }
+// "16 Nov 2026 21h35" in South African time — when the reading reached the app.
+// If the reading's own date was set by hand to another day, just that date.
+// (No ':' or '.' — the Drive script strips them from names.)
+function fileStamp(d) {
+  try {
+    const at = Number(d.submittedAt) || Date.now();
+    const parts = {};
+    new Intl.DateTimeFormat("en-GB", { timeZone: process.env.WATER_TZ || "Africa/Johannesburg", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(new Date(at)).forEach((p) => { parts[p.type] = p.value; });
+    const mon = parts.month.replace(/[^A-Za-z]/g, "").slice(0, 3);
+    const iso = parts.year + "-" + String(MONTHS.findIndex((m) => m.slice(0, 3) === mon) + 1).padStart(2, "0") + "-" + parts.day;
+    const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(d.date || ""));
+    if (m && d.date !== iso) return m[3] + " " + MONTHS[Number(m[2]) - 1].slice(0, 3) + " " + m[1];
+    return parts.day + " " + mon + " " + parts.year + " " + parts.hour + "h" + parts.minute;
+  } catch (e) { return ""; }
+}
 function monthLabel(ym) { const m = /^(\d{4})-(\d\d)$/.exec(String(ym || "")); return m ? MONTHS[Number(m[2]) - 1] + " " + m[1] : "Unsorted"; }
 
 async function supa(cfg, path, init = {}) {
@@ -62,7 +78,7 @@ async function saveToDrive(photos, row, rowId) {
     const r = await fetch(url, {
       method: "POST", redirect: "follow", signal: to.signal, headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        secret, month: monthLabel(d.month), unit: String(d.unit || ""),
+        secret, month: monthLabel(d.month), unit: String(d.unit || ""), stamp: fileStamp(d),
         description: "Water meter reading · Unit " + (d.unit || "?") + " · received " + (d.date || "") + (d.value != null ? " · reading " + d.value : "") + " · " + (d.source === "manual" ? "captured by " + (d.by || "admin") : "sent via the app") + " · " + rowId,
         files: photos.map((p) => ({ mime: p.mime, data: p.data })),
       }),

@@ -61,10 +61,14 @@ Send yourself a test reading through the water link and check the Drive folder.
 
 Open the water link while signed in to the app on the same device (or add `&test` to the link: `https://park-manor-bc.netlify.app/?water&test`). A tick box **Email this reading to the managing agent** appears above the Send button. Untick it, attach a photo and send: no email goes out, and the page lists what happened —
 
-- `✓ Filed in Google Drive as Unit N.jpg` — working.
+- `✓ Filed in Google Drive as Unit N - 16 Nov 2026 21h35.jpg` — working.
 - `✕ Not filed in Google Drive: Drive script: unauthorised` — `WATER_DRIVE_SECRET` in Netlify differs from `SECRET` in the deployed script (after editing the script: Deploy → Manage deployments → New version).
 - `✕ … did not return JSON` — wrong/old `WATER_DRIVE_URL`, or the web app's access is not "Anyone".
 - `✕ Photo not read: Claude API 401` — `ANTHROPIC_API_KEY` is wrong; `404` — unknown model name in `WATER_READ_MODEL`.
 - "The test reading could not be saved" — the `water_readings` table has not been created; run `WATER_READINGS_SETUP.sql` in Supabase.
 
 Remove test readings afterwards from Water readings → the house → Edit → Remove.
+
+## File names
+
+Photos are filed as `Unit N - 16 Nov 2026 21h35.jpg`: the date and time the reading reached the app, in South African time (a reading captured by hand for another day carries just that day's date). This needs the v2.13 line in the script — if files are still named plain `Unit N.jpg`, the deployed script is the older one: in the script editor replace the `var name = nextName_(…)` line with the one in `docs/water-readings-drive.gs`, save, then Deploy → Manage deployments → pencil → Version: New version → Deploy (the URL and password stay the same).
