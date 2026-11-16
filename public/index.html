@@ -4842,6 +4842,7 @@ function buildNavDrawer(){
       +badge
     +'</button>';
   });
+  if(typeof wrCanOpen === 'function' && wrCanOpen()) html += '<button class="nav-drawer-item" onclick="closeNavDrawer();openWaterRegister()"><span class="nav-icon">\ud83d\udca7</span><span>Water readings</span></button>';
   list.innerHTML = html || '<div style="padding:16px 20px;font-size:12px;color:var(--muted);font-family:var(--mono)">No sections available.</div>';
 }
 
@@ -10066,7 +10067,7 @@ async function wcApplyImport(){
 // (`{id, data}` like everything else) so the register fills itself in. If the
 // table doesn't exist yet the email still goes and the register can be marked
 // by hand — see docs/WATER_READINGS_SETUP.sql.
-var WR = { open:false, nav:false, month:'', rows:{}, marks:{}, loaded:false };
+var WR = { open:false, nav:false, month:'', cache:{}, marks:{}, loaded:false, tableMissing:false, edit:null };
 var WR_FIRST_MONTH = '2026-11';
 var WR_HOUSES = 12;
 
@@ -10107,7 +10108,7 @@ function renderWaterReadingForm(opts){
       + '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">💧 Submit your water meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>'
       + (opts.embedded ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
       + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
-      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Your unit</b></span></div>' + lbl('Unit number *') + '<input id="wr-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" style="' + inputCss + '"></div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Your unit</b></span></div>' + lbl('Unit number *') + '<input id="wr-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" oninput="wrPubUnitInput()" style="' + inputCss + '"><div id="wr-last" style="margin-top:10px"></div></div>'
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Photo of your meter</b><i>point your camera at the meter and snap</i></span></div>'
       +   '<div style="display:flex;gap:8px;margin-bottom:8px">'
       +     '<button type="button" onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">📷 Take photo</button>'
@@ -10120,7 +10121,10 @@ function renderWaterReadingForm(opts){
       +   lbl('Anything to add? (optional)') + '<textarea id="wr-note" rows="2" placeholder="e.g. the meter is hard to reach, or the date you read it" maxlength="500" style="' + inputCss + ';resize:vertical"></textarea></div>'
       + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
       + '<div id="pub-submit-bar"><button id="pub-submit-btn" onclick="submitWaterReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer">💧 Send my reading</button></div>';
-    var uEl = document.getElementById('wr-unit'); if(uEl && !opts.embedded) setTimeout(function(){ uEl.focus(); }, 60);
+    var uEl = document.getElementById('wr-unit'), remembered = '';
+    try { remembered = localStorage.getItem('pm_wr_unit') || ''; } catch(e){}
+    if(uEl && remembered){ uEl.value = remembered; wrPubLookup(); }
+    else { wrPubRender(null); if(uEl && !opts.embedded) setTimeout(function(){ uEl.focus(); }, 60); }
     if(opts.embedded) window.scrollTo(0, 0);
   }
   if(typeof PUBLIC_REPORTS_ENABLED === 'undefined'){ return setTimeout(showForm, 300); }
@@ -10160,9 +10164,12 @@ async function submitWaterReading(){
     // Record it for the register (best effort — the email is the thing that must not fail).
     try {
       var now = new Date(), id = 'wr_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-      await sbUpsert('water_readings', id, { unit:String(unit), month:now.toISOString().slice(0, 7), date:now.toISOString().slice(0, 10), submittedAt:now.getTime(),
+      var today = wrLocalDate(now);
+      try { localStorage.setItem('pm_wr_unit', wrUnitKey(unit)); } catch(e){}
+      await sbUpsert('water_readings', id, { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:true,
         value:wrParseValue(valueRaw) != null ? wrParseValue(valueRaw) : wrParseValue(note), valueRaw:valueRaw, note:note, source:'form',
-        photos:notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, 2).map(function(a){ return { name:a.name, type:a.type, data:a.dataUrl }; }) });
+        photos:await Promise.all(notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await wrShrink(a.dataUrl) }; })),
+        photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) });
     } catch(e){ console.warn('water reading not recorded', e); }
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
@@ -10178,40 +10185,141 @@ async function submitWaterReading(){
   }
 }
 
+// ── "When did you last get my reading?" on the public form ─────────────────
+// Looks up what the app has on file for the unit typed in: readings sent
+// through the form and ones the trustees / managing agent captured by hand.
+// Only the date, the reading and how it arrived are shown — never photos or notes.
+function wrLocalDate(d){ d = d || new Date(); return d.getFullYear() + '-' + blPad(d.getMonth() + 1, 2) + '-' + blPad(d.getDate(), 2); }
+var _wrLookupT = null, _wrLookupSeq = 0;
+function wrPubUnitInput(){ clearTimeout(_wrLookupT); _wrLookupT = setTimeout(wrPubLookup, 450); }
+async function wrPubFetch(unit){
+  var out = [], ok = true;
+  try {
+    var r = await supa.from('water_readings').select('id, unit:data->>unit, month:data->>month, date:data->>date, value:data->value, source:data->>source, removed:data->removed, submittedAt:data->submittedAt').eq('data->>unit', unit).order('updated_at', { ascending:false }).limit(36);
+    if(r && r.error) ok = false;
+    else ((r && r.data) || []).forEach(function(row){
+      var d = row.data || row;
+      if(typeof idBelongsToCurrentScheme === 'function' && row.id && !idBelongsToCurrentScheme(row.id)) return;
+      if(d.removed === true || d.removed === 'true' || wrUnitKey(d.unit) !== unit || !d.month) return;
+      out.push({ month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', at:Number(d.submittedAt) || 0 });
+    });
+  } catch(e){ ok = false; }
+  try {
+    var m = await sbGetSetting('water_marks'); if(typeof m === 'string') m = JSON.parse(m);
+    Object.keys(m || {}).forEach(function(month){ var k = (m[month] || {})[unit]; if(k && k.received){ out.push({ month:month, date:k.date || '', value:k.value == null ? null : Number(k.value), source:'manual', at:Number(k.at) || 0 }); ok = true; } });
+  } catch(e){}
+  out.sort(function(a, b){ return (b.date || '').localeCompare(a.date || '') || b.at - a.at; });
+  return ok ? out : null;
+}
+async function wrPubLookup(){
+  var el = document.getElementById('wr-unit'); if(!el) return;
+  var unit = wrUnitKey(el.value), seq = ++_wrLookupSeq;
+  if(!unit){ wrPubRender(null); return; }
+  wrPubRender({ unit:unit, loading:true });
+  var list = await wrPubFetch(unit);
+  if(seq !== _wrLookupSeq) return;                // a newer keystroke won
+  wrPubRender({ unit:unit, list:list });
+}
+function wrLongMonth(ym){ var p = String(ym || '').split('-'), N = ['January','February','March','April','May','June','July','August','September','October','November','December']; return p.length < 2 ? '' : N[Number(p[1]) - 1] + ' ' + p[0]; }
+function wrPubRender(st){
+  var host = document.getElementById('wr-last'); if(!host) return;
+  var box = function(bg, bd, inner){ return '<div style="border:1px solid ' + bd + ';background:' + bg + ';border-radius:12px;padding:12px 14px;font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--text2)">' + inner + '</div>'; };
+  if(!st){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Type your unit number to see when we last received your reading.</div>'; return; }
+  if(st.loading){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Checking what we have for Unit ' + blEsc(st.unit) + '…</div>'; return; }
+  if(st.list == null){ host.innerHTML = ''; return; }           // lookup unavailable — say nothing rather than something wrong
+  var thisMonth = wrLocalDate().slice(0, 7), mine = st.list.filter(function(e){ return e.month === thisMonth; })[0], last = st.list[0];
+  var how = function(e){ return e.source === 'form' ? 'sent through this form' : 'logged by the trustees'; };
+  var val = function(e){ return e.value != null ? ' · reading <b>' + blEsc(String(e.value)) + '</b>' : ''; };
+  var h = '';
+  if(mine) h += box('var(--green-bg,rgba(74,222,158,.12))', 'var(--green-bd,rgba(74,222,158,.35))', '<div style="font-weight:700;color:var(--green)">✅ ' + blEsc(wrLongMonth(thisMonth)) + ' reading received</div><div>On ' + blEsc(blDate(mine.date, true)) + val(mine) + ' · ' + how(mine) + '.</div><div style="color:var(--muted);font-size:12px;margin-top:2px">Nothing more to do — only send another if that one was wrong.</div>');
+  else h += box('var(--bl-owe-bg,rgba(240,160,111,.12))', 'var(--bl-owe-bd,rgba(240,160,111,.4))', '<div style="font-weight:700;color:var(--bl-owe,#b4570f)">⏳ No ' + blEsc(wrLongMonth(thisMonth)) + ' reading yet for Unit ' + blEsc(st.unit) + '</div><div>' + (last ? 'The last one we received was on <b>' + blEsc(blDate(last.date, true)) + '</b>' + val(last) + ' · ' + how(last) + '.' : 'We haven’t received a reading for this unit through the app yet.') + '</div>');
+  var earlier = [], seen = {}; if(mine) seen[thisMonth] = 1; else if(last) seen[last.month] = 1;
+  st.list.forEach(function(e){ if(seen[e.month]) return; seen[e.month] = 1; earlier.push(e); });
+  if(earlier.length) h += '<div style="margin-top:8px;font-size:12px;color:var(--muted);font-family:var(--sans)">Earlier: ' + earlier.slice(0, 4).map(function(e){ return blEsc(wrLongMonth(e.month)) + ' ✓' + (e.value != null ? ' ' + blEsc(String(e.value)) : ''); }).join(' &nbsp;·&nbsp; ') + '</div>';
+  host.innerHTML = h;
+}
+
 // ── Register ────────────────────────────────────────────────────────────────
+// One row per house per month. Entries come from three places:
+//   • `water_readings` rows  — sent through the forms (source 'form') or
+//     captured here by hand (source 'manual'); both can be edited: reading,
+//     date, note, photos. Removing one is a soft delete (data.removed).
+//   • `settings.water_marks` — older tick-only marks, and the fallback when
+//     the water_readings table hasn't been created yet (no photos possible).
+//   • tickets with category "Water Reading" (before the dedicated form).
+// Rows are loaded a month at a time so photos don't make the screen slow.
 function wrCanOpen(){ return _currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management'; }
 function wrCanMark(){ return wrCanOpen(); }
+function wrWho(){ return (_currentUserObj && (_currentUserObj.name || _currentUserObj.username)) || 'admin'; }
 function wrMonths(){ var out = [], m = WR_FIRST_MONTH, now = new Date(), last = blAddMonths(now.toISOString().slice(0, 7), 1); while(m <= last){ out.push(m); m = blAddMonths(m, 1); } return out.reverse(); }
+// Shrink a photo for storage (the full-size copy went out in the email).
+function wrShrink(dataUrl, maxDim, q){
+  return new Promise(function(resolve){
+    try {
+      var img = new Image();
+      img.onload = function(){
+        var s = Math.min(1, (maxDim || 1280) / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        try { resolve(c.toDataURL('image/jpeg', q || 0.62)); } catch(e){ resolve(dataUrl); }
+      };
+      img.onerror = function(){ resolve(dataUrl); };
+      img.src = dataUrl;
+    } catch(e){ resolve(dataUrl); }
+  });
+}
+async function wrUpsert(id, data){
+  try { var r = await supa.from('water_readings').upsert({ id:scopedId(id), data:data, updated_at:new Date().toISOString() }); return !(r && r.error); }
+  catch(e){ return false; }
+}
+async function wrLoadMonth(month, force){
+  WR.cache = WR.cache || {};
+  if(WR.cache[month] && !force) return;
+  var out = {};
+  try {
+    var r = await supa.from('water_readings').select('id, data').eq('data->>month', month);
+    if(r && r.error){ WR.tableMissing = true; }
+    else { WR.tableMissing = false; ((r && r.data) || []).forEach(function(row){ if(!row || !row.data || row.data.month !== month) return; if(typeof idBelongsToCurrentScheme === 'function' && !idBelongsToCurrentScheme(row.id)) return; out[unscopeId(row.id)] = row.data; }); }
+  } catch(e){ WR.tableMissing = true; }
+  WR.cache[month] = out;
+}
 async function wrLoad(force){
-  if(WR.loaded && !force) return;
-  try { WR.rows = await sbLoadAll('water_readings') || {}; } catch(e){ WR.rows = {}; }
-  try { var m = await sbGetSetting('water_marks'); WR.marks = (m && typeof m === 'object') ? (typeof m === 'string' ? JSON.parse(m) : m) : {}; } catch(e){ WR.marks = {}; }
-  WR.loaded = true;
+  if(!WR.loaded || force){
+    try { var m = await sbGetSetting('water_marks'); WR.marks = (m && typeof m === 'object') ? m : (typeof m === 'string' ? JSON.parse(m) : {}); } catch(e){ WR.marks = {}; }
+    WR.loaded = true;
+  }
+  await Promise.all([wrLoadMonth(WR.month, force), wrLoadMonth(blAddMonths(WR.month, -1), force)]);
 }
 async function wrSaveMarks(){ try { await sbSetSetting('water_marks', WR.marks); } catch(e){ console.warn('water marks', e); } }
-function wrUnitKey(u){ return String(u || '').trim().replace(/^unit\s*/i, '').replace(/^0+(\d)/, '$1'); }
-// Everything known for a month: form submissions, manual marks, old-style tickets.
+function wrUnitKey(u){ return String(u || '').trim().replace(/^(unit|house|door)\s*(no\.?)?\s*/i, '').replace(/^0+(\d)/, '$1'); }
+function wrHouseList(){
+  if(typeof UNITS !== 'undefined' && Object.keys(UNITS).length){
+    var hs = Object.values(UNITS).filter(function(u){ return !blIsGarage(u); }).sort(function(a, b){ return a.section - b.section; }).map(function(u){ return { key:String(u.section), label:'House ' + (u.houseNo || u.section), owner:u.ownerName || '', uid:u.id }; });
+    if(hs.length) return hs;
+  }
+  var out = []; for(var i = 1; i <= WR_HOUSES; i++) out.push({ key:String(i), label:'House ' + i, owner:'' }); return out;
+}
 function wrRowsFor(month){
   var byUnit = {};
   var add = function(unit, e){ var k = wrUnitKey(unit); if(!k) return; (byUnit[k] = byUnit[k] || []).push(e); };
-  Object.keys(WR.rows || {}).forEach(function(id){ var r = WR.rows[id]; if(!r || r.month !== month) return; add(r.unit, Object.assign({ id:id, kind:'form' }, r)); });
+  var rows = (WR.cache || {})[month] || {};
+  Object.keys(rows).forEach(function(id){ var r = rows[id]; if(!r || r.removed) return; add(r.unit, Object.assign({ id:id, kind:r.source === 'manual' ? 'manual' : 'form' }, r)); });
   var mk = (WR.marks || {})[month] || {};
-  Object.keys(mk).forEach(function(unit){ var m = mk[unit]; if(m && m.received) add(unit, Object.assign({ kind:'manual' }, m)); });
+  Object.keys(mk).forEach(function(unit){ var m = mk[unit]; if(m && m.received) add(unit, Object.assign({ kind:'mark', submittedAt:m.at }, m)); });
   if(typeof TICKETS !== 'undefined'){
-    Object.values(TICKETS || {}).forEach(function(t){ if(!t || t.category !== 'Water Reading') return; var d = String(t.dateOpen || (t.added ? new Date(t.added).toISOString().slice(0, 10) : '')); if(d.slice(0, 7) !== month) return; add(t.unit, { kind:'ticket', id:t.id, date:d, value:wrParseValue(t.desc) != null ? wrParseValue(t.desc) : wrParseValue(t.title), note:t.title, ticketNumber:t.ticketNumber }); });
+    Object.values(TICKETS || {}).forEach(function(t){ if(!t || t.category !== 'Water Reading') return; var d = String(t.dateOpen || (t.added ? new Date(t.added).toISOString().slice(0, 10) : '')); if(d.slice(0, 7) !== month) return; add(t.unit, { kind:'ticket', id:t.id, date:d, submittedAt:t.added || 0, value:wrParseValue(t.desc) != null ? wrParseValue(t.desc) : wrParseValue(t.title), note:t.title, ticketNumber:t.ticketNumber }); });
   }
-  var houses = [];
-  var fromUnits = (typeof UNITS !== 'undefined' && Object.keys(UNITS).length) ? Object.values(UNITS).filter(function(u){ return !blIsGarage(u); }).sort(function(a, b){ return a.section - b.section; }).map(function(u){ return { key:String(u.section), label:'House ' + (u.houseNo || u.section), owner:u.ownerName || '', uid:u.id }; }) : null;
-  if(!fromUnits) for(var i = 1; i <= WR_HOUSES; i++) fromUnits = (fromUnits || []).concat([{ key:String(i), label:'House ' + i, owner:'' }]);
-  fromUnits.forEach(function(h){ var es = (byUnit[h.key] || []).sort(function(a, b){ return (b.submittedAt || 0) - (a.submittedAt || 0); }); houses.push({ house:h, entries:es, received:es.length > 0, latest:es[0] || null }); delete byUnit[h.key]; });
+  var houses = wrHouseList().map(function(h){ var es = (byUnit[h.key] || []).sort(function(a, b){ return (b.submittedAt || 0) - (a.submittedAt || 0); }); delete byUnit[h.key]; return { house:h, entries:es, received:es.length > 0, latest:es[0] || null }; });
   var stray = Object.keys(byUnit).map(function(k){ return { house:{ key:k, label:'Unit ' + k, owner:'', unknown:true }, entries:byUnit[k], received:true, latest:byUnit[k][0] }; });
   return { houses:houses, stray:stray };
 }
+function wrValueOf(month, key){ var d = wrRowsFor(month), hit = null; d.houses.forEach(function(x){ if(x.house.key === key) x.entries.forEach(function(e){ if(hit == null && e.value != null) hit = Number(e.value); }); }); return hit; }
 async function openWaterRegister(month){
   if(!wrCanOpen()){ blToast('Only trustees, management and admin can see the readings register.', 'err'); return; }
   if(typeof blEnsureBillingLoaded === 'function'){ try { await blEnsureBillingLoaded(); } catch(e){} }
+  WR.month = month || WR.month || new Date().toISOString().slice(0, 7); if(WR.month < WR_FIRST_MONTH) WR.month = WR_FIRST_MONTH;
   await wrLoad();
-  WR.open = true; WR.month = month || new Date().toISOString().slice(0, 7); if(WR.month < WR_FIRST_MONTH) WR.month = WR_FIRST_MONTH;
+  WR.open = true;
   var m = blEl('wr-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
   if(!WR.nav){ WR.nav = true; blNavPush(function(){ WR.nav = false; closeWaterRegister(true); }); }
   renderWaterRegister();
@@ -10222,58 +10330,135 @@ function closeWaterRegister(fromBack){
   WR.open = false;
   if(WR.nav && fromBack !== true){ WR.nav = false; blNavPop(); }
 }
-function wrSetMonth(v){ WR.month = v; renderWaterRegister(); }
+async function wrSetMonth(v){ WR.month = v; await wrLoad(); renderWaterRegister(); }
+async function wrRefresh(){ await wrLoad(true); renderWaterRegister(); blToast('Up to date'); }
 function renderWaterRegister(){
   var body = blEl('wr-body'), foot = blEl('wr-foot'); if(!body) return;
   var data = wrRowsFor(WR.month), got = data.houses.filter(function(h){ return h.received; }).length, n = data.houses.length, canMark = wrCanMark();
   var sub = blEl('wr-sub'); if(sub) sub.textContent = blMonthName(WR.month) + ' · ' + got + ' of ' + n + ' received';
-  var h = '<div class="bl-card2"><div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="wr-month">Month</label><select id="wr-month" class="bl-in" onchange="wrSetMonth(this.value)">' + wrMonths().map(function(m){ return '<option value="' + m + '"' + (m === WR.month ? ' selected' : '') + '>' + blMonthName(m) + '</option>'; }).join('') + '</select></div>'
+  var h = '';
+  if(WR.tableMissing) h += '<div class="bl-note"><span class="ic">⚠️</span><span>The readings table isn’t set up yet, so readings sent through the form aren’t recorded here and photos can’t be saved. Run <b>WATER_READINGS_SETUP.sql</b> once in Supabase. Until then you can still tick houses off by hand.</span></div>';
+  h += '<div class="bl-card2"><div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="wr-month">Month</label><select id="wr-month" class="bl-in" onchange="wrSetMonth(this.value)">' + wrMonths().map(function(m){ return '<option value="' + m + '"' + (m === WR.month ? ' selected' : '') + '>' + blMonthName(m) + '</option>'; }).join('') + '</select></div>'
     + '<div class="bl-tile' + (got === n ? ' ok' : (got ? '' : ' owe')) + '" style="padding:10px 14px"><div class="k">Received</div><div class="v">' + got + ' / ' + n + '</div><div class="s">' + (got === n ? 'everyone’s in' : (n - got) + ' outstanding') + '</div></div></div>'
-    + '<div class="bl-hint" style="margin-top:10px">Readings sent through the water-meter form (and the Water Reading tile on the general form) tick themselves off here as soon as they arrive. Anything that came in another way — WhatsApp, email, a phone call — gets marked by hand.</div></div>';
+    + '<div class="bl-hint" style="margin-top:10px">Readings sent through the water-meter form tick themselves off. For anything that came by WhatsApp, email or a walk-around, tap <b>Add reading</b> on the house: type the reading, attach the photo, save.</div></div>';
   var outstanding = data.houses.filter(function(x){ return !x.received; });
-  if(outstanding.length) h += '<div class="bl-card2"><div class="bl-h"><span>Still outstanding</span><button type="button" class="lnk" onclick="wrCopyReminder()">Copy reminder</button></div><div class="bl-chipsrow">' + outstanding.map(function(x){ return '<span class="bl-stat">' + blEsc(x.house.label) + '</span>'; }).join('') + '</div></div>';
-  h += '<div class="bl-card2">' + data.houses.concat(data.stray).map(function(x){ return wrHouseRow(x, canMark); }).join('') + '</div>';
+  if(outstanding.length && got) h += '<div class="bl-card2"><div class="bl-h"><span>Still outstanding</span><button type="button" class="lnk" onclick="wrCopyReminder()">Copy reminder</button></div><div class="bl-chipsrow">' + outstanding.map(function(x){ return '<button type="button" class="bl-chip" style="height:36px" ' + (canMark ? 'onclick="wrEdit(\'' + blEsc(x.house.key) + '\')"' : '') + '>' + blEsc(x.house.label) + '</button>'; }).join('') + '</div></div>';
+  var prev = blAddMonths(WR.month, -1);
+  h += '<div class="bl-card2">' + data.houses.concat(data.stray).map(function(x){ return wrHouseRow(x, canMark, prev); }).join('') + '</div>';
   body.innerHTML = h;
-  foot.innerHTML = '<button type="button" class="bl-btn" onclick="closeWaterRegister()">Close</button><span class="grow"></span><button type="button" class="bl-btn" onclick="wrLoad(true).then(renderWaterRegister)">↻ Refresh</button>';
+  foot.innerHTML = '<button type="button" class="bl-btn" onclick="wrRefresh()">↻</button>' + (outstanding.length && !got ? '<button type="button" class="bl-btn" onclick="wrCopyReminder()">Copy reminder</button>' : '') + '<span class="grow"></span>' + (canMark ? '<button type="button" class="bl-btn pri" onclick="wrEdit(null)">＋ Add reading</button>' : '<button type="button" class="bl-btn" onclick="closeWaterRegister()">Close</button>');
 }
-function wrHouseRow(x, canMark){
+function wrHouseRow(x, canMark, prevMonth){
   var e = x.latest, k = x.house.key;
-  var srcLabel = !e ? '' : e.kind === 'form' ? '💧 via the form' : e.kind === 'manual' ? '✍️ marked by ' + (e.by || 'admin') : '🎫 ticket #' + (e.ticketNumber || '');
-  var val = e && e.value != null ? '<b>' + blEsc(String(e.value)) + '</b> kL' : (e && e.valueRaw ? '<b>' + blEsc(e.valueRaw) + '</b>' : '');
-  var photos = (e && e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border2);cursor:pointer" onclick="wrPhoto(\'' + blEsc(e.id) + '\',' + i + ')">'; }).join('');
-  var more = e ? '<div class="bl-lr-more" style="display:block;margin-top:8px">'
-      + (val ? '<div class="row"><span>Reading</span>' + val + '</div>' : '')
+  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : '✍️ captured by ' + (e.by || 'admin');
+  var prevVal = e && e.value != null ? wrValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
+  var photos = (e && e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);cursor:pointer" onclick="wrPhoto(\'' + blEsc(e.id || '') + '\',' + i + ')">'; }).join('');
+  var more = '';
+  if(e){
+    more = '<div class="bl-lr-more" style="display:block;margin-top:8px">'
+      + '<div class="row"><span>Reading</span><b>' + (e.value != null ? blEsc(String(e.value)) + ' kL' + (used != null ? ' <span style="font-weight:500;color:' + (used < 0 ? 'var(--bl-owe)' : 'var(--muted)') + '">· ' + used + ' used since ' + blEsc(blMonthName(prevMonth)) + '</span>' : '') : (e.valueRaw ? blEsc(e.valueRaw) : '<span style="color:var(--bl-owe);font-weight:500">not typed in yet</span>')) + '</b></div>'
       + '<div class="row"><span>Received</span><b>' + blEsc(blDate(e.date || '', true)) + '</b></div>'
-      + '<div class="row"><span>Source</span><b>' + srcLabel + '</b></div>'
+      + '<div class="row"><span>How</span><b style="text-align:right">' + blEsc(src) + '</b></div>'
       + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
-      + (x.entries.length > 1 ? '<div class="row"><span>Also</span><b>' + (x.entries.length - 1) + ' more submission' + (x.entries.length > 2 ? 's' : '') + ' this month</b></div>' : '')
-      + (photos ? '<div style="display:flex;gap:8px;margin-top:8px">' + photos + '</div>' : '')
-      + '<div class="bl-doc-acts">' + (canMark ? (e.kind === 'manual' ? '<button type="button" class="bl-btn sm" onclick="wrUnmark(\'' + blEsc(k) + '\')">Undo mark</button>' : '<button type="button" class="bl-btn sm" onclick="wrMark(\'' + blEsc(k) + '\')">✍️ Add a note / correct</button>') : '')
-      + (e.value != null && x.house.uid && typeof blRO === 'function' && !blRO() ? '<button type="button" class="bl-btn sm" onclick="wrToBilling(\'' + x.house.uid + '\',\'' + blEsc(e.date || '') + '\',' + Number(e.value) + ')">📥 Add to billing readings</button>' : '') + '</div></div>'
-    : (canMark ? '<div class="bl-doc-acts" style="margin-top:8px"><button type="button" class="bl-btn sm pri" onclick="wrMark(\'' + blEsc(k) + '\')">✓ Mark as received</button></div>' : '');
+      + (x.entries.length > 1 ? '<div class="row"><span>Also</span><b>' + (x.entries.length - 1) + ' earlier submission' + (x.entries.length > 2 ? 's' : '') + ' this month</b></div>' : '')
+      + (photos ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + photos + '</div>' : '')
+      + (canMark ? '<div class="bl-doc-acts"><button type="button" class="bl-btn sm" onclick="wrEdit(\'' + blEsc(k) + '\',true)">✏️ Edit' + (e.value == null ? ' · type the reading' : '') + '</button>'
+        + (e.value != null && x.house.uid && typeof blRO === 'function' && !blRO() ? '<button type="button" class="bl-btn sm" onclick="wrToBilling(\'' + x.house.uid + '\',\'' + blEsc(e.date || '') + '\',' + Number(e.value) + ')">📥 To billing</button>' : '') + '</div>' : '')
+      + '</div>';
+  } else if(canMark){
+    more = '<div class="bl-doc-acts" style="margin-top:8px"><button type="button" class="bl-btn sm pri" onclick="wrEdit(\'' + blEsc(k) + '\')">＋ Add reading</button></div>';
+  }
   return '<div class="bl-lr" style="cursor:default"><div class="bl-lr-main"><div class="bl-lic">' + (x.received ? '✅' : '⬜') + '</div><div class="bl-ltx"><b>' + blEsc(x.house.label) + (x.house.unknown ? ' <span class="bl-st warn">not a house</span>' : '') + '</b><small>' + blEsc(blNice(x.house.owner || '')) + '</small></div>'
     + '<div class="bl-lam"><b style="color:' + (x.received ? 'var(--green)' : 'var(--bl-owe)') + '">' + (x.received ? 'Received' : 'Outstanding') + '</b><small>' + (e ? blEsc(blDate(e.date || '')) + (e.value != null ? ' · ' + blEsc(String(e.value)) : '') : '—') + '</small></div></div>' + more + '</div>';
 }
-function wrPhoto(id, i){ var r = WR.rows[id]; var p = r && r.photos && r.photos[i]; if(!p) return; var w = window.open('', '_blank'); if(w){ w.document.write('<title>Meter photo</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="' + p.data + '" style="max-width:100%;max-height:100vh"></body>'); } }
-async function wrMark(unit){
-  if(!wrCanMark()) return;
-  var cur = ((WR.marks || {})[WR.month] || {})[unit] || {}, today = new Date().toISOString().slice(0, 10);
-  var picked = null;
-  var ok = await blDialog({ title:'House ' + unit + ' · ' + blMonthName(WR.month), body:'<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl">Received on</label><input id="wrm-date" type="date" class="bl-in" value="' + blEsc(cur.date || today) + '"></div><div class="bl-f"><label class="bl-lbl">Reading (kL, optional)</label><input id="wrm-value" type="number" step="0.001" inputmode="decimal" class="bl-in" value="' + (cur.value == null ? '' : cur.value) + '"></div></div><div class="bl-f" style="margin-top:10px"><label class="bl-lbl">Note (optional)</label><input id="wrm-note" type="text" class="bl-in" value="' + blEsc(cur.note || '') + '" placeholder="e.g. sent by WhatsApp"></div>', cancel:false,
-    buttons:[{ label:'Save', kind:'pri', value:true, onClick:function(){ picked = { date:(blEl('wrm-date') || {}).value || today, value:_mrNum((blEl('wrm-value') || {}).value), note:_uStr('wrm-note') }; } }, { label:'Cancel', value:false }] });
-  if(ok !== true || !picked) return;
-  WR.marks[WR.month] = WR.marks[WR.month] || {};
-  WR.marks[WR.month][unit] = { received:true, date:picked.date, value:picked.value, note:picked.note, by:(_currentUserObj && (_currentUserObj.name || _currentUserObj.username)) || 'admin', at:Date.now() };
-  await wrSaveMarks(); renderWaterRegister(); blToast('House ' + unit + ' marked as received', 'ok');
+function wrFindPhotoEntry(id){ var hit = null; Object.keys(WR.cache || {}).forEach(function(m){ if(WR.cache[m][id]) hit = WR.cache[m][id]; }); return hit; }
+function wrPhoto(id, i){ var r = wrFindPhotoEntry(id); var p = r && r.photos && r.photos[i]; if(!p) return; var w = window.open('', '_blank'); if(w){ w.document.write('<title>Meter photo</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="' + p.data + '" style="max-width:100%;max-height:100vh"></body>'); } }
+
+// ── Capture / edit one reading ──────────────────────────────────────────────
+var WR_MAX_PHOTOS = 3;
+function wrEditPhotosHtml(){
+  var ed = WR.edit || { photos:[] };
+  return (ed.photos || []).map(function(p, i){ return '<div style="position:relative;width:76px;height:76px"><img src="' + p.data + '" alt="" style="width:76px;height:76px;object-fit:cover;border-radius:10px;border:1px solid var(--border2)"><button type="button" aria-label="Remove photo" onclick="wrEditRemovePhoto(' + i + ')" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.75);color:#fff;font-size:13px;cursor:pointer">✕</button></div>'; }).join('')
+    + (ed.busy ? '<div class="bl-hint" style="align-self:center">Adding photo…</div>' : '');
 }
-async function wrUnmark(unit){ if(!wrCanMark()) return; if(WR.marks[WR.month]) delete WR.marks[WR.month][unit]; await wrSaveMarks(); renderWaterRegister(); blToast('Mark removed'); }
+function wrEditRemovePhoto(i){ WR.edit.photos.splice(i, 1); var h = blEl('wre-photos'); if(h) h.innerHTML = wrEditPhotosHtml(); }
+async function wrEditAddFiles(files){
+  var ed = WR.edit; if(!ed) return;
+  var list = Array.from(files || []), host = blEl('wre-photos');
+  ed.busy = true; if(host) host.innerHTML = wrEditPhotosHtml();
+  for(var i = 0; i < list.length; i++){
+    if(ed.photos.length >= WR_MAX_PHOTOS){ blToast('Up to ' + WR_MAX_PHOTOS + ' photos per reading.', 'err'); break; }
+    try { var c = await publicCompressPhoto(list[i]); var small = await wrShrink(c.data); ed.photos.push({ name:c.name || list[i].name || 'meter.jpg', type:'image/jpeg', data:small }); }
+    catch(e){ blToast('Couldn’t read that photo.', 'err'); }
+  }
+  ed.busy = false; if(host) host.innerHTML = wrEditPhotosHtml();
+}
+// unit: house key or null (pick one in the dialog); editLatest: open the house's newest entry.
+async function wrEdit(unit, editLatest){
+  if(!wrCanMark()) return;
+  var data = wrRowsFor(WR.month), today = new Date().toISOString().slice(0, 10), existing = null;
+  if(unit && editLatest){ data.houses.concat(data.stray).forEach(function(x){ if(x.house.key === unit) existing = x.latest; }); }
+  if(existing && existing.kind === 'ticket') existing = null;      // tickets stay as they are; capture a fresh entry instead
+  var inMonth = today.slice(0, 7) === WR.month ? today : blLastOfMonth(WR.month);
+  WR.edit = { unit:unit, existing:existing, photos:existing && existing.photos ? existing.photos.slice() : [], busy:false };
+  var houses = wrHouseList(), outstanding = data.houses.filter(function(x){ return !x.received; }).map(function(x){ return x.house.key; });
+  var prevVal = unit ? wrValueOf(blAddMonths(WR.month, -1), unit) : null;
+  var body = (unit ? '' : '<div class="bl-f" style="margin-bottom:10px"><label class="bl-lbl" for="wre-unit">House</label><select id="wre-unit" class="bl-in">' + houses.map(function(hh){ return '<option value="' + blEsc(hh.key) + '"' + (outstanding[0] === hh.key ? ' selected' : '') + '>' + blEsc(hh.label) + (hh.owner ? ' · ' + blEsc(blNice(hh.owner)) : '') + (outstanding.indexOf(hh.key) < 0 ? ' ✓' : '') + '</option>'; }).join('') + '</select></div>')
+    + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="wre-value">Reading (kL)</label><input id="wre-value" type="number" step="0.0001" inputmode="decimal" class="bl-in" placeholder="digits on the meter" value="' + (existing && existing.value != null ? existing.value : '') + '"></div>'
+    + '<div class="bl-f"><label class="bl-lbl" for="wre-date">Received on</label><input id="wre-date" type="date" class="bl-in" value="' + blEsc((existing && existing.date) || inMonth) + '"></div></div>'
+    + (prevVal != null ? '<div class="bl-hint" style="margin-top:6px">Last month’s reading: <b>' + prevVal + '</b></div>' : '')
+    + '<div class="bl-f" style="margin-top:10px"><label class="bl-lbl">Photo of the meter</label><div id="wre-photos" style="display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 8px">' + wrEditPhotosHtml() + '</div>'
+    + '<div style="display:flex;gap:8px"><label class="bl-btn" style="flex:1" for="wre-cam">📷 Take photo</label><label class="bl-btn" style="flex:1" for="wre-gal">🖼 Choose</label></div>'
+    + '<input id="wre-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="wrEditAddFiles(this.files);this.value=\'\'"><input id="wre-gal" type="file" accept="image/*" multiple style="display:none" onchange="wrEditAddFiles(this.files);this.value=\'\'"></div>'
+    + '<div class="bl-f" style="margin-top:10px"><label class="bl-lbl" for="wre-note">Note (optional)</label><input id="wre-note" type="text" class="bl-in" placeholder="e.g. sent by WhatsApp" value="' + blEsc((existing && existing.note) || '') + '"></div>'
+    + (WR.tableMissing ? '<div class="warn" style="margin-top:10px">Photos can’t be saved until WATER_READINGS_SETUP.sql has been run — the reading and note will be.</div>' : '');
+  var picked = null, collect = function(){ picked = { unit:unit || (blEl('wre-unit') || {}).value || '', date:(blEl('wre-date') || {}).value || inMonth, value:_mrNum((blEl('wre-value') || {}).value), note:_uStr('wre-note') }; };
+  var buttons = [{ label:existing ? 'Save changes' : 'Save reading', kind:'pri', value:'save', onClick:collect }];
+  if(existing) buttons.push({ label:'Remove this reading', kind:'dng', value:'remove' });
+  buttons.push({ label:'Cancel', value:false });
+  var title = (unit ? 'House ' + unit : 'Add a reading') + ' · ' + blMonthName(WR.month);
+  var res = await blDialog({ title:title, body:body, cancel:false, buttons:buttons });
+  var ed = WR.edit; WR.edit = null;
+  if(res === 'remove'){ await wrRemoveEntry(ed.unit, existing); return; }
+  if(res !== 'save' || !picked) return;
+  if(!picked.unit){ blToast('Choose the house.', 'err'); return; }
+  await wrSaveEntry(picked, existing, ed.photos || []);
+}
+async function wrSaveEntry(p, existing, photos){
+  var month = WR.month, isRow = existing && (existing.kind === 'form' || existing.kind === 'manual') && existing.id;
+  var id = isRow ? existing.id : 'wr_m_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  var base = isRow ? Object.assign({}, (WR.cache[month] || {})[id] || {}) : { source:'manual', by:wrWho(), submittedAt:Date.now() };
+  var data = Object.assign(base, { unit:String(p.unit), month:month, date:p.date, value:p.value, note:p.note, photos:photos });
+  if(p.value != null) data.valueRaw = String(p.value);
+  if(isRow){ data.editedBy = wrWho(); data.editedAt = Date.now(); }
+  var ok = await wrUpsert(id, data);
+  if(ok){
+    WR.cache[month] = WR.cache[month] || {}; WR.cache[month][id] = data; WR.tableMissing = false;
+    if((WR.marks[month] || {})[p.unit]){ delete WR.marks[month][p.unit]; await wrSaveMarks(); }      // superseded tick
+    renderWaterRegister(); blToast('House ' + p.unit + (isRow ? ' updated' : ' recorded'), 'ok');
+  } else {
+    WR.tableMissing = true;
+    WR.marks[month] = WR.marks[month] || {};
+    WR.marks[month][p.unit] = { received:true, date:p.date, value:p.value, note:p.note, by:wrWho(), at:Date.now() };
+    await wrSaveMarks(); renderWaterRegister();
+    blToast('House ' + p.unit + ' ticked off' + (photos.length ? ' — the photo wasn’t saved (table not set up)' : ''), photos.length ? 'err' : 'ok');
+  }
+}
+async function wrRemoveEntry(unit, e){
+  if(!e) return;
+  var ok = await blConfirm('Remove this reading?', '<p>House ' + blEsc(unit) + ' goes back to outstanding for ' + blEsc(blMonthName(WR.month)) + (e.kind === 'form' ? ' (the email that was sent isn’t affected)' : '') + '.</p>', 'Remove', { danger:true });
+  if(!ok) return;
+  if(e.kind === 'mark'){ if(WR.marks[WR.month]) delete WR.marks[WR.month][unit]; await wrSaveMarks(); }
+  else if(e.id){ var row = Object.assign({}, (WR.cache[WR.month] || {})[e.id] || {}, { removed:true, removedBy:wrWho(), removedAt:Date.now(), photos:[] }); if(await wrUpsert(e.id, row)) WR.cache[WR.month][e.id] = row; else { blToast('Couldn’t remove it — try again.', 'err'); return; } }
+  renderWaterRegister(); blToast('Reading removed');
+}
 async function wrToBilling(uid, date, value){
   var u = UNITS[uid]; if(!u) return;
   var ok = await blConfirm('Add to Section ' + u.section + '’s meter readings?', '<p>Water <b>' + blEsc(String(value)) + '</b> on ' + blEsc(blDate(date, true)) + ' is added to the unit’s reading history, ready for the next invoice.</p>', 'Add');
   if(!ok) return;
   u.meterReadings = u.meterReadings || []; var row = u.meterReadings.filter(function(r){ return r.date === date; })[0];
   if(!row){ row = { date:date }; u.meterReadings.push(row); }
-  row.water = value; row.src = row.src || 'water form'; u.meterReadings.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); }); u.updated = Date.now();
+  row.water = value; row.src = row.src || 'water register'; u.meterReadings.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); }); u.updated = Date.now();
   await saveUnits(); blToast('Added to Section ' + u.section, 'ok');
 }
 function wrCopyReminder(){

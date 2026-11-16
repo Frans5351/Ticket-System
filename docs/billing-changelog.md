@@ -1,5 +1,17 @@
 # Billing changelog
 
+## v2.6 — residents see when their reading was last received
+- Water form (`?water` and the Water Reading tile): typing the unit number shows whether this month has been received and the date/reading of the last one on file, including readings captured by hand in the register. The unit is remembered on the device.
+- Form submissions now store every attached photo (shrunk) plus the full message, and are dated in local time.
+
+
+## v2.5 — capture water readings by hand
+- Water meter readings register: **Add reading** per house (or from the footer with a house picker): type the reading, set the date, attach up to 3 photos (camera or gallery), add a note. Stored alongside the form submissions.
+- Any entry can be edited (e.g. type in the reading from a photo that came through the form) or removed; the row shows who captured or edited it and the usage since last month.
+- Also reachable from the burger menu (Water readings) for admin, trustees and management.
+- Readings load one month at a time and stored photos are shrunk, so the screen stays fast.
+
+
 ## v2.4 — water meter readings
 - General `?report` form: the **Water Reading** tile now swaps to the water-meter form (unit, photo, reading, note) with a way back; same routing as `?water` (managing agent + Park Manor inbox, not trustees).
 - Both forms now also save the submission (unit, month, reading, note, up to 2 photos) to a new `water_readings` table — run `WATER_READINGS_SETUP.sql` once in Supabase.

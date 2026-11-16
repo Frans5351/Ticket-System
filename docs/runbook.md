@@ -179,10 +179,21 @@ note). Each submission is emailed to the managing agent + the Park Manor inbox
 `WATER_READINGS_SETUP.sql` once). Trustees, management and admin open the
 register from the Tracker header (💧 Readings) or Billing → ⋯ → Water meter
 readings: one row per house per month from Nov 2026, ticked automatically from
-the form, or marked by hand (date, reading, note). "Copy reminder" builds a
-WhatsApp message listing the outstanding houses; "Add to billing readings"
-pushes a value into the unit's meter history. Manual marks live in
-`settings.water_marks`.
+the form, or captured by hand with **Add reading** (reading, date, note, up to
+3 photos — stored as `source:'manual'` rows in the same table, shrunk to
+~1280px). Any entry, including one that came through the form, can be edited
+(the reading typed in from the photo, a photo added) or removed (soft delete).
+The burger menu also has a **Water readings** entry. "Copy reminder" builds a
+WhatsApp message listing the outstanding houses; "To billing" pushes a value
+into the unit's meter history. If the table hasn't been created, saving falls
+back to a tick in `settings.water_marks` (no photos) and the register says so.
+
+Residents see their own status on the water form: after typing the unit number
+(remembered on the device after the first submission) a panel shows whether
+this month's reading has been received, and the date, value and route of the
+last one on file — form submissions and hand-captured entries alike. Photos and
+notes are never shown publicly. Each form submission is stored whole: unit,
+date, reading, note and every attached photo (shrunk).
 
 ## Billing (levies)
 
