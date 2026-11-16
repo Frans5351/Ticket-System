@@ -1,5 +1,9 @@
 # Billing changelog
 
+## v2.11 — repair: complete folders
+- No app changes. The v2.10 zip carried only the changed files, and replacing the `functions/` folder with it in Finder removed the other 17 server functions, so the Netlify build failed (`Could not resolve "./_passkey-shared.js"`). This zip carries the **complete** `functions/`, `public/` and `docs/` folders, so replacing those folders is safe. It also restores `public/park-manor-entrance.jpg`, `public/deploy.txt` and the architecture docs that went missing the same way.
+- From now on every zip contains complete folders.
+
 ## v2.10 — residents see the photo on file
 - Water form status panel: the photo that goes with the reading shown (this month, else the last one) appears beside the date and reading; tap to enlarge. Served from the copy in the database (Drive files are private).
 
