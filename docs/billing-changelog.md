@@ -1,5 +1,10 @@
 # Billing changelog
 
+## v2.16 — Water readings list shows the newest reading, and all of them
+- **Fix:** a house's entry is now chosen by the reading's own date. Before, a reading typed on the Billing meters tab (e.g. dated the 8th) could sit on top of a photo the resident sent later, because Billing readings were time-stamped when they were copied into the list rather than when they were taken. On the same day, a reading sent with a photo ranks above the Billing copy.
+- **Every reading of the month is shown** under the house ("Also this month"), each with its date, reading, how it arrived, photo thumbnails and Drive link — not just a count. Any of them can be edited or removed (Billing-tab readings are changed in Billing).
+- **Fresh every time:** opening Water readings always reloads from the database, so readings that came in while the app was open appear without pressing ↻.
+
 ## v2.15 — residents can get a copy of their water reading by email
 - Water reading form (`?water` and the Water Reading tile): new optional step 4, **Email me a copy**. If an address is filled in, the resident is emailed their reading as a record — unit, date and time received, what they typed, and the photo attached. The address is remembered on that device.
 - The copy is a separate email (`functions/send-edit-link.js`), not a CC, so the managing agent's addresses aren't shown to the resident. Replies to it go to the Park Manor inbox. The agent's email still names the resident's address and replies from the agent go straight to them.

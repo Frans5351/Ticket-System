@@ -6694,6 +6694,8 @@ body.bl-ro #unit-modal .bl-in:disabled{opacity:1;-webkit-text-fill-color:current
 /* ═══ Billing v2 — charge schedule, invoice lifecycle, monthly run, settings ═══ */
 #binv-modal{z-index:730}#run-modal{z-index:710}#bset-modal{z-index:715}#plan-modal{z-index:712}#wr-modal{z-index:705}
 #wr-modal .bl-lr-more .row b{font-weight:600}
+#wr-modal .bl-lr-more .row>span:first-child{flex:none;white-space:nowrap}
+#wr-modal .bl-lr-more .row>b{min-width:0;overflow-wrap:anywhere}
 .bl-qrow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border)}
 .bl-qrow:first-of-type{border-top:none}
 .bl-qrow .who b{display:block;font:600 13px var(--sans);color:var(--text2)}
@@ -10519,6 +10521,29 @@ function wrHouseList(){
   }
   var out = []; for(var i = 1; i <= WR_HOUSES; i++) out.push({ key:String(i), label:'House ' + i, owner:'' }); return out;
 }
+function wrEntryTime(e){ return (e.kind === 'billing' || e.via === 'billing') ? 0 : (Number(e.submittedAt) || 0); }
+function wrEntryCmp(a, b){ return String(b.date || '').localeCompare(String(a.date || '')) || (wrEntryTime(b) - wrEntryTime(a)); }
+function wrHow(e){
+  return e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test, not emailed' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '')
+    : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '')
+    : e.kind === 'billing' ? '📥 entered on the Billing meters tab'
+    : e.via === 'drive' ? '📁 photo added in the Drive folder · picked up by ' + (e.by || 'admin')
+    : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
+}
+// One of the other readings a house has this month (the newest is shown in full above it).
+function wrEntryMini(e, k, canMark){
+  var photos = (e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border2);cursor:pointer;flex:none" onclick="wrPhoto(\'' + blEsc(e.id || '') + '\',' + i + ')">'; }).join('');
+  var drive = (e.driveFiles || []).map(function(f){ return '<a href="' + blEsc(f.url) + '" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">📁 ' + blEsc(f.name) + '</a>'; }).join(' · ');
+  var editable = canMark && e.id && (e.kind === 'form' || e.kind === 'manual') && e.via !== 'billing';      // Billing-tab readings are changed in Billing
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border2)">'
+    + (photos ? '<div style="display:flex;gap:6px;flex:none">' + photos + '</div>' : '')
+    + '<div style="flex:1;min-width:0;overflow-wrap:anywhere"><div><b>' + blEsc(blDate(e.date || '', true)) + '</b> · ' + (e.value != null ? '<b>' + blEsc(String(e.value)) + ' kL</b>' : (e.ai && e.ai.value != null ? 'photo reads ' + blEsc(String(e.ai.value)) : 'reading not typed in')) + '</div>'
+    + '<div style="color:var(--muted);font-size:12px">' + blEsc(wrHow(e)) + '</div>'
+    + (e.note ? '<div style="color:var(--muted);font-size:12px">“' + blEsc(e.note) + '”</div>' : '')
+    + (drive ? '<div style="font-size:12px">' + drive + '</div>' : '') + '</div>'
+    + (editable ? '<button type="button" class="bl-btn sm" style="flex:none" aria-label="Edit this reading" onclick="wrEdit(\'' + blEsc(k) + '\',\'' + blEsc(e.id) + '\')">✏️</button>' : '')
+    + '</div>';
+}
 function wrRowsFor(month){
   var byUnit = {};
   var add = function(unit, e){ var k = wrUnitKey(unit); if(!k) return; (byUnit[k] = byUnit[k] || []).push(e); };
@@ -10530,8 +10555,8 @@ function wrRowsFor(month){
   if(typeof TICKETS !== 'undefined'){
     Object.values(TICKETS || {}).forEach(function(t){ if(!t || t.category !== 'Water Reading') return; var d = String(t.dateOpen || (t.added ? new Date(t.added).toISOString().slice(0, 10) : '')); if(d.slice(0, 7) !== month) return; add(t.unit, { kind:'ticket', id:t.id, date:d, submittedAt:t.added || 0, value:wrParseValue(t.desc) != null ? wrParseValue(t.desc) : wrParseValue(t.title), note:t.title, ticketNumber:t.ticketNumber }); });
   }
-  var houses = wrHouseList().map(function(h){ var es = (byUnit[h.key] || []).sort(function(a, b){ return (b.submittedAt || 0) - (a.submittedAt || 0); }); delete byUnit[h.key]; return { house:h, entries:es, received:es.length > 0, latest:es[0] || null }; });
-  var stray = Object.keys(byUnit).map(function(k){ return { house:{ key:k, label:'Unit ' + k, owner:'', unknown:true }, entries:byUnit[k], received:true, latest:byUnit[k][0] }; });
+  var houses = wrHouseList().map(function(h){ var es = (byUnit[h.key] || []).sort(wrEntryCmp); delete byUnit[h.key]; return { house:h, entries:es, received:es.length > 0, latest:es[0] || null }; });
+  var stray = Object.keys(byUnit).map(function(k){ var es = byUnit[k].sort(wrEntryCmp); return { house:{ key:k, label:'Unit ' + k, owner:'', unknown:true }, entries:es, received:true, latest:es[0] }; });
   return { houses:houses, stray:stray };
 }
 function wrValueOf(month, key){ var d = wrRowsFor(month), hit = null; d.houses.forEach(function(x){ if(x.house.key === key) x.entries.forEach(function(e){ if(hit == null && e.value != null) hit = Number(e.value); }); }); return hit; }
@@ -10539,7 +10564,7 @@ async function openWaterRegister(month){
   if(!wrCanOpen()){ blToast('Only trustees, management and admin can see the readings register.', 'err'); return; }
   if(typeof blEnsureBillingLoaded === 'function'){ try { await blEnsureBillingLoaded(); } catch(e){} }
   WR.month = month || WR.month || new Date().toISOString().slice(0, 7); if(WR.month < WR_FIRST_MONTH) WR.month = WR_FIRST_MONTH;
-  await Promise.all([wrLoad(), wrConfig()]);
+  await Promise.all([wrLoad(true), wrConfig()]);     // fresh every time: readings may have come in since it was last open
   WR.open = true;
   var m = blEl('wr-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
   if(!WR.nav){ WR.nav = true; blNavPush(function(){ WR.nav = false; closeWaterRegister(true); }); }
@@ -10577,7 +10602,7 @@ function renderWaterRegister(){
 }
 function wrHouseRow(x, canMark, prevMonth){
   var e = x.latest, k = x.house.key;
-  var src = !e ? '' : e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test, not emailed' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '') : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '') : e.kind === 'billing' ? '📥 entered on the Billing meters tab' : e.via === 'drive' ? '📁 photo added in the Drive folder · picked up by ' + (e.by || 'admin') : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
+  var src = e ? wrHow(e) : '';
   var prevVal = e && e.value != null ? wrValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
   var ai = e && e.ai, drive = (e && e.driveFiles) || [], aiHtml = '';
   if(ai && ai.value != null){
@@ -10592,10 +10617,9 @@ function wrHouseRow(x, canMark, prevMonth){
   if(e){
     more = '<div class="bl-lr-more" style="display:block;margin-top:8px">'
       + '<div class="row"><span>Reading</span><b>' + (e.value != null ? blEsc(String(e.value)) + ' kL' + (used != null ? ' <span style="font-weight:500;color:' + (used < 0 ? 'var(--bl-owe)' : 'var(--muted)') + '">· ' + used + ' used since ' + blEsc(blMonthName(prevMonth)) + '</span>' : '') : (e.valueRaw ? blEsc(e.valueRaw) : '<span style="color:var(--bl-owe);font-weight:500">not typed in yet</span>')) + '</b></div>'
-      + '<div class="row"><span>Received</span><b>' + blEsc(blDate(e.date || '', true)) + '</b></div>'
+      + '<div class="row"><span>Received</span><b>' + blEsc(blDate(e.date || '', true)) + (x.entries.length > 1 ? ' <span style="font-weight:500;color:var(--muted)">· latest of ' + x.entries.length + '</span>' : '') + '</b></div>'
       + '<div class="row"><span>How</span><b style="text-align:right">' + blEsc(src) + '</b></div>'
       + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
-      + (x.entries.length > 1 ? '<div class="row"><span>Also</span><b>' + (x.entries.length - 1) + ' earlier submission' + (x.entries.length > 2 ? 's' : '') + ' this month</b></div>' : '')
       + (e.copyTo ? '<div class="row"><span>Copy</span><b style="text-align:right;font-weight:500;overflow-wrap:anywhere">' + (e.copySent ? '✉️ emailed to ' : '⚠️ not delivered to ') + blEsc(e.copyTo) + '</b></div>' : '')
       + driveHtml
       + (photos ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + photos + '</div>' : '')
@@ -10603,6 +10627,7 @@ function wrHouseRow(x, canMark, prevMonth){
       + (canMark ? '<div class="bl-doc-acts"><button type="button" class="bl-btn sm" onclick="wrEdit(\'' + blEsc(k) + '\',true)">✏️ Edit' + (e.value == null ? ' · type the reading' : '') + '</button>'
         + (canFile ? '<button type="button" class="bl-btn sm" onclick="wrFileExisting(\'' + blEsc(e.id) + '\')">' + (WR.cfg.drive && !drive.length ? '📁 Save to Drive' + (WR.cfg.read && !ai ? ' &amp; read' : '') : '🔍 Read the photo') + '</button>' : '')
         + (e.value != null && x.house.uid && typeof blRO === 'function' && !blRO() ? '<button type="button" class="bl-btn sm" onclick="wrToBilling(\'' + x.house.uid + '\',\'' + blEsc(e.date || '') + '\',' + Number(e.value) + ')">📥 To billing</button>' : '') + '</div>' : '')
+      + (x.entries.length > 1 ? '<div style="margin-top:12px"><div style="font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Also this month · ' + (x.entries.length - 1) + '</div>' + x.entries.slice(1).map(function(o){ return wrEntryMini(o, k, canMark); }).join('') + '</div>' : '')
       + '</div>';
   } else if(canMark){
     more = '<div class="bl-doc-acts" style="margin-top:8px"><button type="button" class="bl-btn sm pri" onclick="wrEdit(\'' + blEsc(k) + '\')">＋ Add reading</button></div>';
@@ -10636,7 +10661,7 @@ async function wrEditAddFiles(files){
 async function wrEdit(unit, editLatest){
   if(!wrCanMark()) return;
   var data = wrRowsFor(WR.month), today = new Date().toISOString().slice(0, 10), existing = null;
-  if(unit && editLatest){ data.houses.concat(data.stray).forEach(function(x){ if(x.house.key === unit) existing = x.latest; }); }
+  if(unit && editLatest){ data.houses.concat(data.stray).forEach(function(x){ if(x.house.key !== unit) return; existing = typeof editLatest === 'string' ? (x.entries.filter(function(o){ return o.id === editLatest; })[0] || null) : x.latest; }); }
   if(existing && (existing.kind === 'ticket' || existing.kind === 'billing')) existing = null;      // tickets stay as they are; capture a fresh entry instead
   var inMonth = today.slice(0, 7) === WR.month ? today : blLastOfMonth(WR.month);
   WR.edit = { unit:unit, existing:existing, photos:existing && existing.photos ? existing.photos.slice() : [], busy:false };
