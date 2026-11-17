@@ -10290,17 +10290,19 @@ function wrPubUnitInput(){ clearTimeout(_wrLookupT); _wrLookupT = setTimeout(wrP
 async function wrPubFetch(unit){
   var out = [], ok = true;
   try {
-    var r = await supa.from('water_readings').select('id, unit:data->>unit, month:data->>month, date:data->>date, value:data->value, source:data->>source, removed:data->removed, submittedAt:data->submittedAt, photoName:data->photos->0->>name').eq('data->>unit', unit).order('updated_at', { ascending:false }).limit(36);
+    var r = await supa.from('water_readings').select('id, unit:data->>unit, month:data->>month, date:data->>date, value:data->value, source:data->>source, removed:data->removed, submittedAt:data->submittedAt, via:data->>via, photoName:data->photos->0->>name').eq('data->>unit', unit).order('updated_at', { ascending:false }).limit(36);
     if(r && r.error) ok = false;
     else ((r && r.data) || []).forEach(function(row){
       var d = row.data || row;
       if(typeof idBelongsToCurrentScheme === 'function' && row.id && !idBelongsToCurrentScheme(row.id)) return;
       if(d.removed === true || d.removed === 'true' || wrUnitKey(d.unit) !== unit || !d.month) return;
-      out.push({ id:row.id || '', hasPhoto:!!(d.photoName || (d.photos && d.photos[0])), month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', at:Number(d.submittedAt) || 0 });
+      out.push({ id:row.id || '', hasPhoto:!!(d.photoName || (d.photos && d.photos[0])), month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', via:d.via || '', at:d.via === 'billing' ? 0 : (Number(d.submittedAt) || 0) });
     });
   } catch(e){ ok = false; }
   // Only the water_readings table counts here. (Older tick marks kept in settings —
   // some of them copied from Davies invoice dates — are deliberately not shown.)
+  // Newest reading first by its own date. A reading typed on the Billing meters tab has no real
+  // arrival time (at = 0 above), so on the same day a reading that came with a photo ranks above it.
   out.sort(function(a, b){ return (b.date || '').localeCompare(a.date || '') || b.at - a.at; });
   return ok ? out : null;
 }
@@ -10313,13 +10315,20 @@ async function wrPubLookup(){
   if(seq !== _wrLookupSeq) return;                // a newer keystroke won
   wrPubRender({ unit:unit, list:list });
   // The photo that goes with the reading shown (this month's, else the last one).
-  var shown = wrPubShown(list);
-  if(shown && shown.hasPhoto && shown.id){
-    var src = await wrPubPhoto(shown.id);
+  var shown = wrPubShown(list), pe = wrPubPhotoEntry(list);
+  if(pe){
+    var src = await wrPubPhoto(pe.id);
     if(seq !== _wrLookupSeq) return;
     var ph = document.getElementById('wr-last-photo');
-    if(ph) ph.innerHTML = src ? '<button type="button" onclick="wrPubZoom(this.firstChild.src)" aria-label="Enlarge the photo we have on file" style="padding:0;border:none;background:none;cursor:zoom-in;display:block"><img src="' + src + '" alt="Meter photo on file" style="width:92px;height:92px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);display:block"></button><div style="font-size:10.5px;color:var(--muted);font-family:var(--sans);text-align:center;margin-top:3px">tap to enlarge</div>' : '';
+    if(ph) ph.innerHTML = src ? '<button type="button" onclick="wrPubZoom(this.firstChild.src)" aria-label="Enlarge the photo we have on file" style="padding:0;border:none;background:none;cursor:zoom-in;display:block"><img src="' + src + '" alt="Meter photo on file" style="width:92px;height:92px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);display:block"></button><div style="font-size:10.5px;color:var(--muted);font-family:var(--sans);text-align:center;margin-top:3px;line-height:1.3">' + (pe !== shown && pe.date ? 'photo from ' + blEsc(blDate(pe.date)) + '<br>' : '') + 'tap to enlarge</div>' : '';
   }
+}
+// The photo to show beside the reading: the shown reading's own, or — when that one came
+// without a photo (typed in by the trustees) — the newest photo on file for the same month.
+function wrPubPhotoEntry(list){
+  var s = wrPubShown(list); if(!s) return null;
+  if(s.hasPhoto && s.id) return s;
+  return list.filter(function(e){ return e.month === s.month && e.hasPhoto && e.id; })[0] || null;
 }
 function wrPubShown(list){ if(!list || !list.length) return null; var thisMonth = wrLocalDate().slice(0, 7); return list.filter(function(e){ return e.month === thisMonth; })[0] || list[0]; }
 // Fetch just the first photo of one reading (the list query leaves photos out to stay light).
@@ -10342,7 +10351,7 @@ function wrPubZoom(src){
 function wrLongMonth(ym){ var p = String(ym || '').split('-'), N = ['January','February','March','April','May','June','July','August','September','October','November','December']; return p.length < 2 ? '' : N[Number(p[1]) - 1] + ' ' + p[0]; }
 function wrPubRender(st){
   var host = document.getElementById('wr-last'); if(!host) return;
-  var shown = st && st.list ? wrPubShown(st.list) : null, slot = (shown && shown.hasPhoto && shown.id) ? '<div id="wr-last-photo" style="flex:0 0 92px;min-height:92px"><div style="width:92px;height:92px;border-radius:10px;background:rgba(127,127,127,.15)"></div></div>' : '';
+  var shown = st && st.list ? wrPubShown(st.list) : null, slot = (st && st.list && wrPubPhotoEntry(st.list)) ? '<div id="wr-last-photo" style="flex:0 0 92px;min-height:92px"><div style="width:92px;height:92px;border-radius:10px;background:rgba(127,127,127,.15)"></div></div>' : '';
   var box = function(bg, bd, inner){ return '<div style="border:1px solid ' + bd + ';background:' + bg + ';border-radius:12px;padding:12px 14px;font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--text2);display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0">' + inner + '</div>' + slot + '</div>'; };
   if(!st){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Type your unit number to see when we last received your reading.</div>'; return; }
   if(st.loading){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Checking what we have for Unit ' + blEsc(st.unit) + '…</div>'; return; }

@@ -1,5 +1,9 @@
 # Billing changelog
 
+## v2.18 — the unit lookup shows the photo whenever one is on file
+- **Fix:** when a house had two readings on the same day — one typed on the Billing meters tab and one that came with a photo — the residents' lookup showed the Billing one, which has no photo. It now ranks the same way as the Water readings list: by the reading's date, and on the same day the one that arrived with a photo first.
+- If the newest reading was typed in without a photo, the lookup shows the most recent photo on file for that month beside it, captioned with the photo's date.
+
 ## v2.17 — "the managing agent has this reading" can be set by hand
 - Each reading in Water readings now has an **Agent** line: *emailed by the app*, *sent outside the app · marked by <name>*, or *not sent yet*.
 - Edit a reading (the latest or any earlier one) and tick **The managing agent has this reading** if it was sent to them another way, e.g. by email or WhatsApp. Untick to undo. Readings the app emailed itself are shown ticked and locked.
