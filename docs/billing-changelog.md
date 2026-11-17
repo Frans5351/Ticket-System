@@ -1,5 +1,11 @@
 # Billing changelog
 
+## v2.15 — residents can get a copy of their water reading by email
+- Water reading form (`?water` and the Water Reading tile): new optional step 4, **Email me a copy**. If an address is filled in, the resident is emailed their reading as a record — unit, date and time received, what they typed, and the photo attached. The address is remembered on that device.
+- The copy is a separate email (`functions/send-edit-link.js`), not a CC, so the managing agent's addresses aren't shown to the resident. Replies to it go to the Park Manor inbox. The agent's email still names the resident's address and replies from the agent go straight to them.
+- Test mode (email box unticked): the managing agent and Park Manor inbox are skipped as before, but a copy still goes to the address typed, so the copy can be tested on its own.
+- The page says whether the copy went out; the register shows "Copy: emailed to …" on the reading. A copy that can't be delivered never blocks the reading itself.
+
 ## v2.14 — photos dropped into Drive are picked up; status panel uses only the readings table
 - **Photos added straight into the Drive folder.** Water readings checks `Park Manor Water Meter Readings / <Month Year>` each time it is opened (and on ↻). Photos it doesn't know yet are listed with **Add them to the list**: the house comes from the file name (`Unit 3.jpg`), the date from when the file was added, the meter is read from the photo for confirmation, and the Drive file is linked (nothing is uploaded twice). Files with other names can be assigned to a house or skipped. Needs version 3 of the Google script (`docs/water-readings-drive.gs`: paste, put the password back, Deploy → Manage deployments → New version).
 - **Residents' status panel** ("when did you last get my reading?") now reads only the `water_readings` table. Old tick marks kept in settings — some copied from Davies invoice dates such as 1 November — are no longer shown.

@@ -98,6 +98,9 @@ export default async function handler(req) {
   const isWaterReading = category === "Water Reading";
   const ticketNumber = body.ticketNumber;
   const notifyOnly = !!body.notifyOnly;
+  // Water readings only: skip the managing-agent email (used when testing the
+  // form), leaving just the resident's own copy if they gave an address.
+  const skipAgent = !!body.skipAgent && isWaterReading;
   // Optional Body Corporate inbox — added to the trustee/management notification
   // so that inbox receives a copy of every new-ticket email.
   const bcInbox = (body.bcInbox || "").toString().trim();
@@ -171,6 +174,63 @@ export default async function handler(req) {
       // surface the failure. Still attempt the agent notification below.
       // (Fall through; the final response reports both outcomes.)
     }
+  }
+
+  // ── 1b) Water meter reading: the resident's own copy ─────────────────────
+  // If the resident typed an email address on the water form they get their
+  // reading back as a record: unit, when it was sent, what they typed, and the
+  // photo(s) attached. Replies go to the Park Manor inbox.
+  let copyResult = null;
+  if (isWaterReading && notifyOnly && looksLikeEmail(to)) {
+    let when = "";
+    try {
+      when = new Intl.DateTimeFormat("en-GB", { timeZone: process.env.WATER_TZ || "Africa/Johannesburg", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+    } catch (_) {}
+    const cLines = [
+      "Hi,",
+      "",
+      `Thanks — Park Manor has received your water meter reading${unit ? ` for Unit ${unit}` : ""}.`,
+      "",
+      unit ? `Unit:      ${unit}` : null,
+      when ? `Received:  ${when}` : null,
+      "",
+      "What you sent:",
+      desc || "(photo only)",
+      "",
+      emailAttachments.length ? `Your photo${emailAttachments.length === 1 ? " is" : "s are"} attached.` : null,
+      "",
+      "Keep this email as your record. If something is wrong, simply send another reading:",
+      APP_URL + "/?water",
+      "",
+      "Park Manor Body Corporate",
+    ].filter((l) => l !== null);
+    const copyHtml = emailShell(`
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#177a4c;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">💧 Water meter reading received</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:#3a4354;margin-bottom:6px">Thanks \u2014 we\u2019ve got your reading${unit ? " for Unit " + escH(unit) : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#5c6675;line-height:1.6;margin-bottom:14px">This is your copy of what you sent to Park Manor. Keep it as your record.</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:14px">
+        ${detailRow("Unit", unit)}
+        ${detailRow("Received", when)}
+      </table>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8b96a5;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">What you sent</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a4354;line-height:1.7;background:#f5f7fa;border:1px solid #e4e9ef;border-radius:9px;padding:14px 16px">${escH(desc || "(photo only)").replace(/\n/g, "<br>")}</div>
+      ${emailAttachments.length ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#177a4c;margin-top:12px">\ud83d\udcce Your photo${emailAttachments.length === 1 ? " is" : "s are"} attached to this email.</div>` : ""}
+      ${emailButton(APP_URL + "/?water", "Send another reading")}
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">Something wrong? Just send another reading \u2014 the latest one counts.</div>
+    `);
+    copyResult = await sendEmail({
+      to: [to],
+      subject: `💧 Your water meter reading${unit ? ` — Unit ${unit}` : ""} (Park Manor)`,
+      text: cLines.join("\n"),
+      html: copyHtml,
+      replyTo: looksLikeEmail(bareAddress(body.bcInbox || "")) ? bareAddress(body.bcInbox) : undefined,
+      attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),
+    });
+    if (!copyResult.ok) console.error("send-edit-link: water COPY to resident failed:", copyResult.status, copyResult.msg);
+    else console.log("send-edit-link: water copy sent to resident, id:", copyResult.id);
+  }
+  if (skipAgent) {
+    return jsonResponse(200, { ok: true, agentNotified: false, agentSkipped: true, residentCopy: !!(copyResult && copyResult.ok), residentCopyError: copyResult && !copyResult.ok ? String(copyResult.msg || "failed").slice(0, 200) : "" });
   }
 
   // ── 2) Managing-agent notification (every submission) ────────────────────
@@ -275,7 +335,7 @@ export default async function handler(req) {
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a4354;line-height:1.7;background:#f5f7fa;border:1px solid #e4e9ef;border-radius:9px;padding:14px 16px">${escH(desc || "(none provided)").replace(/\n/g, "<br>")}</div>
       ${attNote}${skipNote}
       ${emailButton(APP_URL, "Open the Park Manor Tracker")}
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">${looksLikeEmail(to) ? "The resident is CC\u2019d on this email \u2014 replying goes directly to them." : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">${looksLikeEmail(to) ? (isWaterReading ? "The resident was emailed their own copy \u2014 replying goes directly to them." : "The resident is CC\u2019d on this email \u2014 replying goes directly to them.") : ""}</div>
     `);
     agentResult = await sendEmail({
       to: agentList,
@@ -285,7 +345,8 @@ export default async function handler(req) {
       // The resident is CC'd so they automatically receive the same report
       // copy the agent gets (their private edit link is NOT in this email
       // by design — it stays theirs alone via the opt-in email / WhatsApp).
-      cc: looksLikeEmail(to) ? [to] : undefined,
+      // (Water readings: the resident gets their own copy above instead of a CC.)
+      cc: looksLikeEmail(to) && !isWaterReading ? [to] : undefined,
       // Let the agent reply straight to the resident when we have their address.
       replyTo: looksLikeEmail(to) ? to : undefined,
       attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),
@@ -308,5 +369,7 @@ export default async function handler(req) {
     ok: true,
     id: residentResult && residentResult.id,
     agentNotified: !!(agentResult && agentResult.ok),
+    residentCopy: !!(copyResult && copyResult.ok),
+    residentCopyError: copyResult && !copyResult.ok ? String(copyResult.msg || "failed").slice(0, 200) : "",
   });
 }

@@ -10108,7 +10108,7 @@ function wrEmailToggle(){
   var el = document.getElementById('wr-email'), btn = document.getElementById('pub-submit-btn'), n = document.getElementById('wr-email-note');
   var on = !el || el.checked;
   if(btn) btn.textContent = on ? '💧 Send my reading' : '🧪 Save test reading (no email)';
-  if(n) n.innerHTML = on ? 'The managing agent and the Park Manor inbox will get this reading by email, as normal.' : '<b style="color:var(--amber,#d9a441)">Test mode — nobody will be emailed.</b> The reading is still saved, the photo filed in Google Drive and the meter read from it.';
+  if(n) n.innerHTML = on ? 'The managing agent and the Park Manor inbox will get this reading by email, as normal.' : '<b style="color:var(--amber,#d9a441)">Test mode — the managing agent and the Park Manor inbox will not be emailed.</b> The reading is still saved, the photo filed in Google Drive and the meter read from it. If you fill in “Email me a copy”, that copy is still sent.';
 }
 function renderWaterReadingForm(opts){
   opts = opts || {};
@@ -10137,12 +10137,16 @@ function renderWaterReadingForm(opts){
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>The reading</b><i>optional if the photo is clear</i></span></div>'
       +   lbl('Digits shown on the meter') + '<input id="wr-value" type="text" inputmode="decimal" placeholder="e.g. 03457.2" maxlength="20" style="' + inputCss + '">'
       +   lbl('Anything to add? (optional)') + '<textarea id="wr-note" rows="2" placeholder="e.g. the meter is hard to reach, or the date you read it" maxlength="500" style="' + inputCss + ';resize:vertical"></textarea></div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">4</span><span><b>Email me a copy</b><i>optional</i></span></div>'
+      +   lbl('Your email address') + '<input id="wr-copy" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" maxlength="120" style="' + inputCss + '">'
+      +   '<div style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin-top:6px">We’ll email you your reading and photo as a record. Leave it empty if you don’t want one.</div></div>'
       + (wrCanSkipEmail() ? '<div class="pub-card" style="border-style:dashed"><label for="wr-email" style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer"><input id="wr-email" type="checkbox" checked onchange="wrEmailToggle()" style="width:22px;height:22px;flex:none;accent-color:var(--accent)"><span style="font-size:14px;font-weight:600;color:var(--text2);font-family:var(--sans)">Email this reading to the managing agent</span></label><div id="wr-email-note" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin-top:6px"></div><div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.5;margin-top:6px">Shown only when you are signed in on this device, or on a link ending in &amp;test. Residents don’t see it.</div></div>' : '')
       + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
       + '<div id="pub-submit-bar"><button id="pub-submit-btn" onclick="submitWaterReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer">💧 Send my reading</button></div>';
     var uEl = document.getElementById('wr-unit'), remembered = '';
     try { remembered = localStorage.getItem('pm_wr_unit') || ''; } catch(e){}
     wrEmailToggle();
+    try { var cEl = document.getElementById('wr-copy'), cSaved = localStorage.getItem('pm_wr_email') || ''; if(cEl && cSaved) cEl.value = cSaved; } catch(e){}
     if(uEl && remembered){ uEl.value = remembered; wrPubLookup(); }
     else { wrPubRender(null); if(uEl && !opts.embedded) setTimeout(function(){ uEl.focus(); }, 60); }
     if(opts.embedded) window.scrollTo(0, 0);
@@ -10160,7 +10164,9 @@ async function submitWaterReading(){
   var note = (document.getElementById('wr-note').value || '').trim();
   var valueRaw = ((document.getElementById('wr-value') || {}).value || '').trim();
   var files = (window._pubFiles || []).filter(function(f){ return !!f; });
+  var copyTo = ((document.getElementById('wr-copy') || {}).value || '').trim();
   if(!unit){ showPublicErr('Please enter your unit number.'); return; }
+  if(copyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(copyTo)){ showPublicErr('That email address doesn’t look right — please check it, or leave it empty.'); return; }
   if(!files.length && !valueRaw && !note){ showPublicErr('Please add a photo of your meter (or type the reading).'); return; }
   if(files.length > MAX_PUBLIC_PHOTOS){ showPublicErr('A maximum of ' + MAX_PUBLIC_PHOTOS + ' photos can be attached.'); return; }
   var btn = document.getElementById('pub-submit-btn');
@@ -10178,18 +10184,23 @@ async function submitWaterReading(){
     if(valueRaw) descLines.push('Reading: ' + valueRaw);
     if(note) descLines.push(note);
     if(!descLines.length) descLines.push('(Photo of meter submitted — see attachment.)');
-    if(sendEmail){
+    var copySent = false, copyErr = '';
+    if(sendEmail || copyTo){
+      // Normal: the managing agent + Park Manor inbox, and the resident's own copy if they gave an address.
+      // Test (box unticked): only the copy, and only if an address was typed.
       var r = await fetch('/api/send-edit-link', { method:'POST', headers:{ 'Content-Type':'application/json' },
-        body:JSON.stringify({ notifyOnly:true, title:'Water meter reading', desc:descLines.join('\n'), unit:unit, reporter:'', phone:'', email:'', category:'Water Reading',
+        body:JSON.stringify({ notifyOnly:true, skipAgent:!sendEmail, title:'Water meter reading', desc:descLines.join('\n'), unit:unit, reporter:'', phone:'', email:copyTo, category:'Water Reading',
           bcInbox:(typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '', attachments:notifyAtt }) });
       if(!r.ok) throw new Error('send failed: ' + r.status);
+      try { var rj = await r.json(); copySent = !!(rj && rj.residentCopy); copyErr = (rj && rj.residentCopyError) || ''; } catch(e){}
     }
+    try { if(copyTo) localStorage.setItem('pm_wr_email', copyTo); else localStorage.removeItem('pm_wr_email'); } catch(e){}
     // Record it for the register (best effort — the email is the thing that must not fail).
     try {
       var now = new Date(), id = 'wr_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
       var today = wrLocalDate(now);
       try { localStorage.setItem('pm_wr_unit', wrUnitKey(unit)); } catch(e){}
-      await sbUpsert('water_readings', id, { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:sendEmail, emailSkipped:!sendEmail,
+      await sbUpsert('water_readings', id, { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:sendEmail, emailSkipped:!sendEmail, copyTo:copyTo, copySent:copySent,
         value:wrParseValue(valueRaw) != null ? wrParseValue(valueRaw) : wrParseValue(note), valueRaw:valueRaw, note:note, source:'form',
         photos:await Promise.all(notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await wrShrink(a.dataUrl) }; })),
         photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) });
@@ -10208,7 +10219,8 @@ async function submitWaterReading(){
     document.getElementById('public-view-content').innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">' + (sendEmail ? 'Reading sent' : 'Test reading saved') + '</div>'
-      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">' + (sendEmail ? 'Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.' : '🧪 <b>No email was sent.</b> The reading for <b>Unit ' + escHtml(unit) + '</b> is saved on this month’s list.') + '</div>'
+      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">' + (sendEmail ? 'Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.' : '🧪 <b>The managing agent was not emailed.</b> The reading for <b>Unit ' + escHtml(unit) + '</b> is saved on this month’s list.') + '</div>'
+      + (copyTo ? '<div style="font-size:13px;font-family:var(--sans);line-height:1.6;max-width:420px;margin:10px auto 0;overflow-wrap:anywhere;color:' + (copySent ? 'var(--text2)' : 'var(--bl-owe,#b4570f)') + '">' + (copySent ? '✉️ A copy has been emailed to <b>' + escHtml(copyTo) + '</b>.' : '⚠️ We couldn’t email your copy to ' + escHtml(copyTo) + (copyErr ? ' (' + escHtml(copyErr) + ')' : '') + ' — your reading itself was received.') + '</div>' : '')
       + '<div id="wr-filed" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.6;max-width:420px;margin:12px auto 0;overflow-wrap:anywhere">' + (files.length ? (sendEmail ? 'Filing your photo in the Park Manor records… you can close this page.' : 'Filing the photo in Google Drive and reading the meter… keep this page open to see the result.') : '') + '</div></div>'
       + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap"><button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
       + '<button onclick="renderPublicReportForm()" style="padding:11px 22px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Report something else</button></div>';
@@ -10584,6 +10596,7 @@ function wrHouseRow(x, canMark, prevMonth){
       + '<div class="row"><span>How</span><b style="text-align:right">' + blEsc(src) + '</b></div>'
       + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
       + (x.entries.length > 1 ? '<div class="row"><span>Also</span><b>' + (x.entries.length - 1) + ' earlier submission' + (x.entries.length > 2 ? 's' : '') + ' this month</b></div>' : '')
+      + (e.copyTo ? '<div class="row"><span>Copy</span><b style="text-align:right;font-weight:500;overflow-wrap:anywhere">' + (e.copySent ? '✉️ emailed to ' : '⚠️ not delivered to ') + blEsc(e.copyTo) + '</b></div>' : '')
       + driveHtml
       + (photos ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + photos + '</div>' : '')
       + aiHtml
