@@ -10523,8 +10523,17 @@ function wrHouseList(){
 }
 function wrEntryTime(e){ return (e.kind === 'billing' || e.via === 'billing') ? 0 : (Number(e.submittedAt) || 0); }
 function wrEntryCmp(a, b){ return String(b.date || '').localeCompare(String(a.date || '')) || (wrEntryTime(b) - wrEntryTime(a)); }
+// Does the managing agent have this reading? Emailed by the app when it was sent,
+// or marked by hand afterwards (sent by email / WhatsApp outside the app).
+// null for entries where it doesn't apply (tickets, readings that live in Billing).
+function wrAgentState(e){
+  if(!e || !e.id || !(e.kind === 'form' || e.kind === 'manual') || e.via === 'billing') return null;
+  if(e.emailed === true) return { ok:true, app:true, text:'emailed by the app' };
+  if(e.agentSent) return { ok:true, text:'sent outside the app' + (e.agentSentBy ? ' · marked by ' + e.agentSentBy : '') };
+  return { ok:false, text:'not sent yet' + (e.emailSkipped ? ' (email was switched off)' : '') };
+}
 function wrHow(e){
-  return e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test, not emailed' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '')
+  return e.kind === 'form' ? '💧 sent via the form' + (e.emailSkipped ? ' · 🧪 test' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '')
     : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '')
     : e.kind === 'billing' ? '📥 entered on the Billing meters tab'
     : e.via === 'drive' ? '📁 photo added in the Drive folder · picked up by ' + (e.by || 'admin')
@@ -10539,6 +10548,7 @@ function wrEntryMini(e, k, canMark){
     + (photos ? '<div style="display:flex;gap:6px;flex:none">' + photos + '</div>' : '')
     + '<div style="flex:1;min-width:0;overflow-wrap:anywhere"><div><b>' + blEsc(blDate(e.date || '', true)) + '</b> · ' + (e.value != null ? '<b>' + blEsc(String(e.value)) + ' kL</b>' : (e.ai && e.ai.value != null ? 'photo reads ' + blEsc(String(e.ai.value)) : 'reading not typed in')) + '</div>'
     + '<div style="color:var(--muted);font-size:12px">' + blEsc(wrHow(e)) + '</div>'
+    + (function(){ var a = wrAgentState(e); return a ? '<div style="font-size:12px;color:' + (a.ok ? 'var(--muted)' : 'var(--bl-owe)') + '">' + (a.ok ? '✉️ Agent: ' : '⚠️ Agent: ') + blEsc(a.text) + '</div>' : ''; })()
     + (e.note ? '<div style="color:var(--muted);font-size:12px">“' + blEsc(e.note) + '”</div>' : '')
     + (drive ? '<div style="font-size:12px">' + drive + '</div>' : '') + '</div>'
     + (editable ? '<button type="button" class="bl-btn sm" style="flex:none" aria-label="Edit this reading" onclick="wrEdit(\'' + blEsc(k) + '\',\'' + blEsc(e.id) + '\')">✏️</button>' : '')
@@ -10619,6 +10629,7 @@ function wrHouseRow(x, canMark, prevMonth){
       + '<div class="row"><span>Reading</span><b>' + (e.value != null ? blEsc(String(e.value)) + ' kL' + (used != null ? ' <span style="font-weight:500;color:' + (used < 0 ? 'var(--bl-owe)' : 'var(--muted)') + '">· ' + used + ' used since ' + blEsc(blMonthName(prevMonth)) + '</span>' : '') : (e.valueRaw ? blEsc(e.valueRaw) : '<span style="color:var(--bl-owe);font-weight:500">not typed in yet</span>')) + '</b></div>'
       + '<div class="row"><span>Received</span><b>' + blEsc(blDate(e.date || '', true)) + (x.entries.length > 1 ? ' <span style="font-weight:500;color:var(--muted)">· latest of ' + x.entries.length + '</span>' : '') + '</b></div>'
       + '<div class="row"><span>How</span><b style="text-align:right">' + blEsc(src) + '</b></div>'
+      + (function(){ var a = wrAgentState(e); return a ? '<div class="row"><span>Agent</span><b style="text-align:right;font-weight:500;color:' + (a.ok ? 'var(--text2)' : 'var(--bl-owe)') + '">' + (a.ok ? '✉️ ' : '⚠️ ') + blEsc(a.text) + '</b></div>' : ''; })()
       + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
       + (e.copyTo ? '<div class="row"><span>Copy</span><b style="text-align:right;font-weight:500;overflow-wrap:anywhere">' + (e.copySent ? '✉️ emailed to ' : '⚠️ not delivered to ') + blEsc(e.copyTo) + '</b></div>' : '')
       + driveHtml
@@ -10675,9 +10686,14 @@ async function wrEdit(unit, editLatest){
     + '<div style="display:flex;gap:8px"><label class="bl-btn" style="flex:1" for="wre-cam">📷 Take photo</label><label class="bl-btn" style="flex:1" for="wre-gal">🖼 Choose</label></div>'
     + '<input id="wre-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="wrEditAddFiles(this.files);this.value=\'\'"><input id="wre-gal" type="file" accept="image/*" multiple style="display:none" onchange="wrEditAddFiles(this.files);this.value=\'\'"></div>'
     + '<div class="bl-f" style="margin-top:10px"><label class="bl-lbl" for="wre-note">Note (optional)</label><input id="wre-note" type="text" class="bl-in" placeholder="e.g. sent by WhatsApp" value="' + blEsc((existing && existing.note) || '') + '"></div>'
+    + (function(){
+        var app = !!(existing && existing.emailed === true), on = app || !!(existing && existing.agentSent);
+        return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--border2);border-radius:12px"><label for="wre-agent" style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:' + (app ? 'default' : 'pointer') + '"><input id="wre-agent" type="checkbox"' + (on ? ' checked' : '') + (app ? ' disabled' : '') + ' style="width:22px;height:22px;flex:none;accent-color:var(--accent)"><span style="font:600 14px var(--sans);color:var(--text2)">The managing agent has this reading</span></label>'
+          + '<div class="bl-hint" style="margin-top:2px">' + (app ? 'Emailed to them by the app when it was sent.' : 'Tick this if you sent it to them yourself, e.g. by email or WhatsApp.') + '</div></div>';
+      })()
     + (WR.cfg && WR.cfg.read ? '<div class="bl-hint" style="margin-top:8px">Tip: leave the reading blank and it’s read from the photo for you to confirm.</div>' : '')
     + (WR.tableMissing ? '<div class="warn" style="margin-top:10px">Photos can’t be saved until WATER_READINGS_SETUP.sql has been run — the reading and note will be.</div>' : '');
-  var picked = null, collect = function(){ picked = { unit:unit || (blEl('wre-unit') || {}).value || '', date:(blEl('wre-date') || {}).value || inMonth, value:_mrNum((blEl('wre-value') || {}).value), note:_uStr('wre-note') }; };
+  var picked = null, collect = function(){ picked = { unit:unit || (blEl('wre-unit') || {}).value || '', date:(blEl('wre-date') || {}).value || inMonth, value:_mrNum((blEl('wre-value') || {}).value), note:_uStr('wre-note'), agent:!!((blEl('wre-agent') || {}).checked) }; };
   var buttons = [{ label:existing ? 'Save changes' : 'Save reading', kind:'pri', value:'save', onClick:collect }];
   if(existing) buttons.push({ label:'Remove this reading', kind:'dng', value:'remove' });
   buttons.push({ label:'Cancel', value:false });
@@ -10697,6 +10713,10 @@ async function wrSaveEntry(p, existing, photos){
   var base = isRow ? Object.assign({}, (WR.cache[month] || {})[id] || {}) : { source:'manual', by:wrWho(), submittedAt:Date.now() };
   var data = Object.assign(base, { unit:String(p.unit), month:month, date:p.date, value:p.value, note:p.note, photos:photos });
   if(p.value != null) data.valueRaw = String(p.value);
+  if(data.emailed !== true && 'agent' in p){                       // "the managing agent has this reading", set by hand
+    if(p.agent && !data.agentSent){ data.agentSent = true; data.agentSentBy = wrWho(); data.agentSentAt = Date.now(); }
+    else if(!p.agent){ delete data.agentSent; delete data.agentSentBy; delete data.agentSentAt; }
+  }
   if(isRow){ data.editedBy = wrWho(); data.editedAt = Date.now(); }
   var ok = await wrUpsert(id, data);
   if(ok){

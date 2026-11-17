@@ -1,5 +1,10 @@
 # Billing changelog
 
+## v2.17 — "the managing agent has this reading" can be set by hand
+- Each reading in Water readings now has an **Agent** line: *emailed by the app*, *sent outside the app · marked by <name>*, or *not sent yet*.
+- Edit a reading (the latest or any earlier one) and tick **The managing agent has this reading** if it was sent to them another way, e.g. by email or WhatsApp. Untick to undo. Readings the app emailed itself are shown ticked and locked.
+- New readings captured by hand can be ticked the same way when they are added.
+
 ## v2.16 — Water readings list shows the newest reading, and all of them
 - **Fix:** a house's entry is now chosen by the reading's own date. Before, a reading typed on the Billing meters tab (e.g. dated the 8th) could sit on top of a photo the resident sent later, because Billing readings were time-stamped when they were copied into the list rather than when they were taken. On the same day, a reading sent with a photo ranks above the Billing copy.
 - **Every reading of the month is shown** under the house ("Also this month"), each with its date, reading, how it arrived, photo thumbnails and Drive link — not just a count. Any of them can be edited or removed (Billing-tab readings are changed in Billing).
