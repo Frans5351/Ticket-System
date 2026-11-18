@@ -32,6 +32,21 @@ const MAX_PHOTOS = 5;
 const MAX_TOTAL_B64 = 5_600_000;
 const FRESH_MS = 20 * 60 * 1000;
 
+// Electricity readings share this function: the app sends kind:"electricity" and the rows live in
+// electricity_readings. Photos go to "Park Manor Electricity Meter Readings / <day Month Year> / Unit N.jpg"
+// (the main meter as "Main Meter.jpg") — the structure already used for the monthly walk-round.
+const TABLES = { water: "water_readings", electricity: "electricity_readings" };
+const kindOf = (k) => (k === "electricity" ? "electricity" : "water");
+const PROMPT_ELEC = [
+  "This photo should show an electricity meter (South Africa) — a kWh meter for a house, or the main meter for a complex.",
+  "Read the cumulative energy register in kWh from the display or the number wheels.",
+  "Digits before the decimal point (or before a decimal marker / differently coloured or boxed last digit) are whole kWh; anything after is the decimal part. If there is no decimal marker, treat every digit as whole kWh.",
+  "Ignore serial numbers, the meter constant (e.g. imp/kWh), voltage/current ratings and any label such as HOUSE 7.",
+  "If a digit wheel is caught between two numbers, take the lower one. If an LCD shows something other than the kWh total (e.g. a date or tariff code), say so in the note and return null.",
+  "Reply with ONLY a JSON object, no other text:",
+  '{"is_meter": true|false, "whole": "<whole-kWh digits exactly as shown, leading zeros included>", "decimals": "<decimal digits, or empty string>", "reading": <number in kWh = whole.decimals, or null if you cannot read it>, "confidence": "high"|"medium"|"low", "note": "<short note if anything is unclear, else empty string>"}',
+].join("\n");
+
 const PROMPT = [
   "This photo should show a residential water meter (South Africa).",
   "Read the meter's cumulative register in kilolitres (m³).",
@@ -97,24 +112,27 @@ async function driveScript(payload, ms) {
   } finally { to.done(); }
 }
 const OLD_SCRIPT = "The Google script is an older version. Paste in the new docs/water-readings-drive.gs and deploy a New version (see docs/WATER_PHOTOS_SETUP.md).";
+const OLD_FOR_ELEC = "The Google script is an older version without electricity support. Paste in the new docs/water-readings-drive.gs and deploy a New version.";
 async function driveList(body) {
   const m = /^(\d{4})-(\d\d)$/.exec(String(body.month || ""));
   if (!m) return errorResponse(400, "month missing");
-  const j = await driveScript({ action: "list", month: monthLabel(body.month) });
+  const j = await driveScript({ action: "list", kind: kindOf(body.kind), month: monthLabel(body.month), ym: String(body.month) });
   if (!j.ok) return jsonResponse(200, { ok: false, error: j.error });
   if (!j.listed) return jsonResponse(200, { ok: false, outdated: true, error: OLD_SCRIPT });
-  return jsonResponse(200, { ok: true, folder: j.folder || "", files: (j.files || []).map((f) => ({ id: String(f.id), name: String(f.name || ""), url: String(f.url || ""), mime: String(f.mime || ""), size: Number(f.size) || 0, created: Number(f.created) || 0 })) });
+  if (kindOf(body.kind) === "electricity" && !(Number(j.v) >= 4)) return jsonResponse(200, { ok: false, outdated: true, error: OLD_FOR_ELEC });
+  return jsonResponse(200, { ok: true, folder: j.folder || "", files: (j.files || []).map((f) => ({ id: String(f.id), name: String(f.name || ""), url: String(f.url || ""), mime: String(f.mime || ""), size: Number(f.size) || 0, created: Number(f.created) || 0, date: /^\d{4}-\d\d-\d\d$/.test(String(f.date || "")) ? String(f.date) : "", folderName: String(f.folderName || "") })) });
 }
 async function driveGet(body) {
   const id = String(body.id || "");
   if (!/^[\w-]{10,100}$/.test(id)) return errorResponse(400, "id missing");
-  const j = await driveScript({ action: "get", id, part: Math.max(0, Number(body.part) || 0) });
+  const j = await driveScript({ action: "get", kind: kindOf(body.kind), id, part: Math.max(0, Number(body.part) || 0) });
   if (!j.ok) return jsonResponse(200, { ok: false, error: j.error });
   if (!j.got) return jsonResponse(200, { ok: false, outdated: true, error: OLD_SCRIPT });
+  if (kindOf(body.kind) === "electricity" && !(Number(j.v) >= 4)) return jsonResponse(200, { ok: false, outdated: true, error: OLD_FOR_ELEC });
   return jsonResponse(200, { ok: true, id: j.id, name: j.name, mime: j.mime, parts: j.parts, part: j.part, data: j.data });
 }
 
-async function saveToDrive(photos, row, rowId) {
+async function saveToDrive(photos, row, rowId, kind) {
   const url = process.env.WATER_DRIVE_URL, secret = process.env.WATER_DRIVE_SECRET;
   if (!url || !secret) return { configured: false, files: [] };
   const d = row.data || {};
@@ -123,22 +141,25 @@ async function saveToDrive(photos, row, rowId) {
     const r = await fetch(url, {
       method: "POST", redirect: "follow", signal: to.signal, headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        secret, month: monthLabel(d.month), unit: String(d.unit || ""), stamp: fileStamp(d),
-        description: "Water meter reading · Unit " + (d.unit || "?") + " · received " + (d.date || "") + (d.value != null ? " · reading " + d.value : "") + " · " + (d.source === "manual" ? "captured by " + (d.by || "admin") : "sent via the app") + " · " + rowId,
-        files: photos.map((p) => ({ mime: p.mime, data: p.data })),
+        secret, kind, month: monthLabel(d.month), unit: String(d.unit || ""), stamp: kind === "electricity" ? "" : fileStamp(d),
+        day: Number(String(d.date || "").slice(8, 10)) || 0,
+        description: (kind === "electricity" ? "Electricity" : "Water") + " meter reading · Unit " + (d.unit || "?") + " · received " + (d.date || "") + (d.value != null ? " · reading " + d.value : "") + " · " + (d.source === "manual" ? "captured by " + (d.by || "admin") : "sent via the app") + " · " + rowId,
+        // electricity photos travel under another name so an OLD script (which only knows water) files nothing rather than misfiling them
+        [kind === "electricity" ? "photos" : "files"]: photos.map((p) => ({ mime: p.mime, data: p.data })),
       }),
     });
     const text = await r.text();
     let j = null; try { j = JSON.parse(text); } catch (e) {}
     if (!j) return { configured: true, files: [], error: "Drive script did not return JSON (status " + r.status + "). Check the web app is deployed with access 'Anyone'." };
     if (!j.ok) return { configured: true, files: [], error: "Drive script: " + (j.error || "failed") };
+    if (kind === "electricity" && !(Number(j.v) >= 4)) return { configured: true, files: [], error: OLD_FOR_ELEC };
     return { configured: true, files: j.files || [], folder: j.folder || "" };
   } catch (e) {
     return { configured: true, files: [], error: e.name === "AbortError" ? "Drive script timed out" : String(e.message || e) };
   } finally { to.done(); }
 }
 
-async function readMeter(photo) {
+async function readMeter(photo, kind) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return { configured: false };
   const model = process.env.WATER_READ_MODEL || "claude-sonnet-5-5";
@@ -149,7 +170,7 @@ async function readMeter(photo) {
       headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
       body: JSON.stringify({ model, max_tokens: 300, messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: photo.mime, data: photo.data } },
-        { type: "text", text: PROMPT },
+        { type: "text", text: kind === "electricity" ? PROMPT_ELEC : PROMPT },
       ] }] }),
     });
     const j = await r.json().catch(() => null);
@@ -160,10 +181,11 @@ async function readMeter(photo) {
     if (!o) return { configured: true, error: "Could not understand the model's answer" };
     let value = o.reading == null || o.reading === "" ? null : Number(o.reading);
     if (value != null && (!isFinite(value) || value < 0 || value > 9999999)) value = null;
-    if (o.is_water_meter === false) value = null;
+    const notMeter = o.is_water_meter === false || o.is_meter === false;
+    if (notMeter) value = null;
     const conf = ["high", "medium", "low"].includes(o.confidence) ? o.confidence : "low";
     return { configured: true, value, confidence: value == null ? "low" : conf, whole: String(o.whole || ""), decimals: String(o.decimals || ""),
-      note: String(o.note || (o.is_water_meter === false ? "This doesn't look like a water meter." : "")).slice(0, 200), model };
+      note: String(o.note || (notMeter ? "This doesn't look like " + (kind === "electricity" ? "an electricity" : "a water") + " meter." : "")).slice(0, 200), model };
   } catch (e) {
     return { configured: true, error: e.name === "AbortError" ? "Reading the photo timed out" : String(e.message || e) };
   } finally { to.done(); }
@@ -179,6 +201,7 @@ export default async function handler(req) {
     if (denied) return errorResponse(401, denied);
     return body.action === "driveList" ? driveList(body) : driveGet(body);
   }
+  const kind = kindOf(body.kind), table = TABLES[kind];
   const rowId = String(body.rowId || "");
   if (!/^[\w:.-]{3,120}$/.test(rowId)) return errorResponse(400, "rowId missing");
   const photos = (Array.isArray(body.photos) ? body.photos : []).slice(0, MAX_PHOTOS).map((p) => splitDataUrl(p && p.dataUrl)).filter(Boolean);
@@ -188,7 +211,7 @@ export default async function handler(req) {
   const cfg = getConfig();
   let row;
   try {
-    const rows = await supa(cfg, "/rest/v1/water_readings?id=eq." + encodeURIComponent(rowId) + "&select=id,data,updated_at&limit=1");
+    const rows = await supa(cfg, "/rest/v1/" + table + "?id=eq." + encodeURIComponent(rowId) + "&select=id,data,updated_at&limit=1");
     row = rows && rows[0];
   } catch (e) { return errorResponse(502, "Could not load the reading: " + e.message); }
   if (!row) return errorResponse(404, "Reading not found");
@@ -196,19 +219,19 @@ export default async function handler(req) {
 
   const wantDrive = body.drive !== false, wantRead = body.read !== false;
   const [drive, read] = await Promise.all([
-    wantDrive ? saveToDrive(photos, row, rowId) : Promise.resolve({ configured: !!process.env.WATER_DRIVE_URL, files: [], skipped: true }),
-    wantRead ? readMeter(photos[0]) : Promise.resolve({ configured: !!process.env.ANTHROPIC_API_KEY, skipped: true }),
+    wantDrive ? saveToDrive(photos, row, rowId, kind) : Promise.resolve({ configured: !!process.env.WATER_DRIVE_URL, files: [], skipped: true }),
+    wantRead ? readMeter(photos[0], kind) : Promise.resolve({ configured: !!process.env.ANTHROPIC_API_KEY, skipped: true }),
   ]);
 
   // Merge onto the freshest copy of the row so a quick edit in between isn't lost.
   let saved = false;
   try {
-    const again = await supa(cfg, "/rest/v1/water_readings?id=eq." + encodeURIComponent(rowId) + "&select=data&limit=1");
+    const again = await supa(cfg, "/rest/v1/" + table + "?id=eq." + encodeURIComponent(rowId) + "&select=data&limit=1");
     const data = Object.assign({}, (again && again[0] && again[0].data) || row.data || {});
     if (drive.files && drive.files.length) { data.driveFiles = (data.driveFiles || []).concat(drive.files.map((f) => ({ name: f.name, url: f.url, id: f.id }))); if (drive.folder) data.driveFolder = drive.folder; }
     if (drive.error) data.driveError = drive.error; else if (drive.files && drive.files.length) delete data.driveError;
     if (read && !read.skipped && read.configured) data.ai = read.error ? { error: read.error, at: Date.now() } : { value: read.value, confidence: read.confidence, whole: read.whole, decimals: read.decimals, note: read.note, model: read.model, at: Date.now() };
-    await supa(cfg, "/rest/v1/water_readings", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ id: rowId, data, updated_at: new Date().toISOString() }) });
+    await supa(cfg, "/rest/v1/" + table, { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ id: rowId, data, updated_at: new Date().toISOString() }) });
     saved = true;
   } catch (e) { console.warn("water-reading: could not update row", e.message); }
 

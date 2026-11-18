@@ -36,6 +36,11 @@
  * (name them "Unit 3.jpg"): Water readings in the app lists them and adds
  * them as readings. That uses the "list" and "get" actions below.
  *
+ * ELECTRICITY readings use the same script: photos from the app's electricity
+ * form go to "Park Manor Electricity Meter Readings / 15 November 2026 /
+ * Unit 7.jpg" (main meter: "Main Meter.jpg") — into the month's existing dated
+ * folder, or a new one named after the day of the first reading that month.
+ *
  * If you ever change this code, use Deploy ▸ Manage deployments ▸ edit ▸
  * "New version" — the URL stays the same.
  * To stop it: Deploy ▸ Manage deployments ▸ Archive.
@@ -46,7 +51,8 @@ var SECRET       = 'CHANGE-ME-to-a-long-password';
 var ROOT_NAME    = 'Park Manor Water Meter Readings';
 var SIBLING_NAME = 'Park Manor Electricity Meter Readings';   // create ours beside this one
 var MAX_FILES    = 5;
-var VERSION      = 3;            // 3 = date/time in file names + list/get for photos added by hand
+var VERSION      = 4;            // 4 = electricity readings too (3 = date/time in names + list/get)
+var ELEC_ROOT_NAME = 'Park Manor Electricity Meter Readings';   // dated folders inside: "15 November 2026" / Unit 7.jpg, Main Meter.jpg
 var PART_CHARS   = 3000000;      // base64 characters per "get" answer (keeps each answer small)
 var MAX_GET_BYTES = 15 * 1024 * 1024;
 
@@ -59,15 +65,17 @@ function doPost(e) {
     if (body.action === 'list') return out_(list_(body));
     if (body.action === 'get')  return out_(get_(body));
     lock.waitLock(20000);                        // one upload at a time so names never clash
-    var root   = getRoot_();
-    var month  = getOrCreate_(root, clean_(body.month, 40) || 'Unsorted');
+    var isElec = body.kind === 'electricity';
+    var monthName = clean_(body.month, 40) || 'Unsorted';
+    var month  = isElec ? elecFolder_(elecRoot_(), monthName, body.day) : getOrCreate_(getRoot_(), monthName);
     var unit   = clean_(body.unit, 12) || 'Unknown';
+    var base   = isElec && /^main/i.test(unit) ? 'Main Meter' : 'Unit ' + unit;
     var saved  = [];
-    (body.files || []).slice(0, MAX_FILES).forEach(function (f) {
+    ((isElec ? body.photos : body.files) || []).slice(0, MAX_FILES).forEach(function (f) {
       if (!f || !f.data) return;
       var mime = String(f.mime || 'image/jpeg');
       var ext  = /png/i.test(mime) ? 'png' : (/webp/i.test(mime) ? 'webp' : 'jpg');
-      var name = nextName_(month, 'Unit ' + unit + (clean_(body.stamp, 40) ? ' - ' + clean_(body.stamp, 40) : ''), ext);
+      var name = nextName_(month, base + (clean_(body.stamp, 40) ? ' - ' + clean_(body.stamp, 40) : ''), ext);
       var file = month.createFile(Utilities.newBlob(Utilities.base64Decode(f.data), mime, name));
       if (body.description) file.setDescription(String(body.description).slice(0, 500));
       saved.push({ name: name, id: file.getId(), url: file.getUrl() });
@@ -85,6 +93,7 @@ function doGet() { return out_({ ok: true, v: VERSION, service: 'Park Manor wate
 
 // What is in a month folder (photos only) — so the app can pick up ones added by hand.
 function list_(body) {
+  if (body.kind === 'electricity') return listElec_(body);
   var root = getRoot_(), name = clean_(body.month, 40), it = root.getFoldersByName(name), folder = null;
   while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) { folder = f; break; } }
   if (!folder) return { ok: true, v: VERSION, listed: true, folder: '', files: [] };
@@ -110,12 +119,53 @@ function get_(body) {
            data: b64.substring(part * PART_CHARS, (part + 1) * PART_CHARS) };
 }
 function inRoot_(file) {
-  var rootId = getRoot_().getId(), ps = file.getParents();
+  var ok = {}; ok[getRoot_().getId()] = 1;
+  var er = DriveApp.getFoldersByName(ELEC_ROOT_NAME); while (er.hasNext()) { var x = er.next(); if (!x.isTrashed()) ok[x.getId()] = 1; }
+  var ps = file.getParents();
   while (ps.hasNext()) {
-    var p = ps.next(); if (p.getId() === rootId) return true;
-    var gp = p.getParents(); while (gp.hasNext()) { if (gp.next().getId() === rootId) return true; }
+    var p = ps.next(); if (ok[p.getId()]) return true;
+    var gp = p.getParents(); while (gp.hasNext()) { if (ok[gp.next().getId()]) return true; }
   }
   return false;
+}
+
+// ── Electricity: "Park Manor Electricity Meter Readings / 15 November 2026 / Unit 7.jpg" ──
+function elecRoot_() {
+  var it = DriveApp.getFoldersByName(ELEC_ROOT_NAME);
+  while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) return f; }
+  return DriveApp.createFolder(ELEC_ROOT_NAME);
+}
+// Every dated folder of one month ("14 September 2026", "15 September 2026"), newest day first.
+function elecFolders_(root, monthName) {
+  var out = [], want = String(monthName).replace(/\s+/g, ' ').trim().toLowerCase(), it = root.getFolders();
+  while (it.hasNext()) {
+    var f = it.next(); if (f.isTrashed()) continue;
+    var m = /^(\d{1,2})\s+(.+)$/.exec(String(f.getName()).replace(/\s+/g, ' ').trim());
+    if (m && m[2].toLowerCase() === want) out.push({ f: f, day: Number(m[1]) });
+  }
+  out.sort(function (a, b) { return b.day - a.day; });
+  return out;
+}
+// The month's folder: the one already there, else a new one named after the day of this reading.
+function elecFolder_(root, monthName, day) {
+  var fs = elecFolders_(root, monthName);
+  if (fs.length) return fs[0].f;
+  var d = Number(day) || Number(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'd'));
+  return root.createFolder(d + ' ' + monthName);
+}
+function listElec_(body) {
+  var fs = elecFolders_(elecRoot_(), clean_(body.month, 40)), ym = /^\d{4}-\d\d$/.test(String(body.ym || '')) ? String(body.ym) : '', out = [];
+  fs.forEach(function (x) {
+    var files = x.f.getFiles();
+    while (files.hasNext() && out.length < 300) {
+      var f = files.next(); if (f.isTrashed()) continue;
+      var mime = String(f.getMimeType() || '');
+      if (!/^image\//i.test(mime) && !/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f.getName())) continue;
+      out.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), mime: mime, size: f.getSize(), created: f.getDateCreated().getTime(),
+                 folderName: String(x.f.getName()).trim(), date: ym ? ym + '-' + (x.day < 10 ? '0' : '') + x.day : '' });
+    }
+  });
+  return { ok: true, v: VERSION, listed: true, folder: fs.length ? fs[0].f.getUrl() : '', files: out };
 }
 
 // Run once from the editor: authorises Drive access and creates the folder.

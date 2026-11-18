@@ -308,6 +308,7 @@ var _PUBLIC_MODE = (function(){
     // the managing agent. Kept separate from ?report so residents submitting a
     // meter reading get the simplest possible flow.
     if(qs.has('water')) return {kind: 'water'};
+    if(qs.has('electricity')) return {kind: 'electricity'};
     // Canonical: ?report — legacy ?contact-public and ?report=1 keep working
     if(qs.has('report') || qs.has('contact-public')) return {kind: 'submit'};
     var editTok = qs.get('reportEdit');
@@ -6313,15 +6314,15 @@ document.getElementById('tbody').addEventListener('click', function(e){
 <style id="bl-css">
 /* ═══ Billing UI — mobile-first. Everything is scoped to the billing surfaces
    so it can't leak into the rest of the app. ═══════════════════════════════ */
-#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu,#bl-toast{
+#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu,#bl-toast{
   --bl-owe:#f0a06f;--bl-owe-bg:rgba(240,160,111,.12);--bl-owe-bd:rgba(240,160,111,.40);
   --bl-a1:#e6b34a;--bl-a2:#e8873a;--bl-a3:#e05c4a;--bl-a4:#b32d3a;
 }
-body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu,#bl-toast){
+body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu,#bl-toast){
   --bl-owe:#b4570f;--bl-owe-bg:rgba(180,87,15,.09);--bl-owe-bd:rgba(180,87,15,.35);
 }
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── Buttons ── */
 .bl-btn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 14px var(--sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .12s,border-color .12s,transform .06s}
@@ -6421,14 +6422,14 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Unit table (desktop) ── */
 .bl-tbl{display:none}
 @media(min-width:900px){.bl-tbl{display:block}.bl-cards{display:none}}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb tbody{display:table-row-group!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb tr{display:table-row!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb th,
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal) .bl-tb .r{text-align:right!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb tbody{display:table-row-group!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb tr{display:table-row!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb th,
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb .r{text-align:right!important}
 .bl-tb tbody tr.row{cursor:pointer}
 .bl-tb tbody tr.row:hover td{background:var(--surface)}
 .bl-tb tfoot td{font-weight:700}
@@ -6496,13 +6497,13 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 .bl-toast-i.ok{background:var(--green);color:#06210f}
 
 /* ── Full-screen sheets (unit editor + importer) ── */
-#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
+#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
 #unit-modal{z-index:700}
 #wc-import-modal{z-index:720}
 .bl-sheet{background:var(--surface);width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;animation:bl-up .22s ease-out}
 @keyframes bl-up{from{transform:translateY(22px);opacity:0}to{transform:none;opacity:1}}
 @media(min-width:768px){
-  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal{align-items:center}
+  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal{align-items:center}
   .bl-sheet{width:min(900px,94vw);height:min(90vh,920px);border-radius:20px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,.5)}
 }
 @media(prefers-reduced-motion:reduce){.bl-sheet,.bl-dlg-card,.bl-menu-panel,.bl-toast-i{animation:none!important}}
@@ -6540,10 +6541,10 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Form fields ── */
 .bl-f{display:flex;flex-direction:column;gap:6px;min-width:0}
 .bl-lbl{font:600 12px var(--sans);color:var(--muted)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .bl-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .bl-grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bl-grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -6696,6 +6697,10 @@ body.bl-ro #unit-modal .bl-in:disabled{opacity:1;-webkit-text-fill-color:current
 #wr-modal .bl-lr-more .row b{font-weight:600}
 #wr-modal .bl-lr-more .row>span:first-child{flex:none;white-space:nowrap}
 #wr-modal .bl-lr-more .row>b{min-width:0;overflow-wrap:anywhere}
+#er-modal{z-index:705}
+#er-modal .bl-lr-more .row b{font-weight:600}
+#er-modal .bl-lr-more .row>span:first-child{flex:none;white-space:nowrap}
+#er-modal .bl-lr-more .row>b{min-width:0;overflow-wrap:anywhere}
 .bl-qrow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border)}
 .bl-qrow:first-of-type{border-top:none}
 .bl-qrow .who b{display:block;font:600 13px var(--sans);color:var(--text2)}
@@ -7158,6 +7163,18 @@ async function wcExtractItems(file){
       <button class="bl-btn ro-ok" onclick="closeBillingSettings()">Close</button>
       <button class="bl-btn pri" onclick="saveBillingSettingsFromSheet()">💾 Save settings</button>
     </div>
+  </div>
+</div>
+
+<!-- Electricity meter readings register -->
+<div id="er-modal" onclick="if(event.target===this)closeElecRegister()">
+  <div class="bl-sheet" role="dialog" aria-modal="true" aria-label="Electricity meter readings">
+    <div class="bl-sh">
+      <button class="bl-back" aria-label="Close" onclick="closeElecRegister()">←</button>
+      <div class="bl-sh-t"><b>⚡ Electricity meter readings</b><span id="er-sub"></span></div>
+    </div>
+    <div class="bl-body" id="er-body"></div>
+    <div class="bl-sf" id="er-foot"></div>
   </div>
 </div>
 
@@ -10175,13 +10192,26 @@ async function submitWaterReading(){
   var emailEl = document.getElementById('wr-email'), sendEmail = !emailEl || emailEl.checked, saved = false, saveErr = '';
   if(btn){ btn.disabled = true; btn.textContent = sendEmail ? 'Sending…' : 'Saving…'; btn.style.opacity = '0.7'; }
   try {
-    var notifyAtt = [], NOTIFY_BUDGET = 4200000, notifyUsed = 0;
+    // Every photo is kept. They are sized so that ALL of them fit in the email and in the upload to
+    // Google Drive — a photo is never dropped for being too big (that lost a resident's reading once).
+    var shots = [];
     for(var i = 0; i < files.length; i++){
-      var compressed = await publicCompressPhoto(files[i]);
-      var attSize = (compressed.data || '').length;
-      if(notifyUsed + attSize <= NOTIFY_BUDGET){ notifyAtt.push({ name:compressed.name, type:compressed.type, dataUrl:compressed.data }); notifyUsed += attSize; }
-      else notifyAtt.push({ name:compressed.name, type:compressed.type, skipped:true, sizeMB:(attSize * 0.75 / 1048576).toFixed(1) });
+      var compressed;
+      try { compressed = await publicCompressPhoto(files[i]); }
+      catch(e){ var bad = new Error('unreadable file'); bad.wrBadFile = (files[i] && files[i].name) || 'One of the files'; throw bad; }
+      shots.push({ name:compressed.name, type:compressed.type, dataUrl:compressed.data });
     }
+    var SHOTS_BUDGET = 3900000, shotsSize = function(){ return shots.reduce(function(n, a){ return n + a.dataUrl.length; }, 0); };
+    var tiers = [[1600, 0.7], [1400, 0.6], [1280, 0.5], [1024, 0.5], [800, 0.45]];
+    for(var t = 0; t < tiers.length && shotsSize() > SHOTS_BUDGET; t++){
+      for(var k = 0; k < shots.length; k++) shots[k].dataUrl = await wrShrink(shots[k].dataUrl, tiers[t][0], tiers[t][1]);
+    }
+    // The email: everything, unless it still can't fit (then the rest is on the list and in Drive regardless).
+    var notifyAtt = [], NOTIFY_BUDGET = 4200000, notifyUsed = 0;
+    shots.forEach(function(a){
+      if(notifyUsed + a.dataUrl.length <= NOTIFY_BUDGET){ notifyAtt.push({ name:a.name, type:a.type, dataUrl:a.dataUrl }); notifyUsed += a.dataUrl.length; }
+      else notifyAtt.push({ name:a.name, type:a.type, skipped:true, sizeMB:(a.dataUrl.length * 0.75 / 1048576).toFixed(1) });
+    });
     var descLines = [];
     if(valueRaw) descLines.push('Reading: ' + valueRaw);
     if(note) descLines.push(note);
@@ -10202,18 +10232,22 @@ async function submitWaterReading(){
       var now = new Date(), id = 'wr_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
       var today = wrLocalDate(now);
       try { localStorage.setItem('pm_wr_unit', wrUnitKey(unit)); } catch(e){}
-      await sbUpsert('water_readings', id, { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:sendEmail, emailSkipped:!sendEmail, copyTo:copyTo, copySent:copySent,
+      var rowData = { unit:wrUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:sendEmail, emailSkipped:!sendEmail, copyTo:copyTo, copySent:copySent,
         value:wrParseValue(valueRaw) != null ? wrParseValue(valueRaw) : wrParseValue(note), valueRaw:valueRaw, note:note, source:'form',
-        photos:await Promise.all(notifyAtt.filter(function(a){ return a.dataUrl; }).slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await wrShrink(a.dataUrl) }; })),
-        photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) });
-      var toFile = notifyAtt.filter(function(a){ return a.dataUrl; }).map(function(a){ return { name:a.name, type:a.type, dataUrl:a.dataUrl }; });
+        photos:await Promise.all(shots.slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await wrShrink(a.dataUrl) }; })),
+        photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) };
+      await sbUpsert('water_readings', id, rowData);
+      var toFile = shots.map(function(a){ return { name:a.name, type:a.type, dataUrl:a.dataUrl }; });
       // sbUpsert never throws, so in test mode (no email to fall back on) check the row really landed.
       if(!sendEmail){
         var chk = await supa.from('water_readings').select('id').eq('id', scopedId(id)).limit(1);
         if(!chk || chk.error || !((chk.data || []).length)) throw new Error((chk && chk.error && chk.error.message) || 'the reading was not stored');
       }
       saved = true;
-      if(toFile.length) wrFile(id, toFile).then(function(j){ wrPubFiled(j, !!valueRaw, !sendEmail); });
+      if(toFile.length) wrFile(id, toFile).then(function(j){
+        if(!j || !j.ok){ try { sbUpsert('water_readings', id, Object.assign({}, rowData, { driveError:String((j && j.error) || 'the photo could not be sent for filing').slice(0, 200) })); } catch(e){} }
+        wrPubFiled(j, !!valueRaw, !sendEmail);
+      });
       else setTimeout(function(){ wrPubFiled(null, false, !sendEmail, 'nophoto'); }, 0);
     } catch(e){ console.warn('water reading not recorded', e); saveErr = String((e && e.message) || e); setTimeout(function(){ wrPubFiled(null); }, 0); }
     // Test mode sends no email, so if the reading wasn't stored nothing happened at all — say so.
@@ -10229,7 +10263,7 @@ async function submitWaterReading(){
     window.scrollTo(0, 0);
   } catch(e){
     console.warn('water reading submit', e);
-    showPublicErr(e && e.wrTest ? 'The test reading could not be saved, so nothing was filed. The usual cause is that the water_readings table has not been created yet — run WATER_READINGS_SETUP.sql in Supabase. (' + String(e.message).slice(0, 160) + ')' : 'Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
+    showPublicErr(e && e.wrBadFile ? '“' + e.wrBadFile + '” isn’t a photo this phone can read (videos and some file types don’t work). Remove it and use the Take photo button instead.' : e && e.wrTest ? 'The test reading could not be saved, so nothing was filed. The usual cause is that the water_readings table has not been created yet — run WATER_READINGS_SETUP.sql in Supabase. (' + String(e.message).slice(0, 160) + ')' : 'Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
     if(btn){ btn.disabled = false; btn.style.opacity = ''; wrEmailToggle(); }
   }
 }
@@ -10900,6 +10934,893 @@ function wrApplyAccess(){
   if(t) t.style.display = on ? 'inline-flex' : 'none';
 }
 (function(){ var o = applyBillingAccess; applyBillingAccess = function(u){ var r = o.apply(this, arguments); wrApplyAccess(); return r; }; })();
+
+// ═══ Electricity meter readings — public form (dedicated + inside the general form),
+// stored submissions, and the monthly "who has sent theirs" register ═════════
+//
+// Submissions are emailed exactly as before (managing agent + Park Manor inbox,
+// never the trustees) AND saved as a row in the `electricity_readings` table
+// (`{id, data}` like everything else) so the register fills itself in. If the
+// table doesn't exist yet the email still goes and the register can be marked
+// by hand — see docs/ELECTRICITY_READINGS_SETUP.sql.
+var ER = { open:false, nav:false, month:'', cache:{}, marks:{}, loaded:false, tableMissing:false, edit:null };
+var ER_FIRST_MONTH = '2026-09';
+var ER_HOUSES = 12;
+
+// ── Public form ─────────────────────────────────────────────────────────────
+// The general report form's "Water Reading" tile swaps the whole form for the
+// electricity-meter one (unit · photo · reading · note), with a way back.
+// Testing aid: someone signed in on this device (or using a link with &test)
+// gets a tick box to send a reading WITHOUT emailing the managing agent.
+// Residents (not signed in) never see it — their readings are always emailed.
+function erCanSkipEmail(){
+  try { if(/[?&]test\b/i.test(location.search)) return true; } catch(e){}
+  try { return typeof getLocalSession === 'function' && !!getLocalSession(); } catch(e){ return false; }
+}
+function erEmailToggle(){
+  var el = document.getElementById('er-email'), btn = document.getElementById('pub-submit-btn'), n = document.getElementById('er-email-note');
+  var on = !el || el.checked;
+  if(btn) btn.textContent = on ? '⚡ Send my reading' : '🧪 Save test reading (no email)';
+  if(n) n.innerHTML = on ? 'The managing agent and the Park Manor inbox will get this reading by email, as normal.' : '<b style="color:var(--amber,#d9a441)">Test mode — the managing agent and the Park Manor inbox will not be emailed.</b> The reading is still saved, the photo filed in Google Drive and the meter read from it. If you fill in “Email me a copy”, that copy is still sent.';
+}
+function renderElectricityReadingForm(opts){
+  opts = opts || {};
+  var host = document.getElementById('public-view-content');
+  if(!host) return;
+  window._pubFiles = [];
+  function showForm(){
+    if(!PUBLIC_REPORTS_ENABLED){
+      host.innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:14px">🔒</div><div style="font-size:16px;color:var(--text2);font-weight:600;margin-bottom:8px">Submissions currently disabled</div><div style="font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.6">The body corporate has temporarily turned off public submissions. Please contact a trustee directly.</div></div>';
+      return;
+    }
+    var inputCss = 'width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;font-family:var(--sans);outline:none;box-sizing:border-box';
+    var lbl = function(t){ return '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + t + '</label>'; };
+    host.innerHTML = ''
+      + '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">⚡ Submit your electricity meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>'
+      + (false ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
+      + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Which meter?</b></span></div>' + erChipsHtml() + '<input id="er-unit" type="hidden"><div id="er-last" style="margin-top:10px"></div></div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Photo of your meter</b><i>the display must be readable</i></span></div>'
+      +   '<div style="display:flex;gap:8px;margin-bottom:8px">'
+      +     '<button type="button" onclick="document.getElementById(\'pub-photos-cam\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--accent-bd);background:var(--accent-bg);color:var(--accent2);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">📷 Take photo</button>'
+      +     '<button type="button" onclick="document.getElementById(\'pub-photos\').click()" style="flex:1;padding:14px 8px;border-radius:9px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer">🖼 Choose from gallery</button>'
+      +   '</div><div id="pub-file-previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"></div>'
+      +   '<input id="pub-photos-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'">'
+      +   '<input id="pub-photos" type="file" accept="image/*" multiple style="display:none" onchange="pubAddFiles(this.files);this.value=\'\'"></div>'
+      + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">3</span><span><b>The reading</b><i>optional if the photo is clear</i></span></div>'
+      +   lbl('Digits shown on the meter') + '<input id="er-value" type="text" inputmode="decimal" placeholder="e.g. 45873.2" maxlength="20" style="' + inputCss + '">'
+      +   lbl('Anything to add? (optional)') + '<textarea id="er-note" rows="2" placeholder="e.g. anything unusual about this meter" maxlength="500" style="' + inputCss + ';resize:vertical"></textarea></div>'
+      + (erCanSkipEmail() ? '<div class="pub-card" style="border-style:dashed"><label for="er-email" style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer"><input id="er-email" type="checkbox" checked onchange="erEmailToggle()" style="width:22px;height:22px;flex:none;accent-color:var(--accent)"><span style="font-size:14px;font-weight:600;color:var(--text2);font-family:var(--sans)">Email this reading to the managing agent</span></label><div id="er-email-note" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.5;margin-top:6px"></div><div style="font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.5;margin-top:6px">Shown only when you are signed in on this device, or on a link ending in &amp;test. Residents don’t see it.</div></div>' : '')
+      + '<div id="pub-err" style="display:none;font-size:11px;color:#f06f6f;font-family:var(--mono);margin-bottom:10px;padding:8px 10px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:7px"></div>'
+      + '<div id="pub-submit-bar"><button id="pub-submit-btn" onclick="submitElectricityReading()" style="width:100%;padding:15px;background:var(--accent);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;font-family:var(--sans);cursor:pointer">⚡ Send my reading</button></div>';
+    var uEl = document.getElementById('er-unit'), remembered = '';
+    try { remembered = localStorage.getItem('pm_er_unit') || ''; } catch(e){}
+    erEmailToggle();
+    try { var cEl = document.getElementById('er-copy'), cSaved = localStorage.getItem('pm_er_email') || ''; if(cEl && cSaved) cEl.value = cSaved; } catch(e){}
+    if(uEl && remembered){ uEl.value = remembered; erPubLookup(); }
+    else { erPubRender(null); if(uEl && !opts.embedded) setTimeout(function(){ uEl.focus(); }, 60); }
+    if(opts.embedded) window.scrollTo(0, 0);
+  }
+  if(typeof PUBLIC_REPORTS_ENABLED === 'undefined'){ return setTimeout(showForm, 300); }
+  showForm();
+}
+function erParseValue(s){ var m = /(\d[\d ]{1,8}(?:[.,]\d+)?)/.exec(String(s || '')); if(!m) return null; var n = parseFloat(m[1].replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : null; }
+async function submitElectricityReading(){
+  clearPublicErr();
+  var honey = document.getElementById('pub-honey');
+  if(honey && honey.value){ document.getElementById('public-view-content').innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>'; return; }
+  if(!publicRateLimitOk()){ showPublicErr('You’ve submitted several times recently. Please wait a bit before submitting another.'); return; }
+  var unit = (document.getElementById('er-unit').value || '').trim().replace(/^unit\s*/i, '');
+  var note = (document.getElementById('er-note').value || '').trim();
+  var valueRaw = ((document.getElementById('er-value') || {}).value || '').trim();
+  var files = (window._pubFiles || []).filter(function(f){ return !!f; });
+  var copyTo = ((document.getElementById('er-copy') || {}).value || '').trim();
+  if(!unit){ showPublicErr('Please choose which meter this is.'); return; }
+  if(copyTo && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(copyTo)){ showPublicErr('That email address doesn’t look right — please check it, or leave it empty.'); return; }
+  if(!files.length && !valueRaw && !note){ showPublicErr('Please add a photo of your meter (or type the reading).'); return; }
+  if(files.length > MAX_PUBLIC_PHOTOS){ showPublicErr('A maximum of ' + MAX_PUBLIC_PHOTOS + ' photos can be attached.'); return; }
+  var btn = document.getElementById('pub-submit-btn');
+  var emailEl = document.getElementById('er-email'), sendEmail = !emailEl || emailEl.checked, saved = false, saveErr = '';
+  if(btn){ btn.disabled = true; btn.textContent = sendEmail ? 'Sending…' : 'Saving…'; btn.style.opacity = '0.7'; }
+  try {
+    // Every photo is kept. They are sized so that ALL of them fit in the email and in the upload to
+    // Google Drive — a photo is never dropped for being too big (that lost a resident's reading once).
+    var shots = [];
+    for(var i = 0; i < files.length; i++){
+      var compressed;
+      try { compressed = await publicCompressPhoto(files[i]); }
+      catch(e){ var bad = new Error('unreadable file'); bad.erBadFile = (files[i] && files[i].name) || 'One of the files'; throw bad; }
+      shots.push({ name:compressed.name, type:compressed.type, dataUrl:compressed.data });
+    }
+    var SHOTS_BUDGET = 3900000, shotsSize = function(){ return shots.reduce(function(n, a){ return n + a.dataUrl.length; }, 0); };
+    var tiers = [[1600, 0.7], [1400, 0.6], [1280, 0.5], [1024, 0.5], [800, 0.45]];
+    for(var t = 0; t < tiers.length && shotsSize() > SHOTS_BUDGET; t++){
+      for(var k = 0; k < shots.length; k++) shots[k].dataUrl = await erShrink(shots[k].dataUrl, tiers[t][0], tiers[t][1]);
+    }
+    // The email: everything, unless it still can't fit (then the rest is on the list and in Drive regardless).
+    var notifyAtt = [], NOTIFY_BUDGET = 4200000, notifyUsed = 0;
+    shots.forEach(function(a){
+      if(notifyUsed + a.dataUrl.length <= NOTIFY_BUDGET){ notifyAtt.push({ name:a.name, type:a.type, dataUrl:a.dataUrl }); notifyUsed += a.dataUrl.length; }
+      else notifyAtt.push({ name:a.name, type:a.type, skipped:true, sizeMB:(a.dataUrl.length * 0.75 / 1048576).toFixed(1) });
+    });
+    var descLines = [];
+    if(valueRaw) descLines.push('Reading: ' + valueRaw);
+    if(note) descLines.push(note);
+    if(!descLines.length) descLines.push('(Photo of meter submitted — see attachment.)');
+    var copySent = false, copyErr = '';
+    if(sendEmail || copyTo){
+      // Normal: the managing agent + Park Manor inbox, and the resident's own copy if they gave an address.
+      // Test (box unticked): only the copy, and only if an address was typed.
+      var r = await fetch('/api/send-edit-link', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body:JSON.stringify({ notifyOnly:true, skipAgent:!sendEmail, title:'Electricity meter reading', desc:descLines.join('\n'), unit:unit, reporter:'', phone:'', email:copyTo, category:'Electricity Reading',
+          bcInbox:(typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '', attachments:notifyAtt }) });
+      if(!r.ok) throw new Error('send failed: ' + r.status);
+      try { var rj = await r.json(); copySent = !!(rj && rj.residentCopy); copyErr = (rj && rj.residentCopyError) || ''; } catch(e){}
+    }
+    try { if(copyTo) localStorage.setItem('pm_er_email', copyTo); else localStorage.removeItem('pm_er_email'); } catch(e){}
+    // Record it for the register (best effort — the email is the thing that must not fail).
+    try {
+      var now = new Date(), id = 'er_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+      var today = erLocalDate(now);
+      try { localStorage.setItem('pm_er_unit', erUnitKey(unit)); } catch(e){}
+      var rowData = { unit:erUnitKey(unit), unitTyped:String(unit), month:today.slice(0, 7), date:today, submittedAt:now.getTime(), emailed:sendEmail, emailSkipped:!sendEmail, copyTo:copyTo, copySent:copySent,
+        value:erParseValue(valueRaw) != null ? erParseValue(valueRaw) : erParseValue(note), valueRaw:valueRaw, note:note, source:'form',
+        photos:await Promise.all(shots.slice(0, MAX_PUBLIC_PHOTOS).map(async function(a){ return { name:a.name, type:'image/jpeg', data:await erShrink(a.dataUrl) }; })),
+        photoCount:files.length, photosNotEmailed:notifyAtt.filter(function(a){ return a.skipped; }).map(function(a){ return a.name; }) };
+      await sbUpsert('electricity_readings', id, rowData);
+      var toFile = shots.map(function(a){ return { name:a.name, type:a.type, dataUrl:a.dataUrl }; });
+      // sbUpsert never throws, so in test mode (no email to fall back on) check the row really landed.
+      if(!sendEmail){
+        var chk = await supa.from('electricity_readings').select('id').eq('id', scopedId(id)).limit(1);
+        if(!chk || chk.error || !((chk.data || []).length)) throw new Error((chk && chk.error && chk.error.message) || 'the reading was not stored');
+      }
+      saved = true;
+      if(toFile.length) erFile(id, toFile).then(function(j){
+        if(!j || !j.ok){ try { sbUpsert('electricity_readings', id, Object.assign({}, rowData, { driveError:String((j && j.error) || 'the photo could not be sent for filing').slice(0, 200) })); } catch(e){} }
+        erPubFiled(j, !!valueRaw, !sendEmail);
+      });
+      else setTimeout(function(){ erPubFiled(null, false, !sendEmail, 'nophoto'); }, 0);
+    } catch(e){ console.warn('electricity reading not recorded', e); saveErr = String((e && e.message) || e); setTimeout(function(){ erPubFiled(null); }, 0); }
+    // Test mode sends no email, so if the reading wasn't stored nothing happened at all — say so.
+    if(!sendEmail && !saved){ var te = new Error('test reading not saved: ' + saveErr); te.erTest = true; throw te; }
+    document.getElementById('public-view-content').innerHTML = ''
+      + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
+      + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">' + (sendEmail ? 'Reading sent' : 'Test reading saved') + '</div>'
+      + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">' + (sendEmail ? 'Thanks! Your electricity meter reading for <b>' + escHtml(erLabel(unit)) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.' : '🧪 <b>The managing agent was not emailed.</b> The reading for <b>' + escHtml(erLabel(unit)) + '</b> is saved on this month’s list.') + '</div>'
+      + (copyTo ? '<div style="font-size:13px;font-family:var(--sans);line-height:1.6;max-width:420px;margin:10px auto 0;overflow-wrap:anywhere;color:' + (copySent ? 'var(--text2)' : 'var(--bl-owe,#b4570f)') + '">' + (copySent ? '✉️ A copy has been emailed to <b>' + escHtml(copyTo) + '</b>.' : '⚠️ We couldn’t email your copy to ' + escHtml(copyTo) + (copyErr ? ' (' + escHtml(copyErr) + ')' : '') + ' — your reading itself was received.') + '</div>' : '')
+      + '<div id="er-filed" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.6;max-width:420px;margin:12px auto 0;overflow-wrap:anywhere">' + (files.length ? (sendEmail ? 'Filing your photo in the Park Manor records… you can close this page.' : 'Filing the photo in Google Drive and reading the meter… keep this page open to see the result.') : '') + '</div></div>'
+      + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap"><button onclick="renderElectricityReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Next meter →</button>'
+      + '</div>';
+    window.scrollTo(0, 0);
+  } catch(e){
+    console.warn('electricity reading submit', e);
+    showPublicErr(e && e.erBadFile ? '“' + e.erBadFile + '” isn’t a photo this phone can read (videos and some file types don’t work). Remove it and use the Take photo button instead.' : e && e.erTest ? 'The test reading could not be saved, so nothing was filed. The usual cause is that the electricity_readings table has not been created yet — run ELECTRICITY_READINGS_SETUP.sql in Supabase. (' + String(e.message).slice(0, 160) + ')' : 'Sorry — the reading couldn’t be sent. Please check your connection and try again, or WhatsApp a photo of your meter to a trustee.');
+    if(btn){ btn.disabled = false; btn.style.opacity = ''; erEmailToggle(); }
+  }
+}
+
+// ── Filing photos in Google Drive + reading the meter from the photo ────────
+// The server function (functions/water-reading.js) does both for a reading
+// that has just been saved; it writes the results onto the row itself, so the
+// work still completes if the page is closed once the upload has gone.
+async function erFile(id, photos, opts){
+  try {
+    var r = await fetch('/api/water-reading', { method:'POST', headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({ kind:'electricity', rowId:scopedId(id), photos:photos, read:!(opts && opts.read === false), drive:!(opts && opts.drive === false) }) });
+    var j = null; try { j = await r.json(); } catch(e){}
+    if(!r.ok) return { ok:false, error:(j && j.error) || ('status ' + r.status) };
+    return j || { ok:false, error:'no answer' };
+  } catch(e){ return { ok:false, error:String(e && e.message || e) }; }
+}
+// What's switched on (asked once): { drive:bool, read:bool } or null when the function isn't reachable.
+async function erConfig(){
+  if(ER.cfg !== undefined) return ER.cfg;
+  try { var r = await fetch('/api/water-reading?kind=electricity'); ER.cfg = r.ok ? await r.json() : null; } catch(e){ ER.cfg = null; }
+  return ER.cfg;
+}
+function erPubFiled(j, typed, test, why){
+  var el = document.getElementById('er-filed'); if(!el) return;
+  if(test){
+    var L = [], ok = '<span style="color:var(--bl-paid,#3fb37f)">✓</span> ', no = '<span style="color:var(--bl-owe,#e2685f)">✕</span> ';
+    L.push(ok + 'Saved on the Electricity readings list');
+    if(why === 'nophoto') L.push('— No photo attached, so nothing to file or read.');
+    else if(!j || !j.ok) L.push(no + 'Photo not processed: ' + blEsc((j && j.error) || 'the server did not answer'));
+    else {
+      var d = j.drive || {}, rd = j.read || {};
+      if(!d.configured) L.push('— Google Drive filing is not switched on (WATER_DRIVE_URL / WATER_DRIVE_SECRET).');
+      else if(d.files && d.files.length) L.push(ok + 'Filed in Google Drive as ' + d.files.map(function(f){ return f.url ? '<a href="' + blEsc(f.url) + '" target="_blank" rel="noopener" style="color:var(--accent2)">' + blEsc(f.name) + '</a>' : blEsc(f.name); }).join(', ') + (d.folder ? ' · <a href="' + blEsc(d.folder) + '" target="_blank" rel="noopener" style="color:var(--accent2)">open the folder</a>' : ''));
+      else L.push(no + 'Not filed in Google Drive: ' + blEsc(d.error || 'no reason given'));
+      if(!rd.configured) L.push('— Reading the photo is not switched on (ANTHROPIC_API_KEY).');
+      else if(rd.error) L.push(no + 'Photo not read: ' + blEsc(rd.error));
+      else if(rd.value != null) L.push(ok + 'The photo reads <b>' + blEsc(String(rd.value)) + '</b> (' + blEsc(rd.confidence || 'low') + ' confidence' + (rd.note ? ' — ' + blEsc(rd.note) : '') + ')');
+      else L.push('— The photo could not be read as a meter' + (rd.note ? ': ' + blEsc(rd.note) : '') + '.');
+    }
+    el.innerHTML = '<div style="text-align:left;border:1px dashed var(--border2);border-radius:10px;padding:12px 14px;line-height:1.8;font-size:13px;color:var(--text2)">' + L.join('<br>') + '</div>';
+    return;
+  }
+  if(!j || !j.ok){ el.textContent = ''; return; }
+  var parts = [];
+  if(j.drive && j.drive.files && j.drive.files.length) parts.push('✓ Your photo is filed in the Park Manor records.');
+  if(j.read && j.read.value != null && !typed) parts.push('We read your meter as <b>' + blEsc(String(j.read.value)) + '</b> — the managing agent will confirm it.');
+  el.innerHTML = parts.join('<br>');
+}
+
+// ── "When did you last get my reading?" on the public form ─────────────────
+// Looks up what the app has on file for the unit typed in: readings sent
+// through the form and ones the trustees / managing agent captured by hand.
+// Only the date, the reading and how it arrived are shown — never photos or notes.
+function erLocalDate(d){ d = d || new Date(); return d.getFullYear() + '-' + blPad(d.getMonth() + 1, 2) + '-' + blPad(d.getDate(), 2); }
+var _erLookupT = null, _erLookupSeq = 0;
+function erPubUnitInput(){ clearTimeout(_erLookupT); _erLookupT = setTimeout(erPubLookup, 450); }
+async function erPubFetch(unit){
+  var out = [], ok = true;
+  try {
+    var r = await supa.from('electricity_readings').select('id, unit:data->>unit, month:data->>month, date:data->>date, value:data->value, source:data->>source, removed:data->removed, submittedAt:data->submittedAt, via:data->>via, photoName:data->photos->0->>name').eq('data->>unit', unit).order('updated_at', { ascending:false }).limit(36);
+    if(r && r.error) ok = false;
+    else ((r && r.data) || []).forEach(function(row){
+      var d = row.data || row;
+      if(typeof idBelongsToCurrentScheme === 'function' && row.id && !idBelongsToCurrentScheme(row.id)) return;
+      if(d.removed === true || d.removed === 'true' || erUnitKey(d.unit) !== unit || !d.month) return;
+      out.push({ id:row.id || '', hasPhoto:!!(d.photoName || (d.photos && d.photos[0])), month:d.month, date:d.date || '', value:d.value == null || d.value === '' ? null : Number(d.value), source:d.source === 'manual' ? 'manual' : 'form', via:d.via || '', at:d.via === 'billing' ? 0 : (Number(d.submittedAt) || 0) });
+    });
+  } catch(e){ ok = false; }
+  // Only the electricity_readings table counts here. (Older tick marks kept in settings —
+  // some of them copied from Davies invoice dates — are deliberately not shown.)
+  // Newest reading first by its own date. A reading typed on the Billing meters tab has no real
+  // arrival time (at = 0 above), so on the same day a reading that came with a photo ranks above it.
+  out.sort(function(a, b){ return (b.date || '').localeCompare(a.date || '') || b.at - a.at; });
+  return ok ? out : null;
+}
+async function erPubLookup(){
+  var el = document.getElementById('er-unit'); if(!el) return;
+  var unit = erUnitKey(el.value), seq = ++_erLookupSeq;
+  if(!unit){ erPubRender(null); return; }
+  erPubRender({ unit:unit, loading:true });
+  var list = await erPubFetch(unit);
+  if(seq !== _erLookupSeq) return;                // a newer keystroke won
+  erPubRender({ unit:unit, list:list });
+  // The photo that goes with the reading shown (this month's, else the last one).
+  var shown = erPubShown(list), pe = erPubPhotoEntry(list);
+  if(pe){
+    var src = await erPubPhoto(pe.id);
+    if(seq !== _erLookupSeq) return;
+    var ph = document.getElementById('er-last-photo');
+    if(ph) ph.innerHTML = src ? '<button type="button" onclick="erPubZoom(this.firstChild.src)" aria-label="Enlarge the photo we have on file" style="padding:0;border:none;background:none;cursor:zoom-in;display:block"><img src="' + src + '" alt="Meter photo on file" style="width:92px;height:92px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);display:block"></button><div style="font-size:10.5px;color:var(--muted);font-family:var(--sans);text-align:center;margin-top:3px;line-height:1.3">' + (pe !== shown && pe.date ? 'photo from ' + blEsc(blDate(pe.date)) + '<br>' : '') + 'tap to enlarge</div>' : '';
+  }
+}
+// The photo to show beside the reading: the shown reading's own, or — when that one came
+// without a photo (typed in by the trustees) — the newest photo on file for the same month.
+function erPubPhotoEntry(list){
+  var s = erPubShown(list); if(!s) return null;
+  if(s.hasPhoto && s.id) return s;
+  return list.filter(function(e){ return e.month === s.month && e.hasPhoto && e.id; })[0] || null;
+}
+function erPubShown(list){ if(!list || !list.length) return null; var thisMonth = erLocalDate().slice(0, 7); return list.filter(function(e){ return e.month === thisMonth; })[0] || list[0]; }
+// Fetch just the first photo of one reading (the list query leaves photos out to stay light).
+async function erPubPhoto(rowId){
+  try {
+    var r = await supa.from('electricity_readings').select('id, photo:data->photos->0->>data').eq('id', rowId).limit(1);
+    var hit = ((r && r.data) || []).filter(function(x){ return x.id === rowId; })[0]; if(!hit) return '';
+    var src = hit.photo || (hit.data && hit.data.photos && hit.data.photos[0] && hit.data.photos[0].data) || '';
+    return /^data:image\//.test(src) ? src : '';
+  } catch(e){ return ''; }
+}
+function erPubZoom(src){
+  var host = document.getElementById('public-view') || document.body, o = document.createElement('div');
+  o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'Meter photo');
+  o.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out';
+  o.innerHTML = '<img src="' + src + '" alt="Meter photo" style="max-width:100%;max-height:100%;border-radius:8px"><div style="position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:16px;color:#fff;font:600 15px var(--sans);background:rgba(255,255,255,.16);border-radius:99px;padding:8px 14px">Close ✕</div>';
+  o.onclick = function(){ if(o.parentNode) o.parentNode.removeChild(o); };
+  host.appendChild(o);
+}
+function erLongMonth(ym){ var p = String(ym || '').split('-'), N = ['January','February','March','April','May','June','July','August','September','October','November','December']; return p.length < 2 ? '' : N[Number(p[1]) - 1] + ' ' + p[0]; }
+function erPubRender(st){
+  var host = document.getElementById('er-last'); if(!host) return;
+  var shown = st && st.list ? erPubShown(st.list) : null, slot = (st && st.list && erPubPhotoEntry(st.list)) ? '<div id="er-last-photo" style="flex:0 0 92px;min-height:92px"><div style="width:92px;height:92px;border-radius:10px;background:rgba(127,127,127,.15)"></div></div>' : '';
+  var box = function(bg, bd, inner){ return '<div style="border:1px solid ' + bd + ';background:' + bg + ';border-radius:12px;padding:12px 14px;font-family:var(--sans);font-size:13px;line-height:1.5;color:var(--text2);display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0">' + inner + '</div>' + slot + '</div>'; };
+  if(!st){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Pick a meter to see when it was last read.</div>'; return; }
+  if(st.loading){ host.innerHTML = '<div style="font-size:12px;color:var(--muted);font-family:var(--sans)">Checking what we have for ' + blEsc(erLabel(st.unit)) + '…</div>'; return; }
+  if(st.list == null){ host.innerHTML = ''; return; }           // lookup unavailable — say nothing rather than something wrong
+  var thisMonth = erLocalDate().slice(0, 7), mine = st.list.filter(function(e){ return e.month === thisMonth; })[0], last = st.list[0];
+  var how = function(e){ return e.source === 'form' ? 'sent through this form' : 'logged by the trustees'; };
+  var val = function(e){ return e.value != null ? ' · reading <b>' + blEsc(String(e.value)) + '</b>' : ''; };
+  var h = '';
+  if(mine) h += box('var(--green-bg,rgba(74,222,158,.12))', 'var(--green-bd,rgba(74,222,158,.35))', '<div style="font-weight:700;color:var(--green)">✅ ' + blEsc(erLongMonth(thisMonth)) + ' reading received</div><div>On ' + blEsc(blDate(mine.date, true)) + val(mine) + ' · ' + how(mine) + '.</div><div style="color:var(--muted);font-size:12px;margin-top:2px">Nothing more to do — only send another if that one was wrong.</div>');
+  else h += box('var(--bl-owe-bg,rgba(240,160,111,.12))', 'var(--bl-owe-bd,rgba(240,160,111,.4))', '<div style="font-weight:700;color:var(--bl-owe,#b4570f)">⏳ No ' + blEsc(erLongMonth(thisMonth)) + ' reading yet for ' + blEsc(erLabel(st.unit)) + '</div><div>' + (last ? 'The last one we received was on <b>' + blEsc(blDate(last.date, true)) + '</b>' + val(last) + ' · ' + how(last) + '.' : 'We haven’t received a reading for this unit through the app yet.') + '</div>');
+  var earlier = [], seen = {}; if(mine) seen[thisMonth] = 1; else if(last) seen[last.month] = 1;
+  st.list.forEach(function(e){ if(seen[e.month]) return; seen[e.month] = 1; earlier.push(e); });
+  if(earlier.length) h += '<div style="margin-top:8px;font-size:12px;color:var(--muted);font-family:var(--sans)">Earlier: ' + earlier.slice(0, 4).map(function(e){ return blEsc(erLongMonth(e.month)) + ' ✓' + (e.value != null ? ' ' + blEsc(String(e.value)) : ''); }).join(' &nbsp;·&nbsp; ') + '</div>';
+  host.innerHTML = h;
+}
+
+// ── Register ────────────────────────────────────────────────────────────────
+// One row per house per month. Entries come from three places:
+//   • `electricity_readings` rows  — sent through the forms (source 'form') or
+//     captured here by hand (source 'manual'); both can be edited: reading,
+//     date, note, photos. Removing one is a soft delete (data.removed).
+//   • `settings.electricity_marks` — older tick-only marks, and the fallback when
+//     the electricity_readings table hasn't been created yet (no photos possible).
+//   • tickets with category "Water Reading" (before the dedicated form).
+// Rows are loaded a month at a time so photos don't make the screen slow.
+function erCanOpen(){ return _currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management'; }
+function erCanMark(){ return erCanOpen(); }
+function erWho(){ return (_currentUserObj && (_currentUserObj.name || _currentUserObj.username)) || 'admin'; }
+function erMonths(){ var out = [], m = ER_FIRST_MONTH, now = new Date(), last = blAddMonths(now.toISOString().slice(0, 7), 1); while(m <= last){ out.push(m); m = blAddMonths(m, 1); } return out.reverse(); }
+// Shrink a photo for storage (the full-size copy went out in the email).
+function erShrink(dataUrl, maxDim, q){
+  return new Promise(function(resolve){
+    try {
+      var img = new Image();
+      img.onload = function(){
+        var s = Math.min(1, (maxDim || 1280) / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        try { resolve(c.toDataURL('image/jpeg', q || 0.62)); } catch(e){ resolve(dataUrl); }
+      };
+      img.onerror = function(){ resolve(dataUrl); };
+      img.src = dataUrl;
+    } catch(e){ resolve(dataUrl); }
+  });
+}
+async function erUpsert(id, data){
+  try { var r = await supa.from('electricity_readings').upsert({ id:scopedId(id), data:data, updated_at:new Date().toISOString() }); return !(r && r.error); }
+  catch(e){ return false; }
+}
+async function erLoadMonth(month, force){
+  ER.cache = ER.cache || {};
+  if(ER.cache[month] && !force) return;
+  var out = {};
+  try {
+    var r = await supa.from('electricity_readings').select('id, data').eq('data->>month', month);
+    if(r && r.error){ ER.tableMissing = true; }
+    else { ER.tableMissing = false; ((r && r.data) || []).forEach(function(row){ if(!row || !row.data || row.data.month !== month) return; if(typeof idBelongsToCurrentScheme === 'function' && !idBelongsToCurrentScheme(row.id)) return; out[unscopeId(row.id)] = row.data; }); }
+  } catch(e){ ER.tableMissing = true; }
+  ER.cache[month] = out;
+}
+async function erLoad(force){
+  if(!ER.loaded || force){
+    try { var m = await sbGetSetting('electricity_marks'); ER.marks = (m && typeof m === 'object') ? m : (typeof m === 'string' ? JSON.parse(m) : {}); } catch(e){ ER.marks = {}; }
+    ER.loaded = true;
+  }
+  await Promise.all([erLoadMonth(ER.month, force), erLoadMonth(blAddMonths(ER.month, -1), force)]);
+  if(erCanMark()){ await erMigrateMarks(); await erSyncBilling(ER.month); await erSyncBilling(blAddMonths(ER.month, -1)); }
+}
+// Before the electricity_readings table existed, ticks were kept in settings.electricity_marks.
+// Now that the table is there it is the only record: ticks copied across from the
+// Billing meters tab are dropped (many carried a Davies invoice date such as the 1st —
+// genuine ones are re-derived from Billing by erSyncBilling), and ticks made by hand
+// become proper rows.
+async function erMigrateMarks(){
+  if(ER.tableMissing || !ER.marks) return;
+  var months = Object.keys(ER.marks).filter(function(m){ return ER.marks[m] && Object.keys(ER.marks[m]).length; });
+  if(!months.length) return;
+  var dirty = false;
+  for(var i = 0; i < months.length; i++){
+    var month = months[i], mk = ER.marks[month];
+    await erLoadMonth(month); if(ER.tableMissing) break;
+    var rows = ER.cache[month] || {}, units = Object.keys(mk);
+    for(var j = 0; j < units.length; j++){
+      var unit = units[j], m = mk[unit] || {};
+      if(m.received && !/Billing meters tab/i.test(m.note || '')){
+        var has = Object.keys(rows).some(function(id){ return rows[id] && !rows[id].removed && erUnitKey(rows[id].unit) === erUnitKey(unit); });
+        if(!has){
+          var id = 'er_k_' + month + '_' + erUnitKey(unit);
+          var data = { unit:erUnitKey(unit), month:month, date:m.date || (month + '-01'), value:m.value == null || m.value === '' ? null : Number(m.value), note:m.note || '', source:'manual', by:m.by || 'admin', submittedAt:Number(m.at) || Date.now(), fromTick:true, photos:[] };
+          if(data.value != null) data.valueRaw = String(data.value);
+          if(!(await erUpsert(id, data))) continue;                    // couldn't save — keep the tick for next time
+          rows[id] = data;
+        }
+      }
+      delete mk[unit]; dirty = true;
+    }
+    if(!Object.keys(mk).length) delete ER.marks[month];
+  }
+  if(dirty) await erSaveMarks();
+}
+// ── Billing ↔ register ──────────────────────────────────────────────────────
+// A electricity reading typed on a unit's Meters tab in Billing (or captured on an
+// invoice issued here) is a reading received, so it counts in the register and
+// on the residents' status panel. Readings that came in with imported Davies
+// invoices don't count — they are Davies' billing of an older reading.
+// Did this meter row come in with an imported Davies invoice? Those carry the
+// invoice (billing) date, not the day the meter was read, and the reading is
+// an older one — so they never count as "received". Recognised by the invoice
+// number on the row, the import's separate reading date, or — for rows from
+// earlier imports that kept neither — the value/date matching an imported invoice.
+function erIsImportedReading(u, r){
+  var invs = u.importedInvoices || [];
+  if(r.eDate && r.eDate !== r.date) return true;
+  for(var i = 0; i < invs.length; i++){
+    var inv = invs[i];
+    if(r.src && r.src === inv.invoiceNo) return true;
+    var w = (inv.lines || []).filter(function(l){ return (l.kind === 'elec' || l.kind === 'electricity') && l.meter && l.meter.curr != null; })[0];
+    if(w && Math.abs(Number(w.meter.curr) - Number(r.elec)) < 0.00051) return true;
+    if(!w && inv.date && inv.date === r.date) return true;
+  }
+  return false;
+}
+function erBillingReadings(month){
+  var out = [];
+  if(typeof UNITS === 'undefined') return out;
+  Object.values(UNITS).forEach(function(u){
+    if(blIsGarage(u)) return;
+    (u.meterReadings || []).forEach(function(r){
+      if(r.elec == null || r.elec === '') return;
+      var d = r.eDate || r.date || ''; if(d.slice(0, 7) !== month) return;
+      if(/^electricity (register|form)$/i.test(r.src || '') || erIsImportedReading(u, r)) return;
+      out.push({ id:'er_b_' + u.section + '_' + d, unit:String(u.section), date:d, value:Number(r.elec) });
+    });
+  });
+  return out;
+}
+async function erSyncBilling(month){
+  if(month < ER_FIRST_MONTH || typeof UNITS === 'undefined' || !Object.keys(UNITS).length) return 0;
+  var cache = ER.cache[month] = ER.cache[month] || {}, list = erBillingReadings(month), live = {}, n = 0, marksDirty = false;
+  for(var i = 0; i < list.length; i++){
+    var b = list[i], cur = cache[b.id]; live[b.id] = 1;
+    var revive = cur && cur.removed && cur.removedBy === 'billing';      // deleted in Billing earlier, typed in again
+    if(cur && !revive && (cur.removed || Number(cur.value) === b.value)) continue;
+    var data = Object.assign({}, cur || { source:'manual', via:'billing', by:erWho(), submittedAt:Date.now(), photos:[] }, { unit:b.unit, month:month, date:b.date, value:b.value, valueRaw:String(b.value), removed:false });
+    if(await erUpsert(b.id, data)){ cache[b.id] = data; n++; }
+    else if(!((ER.marks[month] || {})[b.unit])){ ER.marks[month] = ER.marks[month] || {}; ER.marks[month][b.unit] = { received:true, date:b.date, value:b.value, note:'from the Billing meters tab', by:erWho(), at:Date.now() }; marksDirty = true; }
+  }
+  // a reading deleted in Billing comes off the register again
+  var ids = Object.keys(cache);
+  for(var j = 0; j < ids.length; j++){
+    var id = ids[j], row = cache[id];
+    if(id.indexOf('er_b_') !== 0 || row.removed || live[id] || row.via !== 'billing') continue;
+    var gone = Object.assign({}, row, { removed:true, removedBy:'billing', removedAt:Date.now() });
+    if(await erUpsert(id, gone)) cache[id] = gone;
+  }
+  if(marksDirty) await erSaveMarks();
+  return n;
+}
+// After a unit is saved in Billing, push its readings across straight away.
+async function erSyncFromBilling(){
+  try {
+    if(!erCanMark()) return;
+    if(!ER.loaded){ try { var m = await sbGetSetting('electricity_marks'); ER.marks = (m && typeof m === 'object') ? m : (typeof m === 'string' ? JSON.parse(m) : {}); } catch(e){ ER.marks = {}; } ER.loaded = true; }
+    var now = erLocalDate().slice(0, 7), months = [now, blAddMonths(now, -1)];
+    for(var i = 0; i < months.length; i++){ await erLoadMonth(months[i], true); await erSyncBilling(months[i]); }
+    if(ER.open) renderElecRegister();
+  } catch(e){ console.warn('erSyncFromBilling', e); }
+}
+(function(){ var o = saveUnitFromModal; saveUnitFromModal = async function(){ var r = await o.apply(this, arguments); if(r) erSyncFromBilling(); return r; }; })();
+async function erSaveMarks(){ try { await sbSetSetting('electricity_marks', ER.marks); } catch(e){ console.warn('water marks', e); } }
+function erUnitKey(u){ return String(u || '').trim().replace(/^(unit|house|door)\s*(no\.?)?\s*/i, '').replace(/^0+(\d)/, '$1'); }
+function erHouseList(){
+  if(typeof UNITS !== 'undefined' && Object.keys(UNITS).length){
+    var hs = Object.values(UNITS).filter(function(u){ return !blIsGarage(u); }).sort(function(a, b){ return a.section - b.section; }).map(function(u){ return { key:String(u.section), label:'House ' + (u.houseNo || u.section), owner:u.ownerName || '', uid:u.id }; });
+    if(hs.length) return hs;
+  }
+  var out = []; for(var i = 1; i <= ER_HOUSES; i++) out.push({ key:String(i), label:'House ' + i, owner:'' }); return out;
+}
+function erEntryTime(e){ return (e.kind === 'billing' || e.via === 'billing') ? 0 : (Number(e.submittedAt) || 0); }
+function erEntryCmp(a, b){ return String(b.date || '').localeCompare(String(a.date || '')) || (erEntryTime(b) - erEntryTime(a)); }
+// Does the managing agent have this reading? Emailed by the app when it was sent,
+// or marked by hand afterwards (sent by email / WhatsApp outside the app).
+// null for entries where it doesn't apply (tickets, readings that live in Billing).
+function erAgentState(e){
+  if(!e || !e.id || !(e.kind === 'form' || e.kind === 'manual') || e.via === 'billing') return null;
+  if(e.emailed === true) return { ok:true, app:true, text:'emailed by the app' };
+  if(e.agentSent) return { ok:true, text:'sent outside the app' + (e.agentSentBy ? ' · marked by ' + e.agentSentBy : '') };
+  return { ok:false, text:'not sent yet' + (e.emailSkipped ? ' (email was switched off)' : '') };
+}
+function erHow(e){
+  return e.kind === 'form' ? '⚡ sent via the form' + (e.emailSkipped ? ' · 🧪 test' : '') + (e.editedBy ? ' · edited by ' + e.editedBy : '')
+    : e.kind === 'ticket' ? '🎫 ticket #' + (e.ticketNumber || '')
+    : e.kind === 'billing' ? '📥 entered on the Billing meters tab'
+    : e.via === 'drive' ? '📁 photo added in the Drive folder · picked up by ' + (e.by || 'admin')
+    : '✍️ captured by ' + (e.by || 'admin') + (e.via === 'billing' ? ' · on the Billing meters tab' : '');
+}
+// One of the other readings a house has this month (the newest is shown in full above it).
+function erEntryMini(e, k, canMark){
+  var photos = (e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border2);cursor:pointer;flex:none" onclick="erPhoto(\'' + blEsc(e.id || '') + '\',' + i + ')">'; }).join('');
+  var drive = (e.driveFiles || []).map(function(f){ return '<a href="' + blEsc(f.url) + '" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">📁 ' + blEsc(f.name) + '</a>'; }).join(' · ');
+  var editable = canMark && e.id && (e.kind === 'form' || e.kind === 'manual') && e.via !== 'billing';      // Billing-tab readings are changed in Billing
+  return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border2)">'
+    + (photos ? '<div style="display:flex;gap:6px;flex:none">' + photos + '</div>' : '')
+    + '<div style="flex:1;min-width:0;overflow-wrap:anywhere"><div><b>' + blEsc(blDate(e.date || '', true)) + '</b> · ' + (e.value != null ? '<b>' + blEsc(String(e.value)) + ' kWh</b>' : (e.ai && e.ai.value != null ? 'photo reads ' + blEsc(String(e.ai.value)) : 'reading not typed in')) + '</div>'
+    + '<div style="color:var(--muted);font-size:12px">' + blEsc(erHow(e)) + '</div>'
+    + (function(){ var a = erAgentState(e); return a ? '<div style="font-size:12px;color:' + (a.ok ? 'var(--muted)' : 'var(--bl-owe)') + '">' + (a.ok ? '✉️ Agent: ' : '⚠️ Agent: ') + blEsc(a.text) + '</div>' : ''; })()
+    + (e.note ? '<div style="color:var(--muted);font-size:12px">“' + blEsc(e.note) + '”</div>' : '')
+    + (drive ? '<div style="font-size:12px">' + drive + '</div>' : '') + '</div>'
+    + (editable ? '<button type="button" class="bl-btn sm" style="flex:none" aria-label="Edit this reading" onclick="erEdit(\'' + blEsc(k) + '\',\'' + blEsc(e.id) + '\')">✏️</button>' : '')
+    + '</div>';
+}
+function erRowsFor(month){
+  var byUnit = {};
+  var add = function(unit, e){ var k = erUnitKey(unit); if(!k) return; (byUnit[k] = byUnit[k] || []).push(e); };
+  var rows = (ER.cache || {})[month] || {};
+  Object.keys(rows).forEach(function(id){ var r = rows[id]; if(!r || r.removed) return; add(r.unit, Object.assign({ id:id, kind:r.source === 'manual' ? 'manual' : 'form' }, r)); });
+  var mk = (ER.marks || {})[month] || {};
+  Object.keys(mk).forEach(function(unit){ var m = mk[unit]; if(m && m.received) add(unit, Object.assign({ kind:'mark', submittedAt:m.at }, m)); });
+  erBillingReadings(month).forEach(function(b){ if(rows[b.id] || (mk[b.unit] && mk[b.unit].received)) return; add(b.unit, { kind:'billing', date:b.date, value:b.value, submittedAt:0 }); });
+  if(typeof TICKETS !== 'undefined'){
+    Object.values(TICKETS || {}).forEach(function(t){ if(!t || t.category !== 'Electricity Reading') return; var d = String(t.dateOpen || (t.added ? new Date(t.added).toISOString().slice(0, 10) : '')); if(d.slice(0, 7) !== month) return; add(t.unit, { kind:'ticket', id:t.id, date:d, submittedAt:t.added || 0, value:erParseValue(t.desc) != null ? erParseValue(t.desc) : erParseValue(t.title), note:t.title, ticketNumber:t.ticketNumber }); });
+  }
+  var houses = erHouseList().map(function(h){ var es = (byUnit[h.key] || []).sort(erEntryCmp); delete byUnit[h.key]; return { house:h, entries:es, received:es.length > 0, latest:es[0] || null }; });
+  var stray = Object.keys(byUnit).map(function(k){ var es = byUnit[k].sort(erEntryCmp); return { house:{ key:k, label:'Unit ' + k, owner:'', unknown:true }, entries:es, received:true, latest:es[0] }; });
+  return { houses:houses, stray:stray };
+}
+function erValueOf(month, key){ var d = erRowsFor(month), hit = null; d.houses.forEach(function(x){ if(x.house.key === key) x.entries.forEach(function(e){ if(hit == null && e.value != null) hit = Number(e.value); }); }); return hit; }
+async function openElecRegister(month){
+  if(!erCanOpen()){ blToast('Only trustees, management and admin can see the readings register.', 'err'); return; }
+  if(typeof blEnsureBillingLoaded === 'function'){ try { await blEnsureBillingLoaded(); } catch(e){} }
+  ER.month = month || ER.month || new Date().toISOString().slice(0, 7); if(ER.month < ER_FIRST_MONTH) ER.month = ER_FIRST_MONTH;
+  await Promise.all([erLoad(true), erConfig()]);     // fresh every time: readings may have come in since it was last open
+  ER.open = true;
+  var m = blEl('er-modal'); m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  if(!ER.nav){ ER.nav = true; blNavPush(function(){ ER.nav = false; closeElecRegister(true); }); }
+  renderElecRegister();
+  erDriveCheck(ER.month);                         // in the background: photos added straight into Drive
+}
+function closeElecRegister(fromBack){
+  var m = blEl('er-modal'); if(m) m.style.display = 'none';
+  if(!BL.open) document.body.style.overflow = '';
+  ER.open = false;
+  if(ER.nav && fromBack !== true){ ER.nav = false; blNavPop(); }
+}
+async function erSetMonth(v){ ER.month = v; await erLoad(); renderElecRegister(); erDriveCheck(ER.month); }
+async function erRefresh(){ await erLoad(true); renderElecRegister(); if(erCanMark() && ER.cfg && ER.cfg.drive && !ER.tableMissing) await erDriveCheck(ER.month, true); else blToast('Up to date'); }
+function renderElecRegister(){
+  var body = blEl('er-body'), foot = blEl('er-foot'); if(!body) return;
+  var data = erRowsFor(ER.month), got = data.houses.filter(function(h){ return h.received; }).length, n = data.houses.length, canMark = erCanMark();
+  var sub = blEl('er-sub'); if(sub) sub.textContent = blMonthName(ER.month) + ' · ' + got + ' of ' + n + ' received';
+  var h = '';
+  if(ER.tableMissing) h += '<div class="bl-note"><span class="ic">⚠️</span><span>The readings table isn’t set up yet, so readings sent through the form aren’t recorded here and photos can’t be saved. Run <b>ELECTRICITY_READINGS_SETUP.sql</b> once in Supabase. Until then you can still tick houses off by hand.</span></div>';
+  h += '<div class="bl-card2"><div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="er-month">Month</label><select id="er-month" class="bl-in" onchange="erSetMonth(this.value)">' + erMonths().map(function(m){ return '<option value="' + m + '"' + (m === ER.month ? ' selected' : '') + '>' + blMonthName(m) + '</option>'; }).join('') + '</select></div>'
+    + '<div class="bl-tile' + (got === n ? ' ok' : (got ? '' : ' owe')) + '" style="padding:10px 14px"><div class="k">Received</div><div class="v">' + got + ' / ' + n + '</div><div class="s">' + (got === n ? 'everyone’s in' : (n - got) + ' outstanding') + '</div></div></div>'
+    + '<div class="bl-hint" style="margin-top:10px">Readings sent through the electricity-meter form tick themselves off. For anything that came by WhatsApp, email or a walk-around, tap <b>Add reading</b> on the house: type the reading, attach the photo, save.</div>'
+    + '<a class="bl-btn pri" style="display:flex;align-items:center;justify-content:center;width:100%;margin-top:10px;text-decoration:none;box-sizing:border-box" href="' + location.pathname + '?electricity" target="_blank" rel="noopener">⚡ Take readings now</a>'
+    + (ER.cfg ? '<div class="bl-chipsrow" style="margin-top:10px"><span class="bl-st ' + (ER.cfg.drive ? 'final' : 'imp') + '">📁 Photos to Google Drive: ' + (ER.cfg.drive ? 'on' : 'not set up') + '</span><span class="bl-st ' + (ER.cfg.read ? 'final' : 'imp') + '">🔍 Read meter from photo: ' + (ER.cfg.read ? 'on' : 'not set up') + '</span></div>' : '') + '</div>';
+  var dv = (ER.drive || {})[ER.month];
+  if(canMark && dv && dv.files && dv.files.length) h += '<div class="bl-card2"><div class="bl-note info" style="margin:0"><span class="ic">📁</span><span><b>' + dv.files.length + ' photo' + (dv.files.length > 1 ? 's' : '') + '</b> in the Google Drive folder ' + (dv.files.length > 1 ? 'aren’t' : 'isn’t') + ' on this list yet: <span style="overflow-wrap:anywhere">' + dv.files.slice(0, 8).map(function(f){ return blEsc(f.name); }).join(', ') + (dv.files.length > 8 ? ' …' : '') + '</span></span></div><button type="button" class="bl-btn pri" style="width:100%;margin-top:10px" onclick="erDriveImportUi()">＋ Add ' + (dv.files.length > 1 ? 'them' : 'it') + ' to the list</button></div>';
+  else if(canMark && dv && dv.error && !dv.outdated) h += '<div class="bl-card2"><div class="bl-hint" style="overflow-wrap:anywhere">📁 Couldn’t check the Drive folder for photos added by hand: ' + blEsc(dv.error) + '</div></div>';
+  else if(canMark && dv && dv.outdated) h += '<div class="bl-card2"><div class="bl-hint">📁 To pick up photos you drop straight into the Drive folder, the Google script needs its newer version — paste in <b>docs/water-readings-drive.gs</b> and deploy a New version.</div></div>';
+  var outstanding = data.houses.filter(function(x){ return !x.received; });
+  if(outstanding.length && got) h += '<div class="bl-card2"><div class="bl-h"><span>Still outstanding</span><button type="button" class="lnk" onclick="erCopyReminder()">Copy reminder</button></div><div class="bl-chipsrow">' + outstanding.map(function(x){ return '<button type="button" class="bl-chip" style="height:36px" ' + (canMark ? 'onclick="erEdit(\'' + blEsc(x.house.key) + '\')"' : '') + '>' + blEsc(x.house.label) + '</button>'; }).join('') + '</div></div>';
+  var prev = blAddMonths(ER.month, -1);
+  h += '<div class="bl-card2">' + data.houses.concat(data.stray).map(function(x){ return erHouseRow(x, canMark, prev); }).join('') + '</div>';
+  body.innerHTML = h;
+  foot.innerHTML = '<button type="button" class="bl-btn" onclick="erRefresh()">↻</button>' + (outstanding.length && !got ? '<button type="button" class="bl-btn" onclick="erCopyReminder()">Copy reminder</button>' : '') + '<span class="grow"></span>' + (canMark ? '<button type="button" class="bl-btn pri" onclick="erEdit(null)">＋ Add reading</button>' : '<button type="button" class="bl-btn" onclick="closeElecRegister()">Close</button>');
+}
+function erHouseRow(x, canMark, prevMonth){
+  var e = x.latest, k = x.house.key;
+  var src = e ? erHow(e) : '';
+  var prevVal = e && e.value != null ? erValueOf(prevMonth, k) : null, used = (prevVal != null) ? Math.round((Number(e.value) - prevVal) * 1000) / 1000 : null;
+  var ai = e && e.ai, drive = (e && e.driveFiles) || [], aiHtml = '';
+  if(ai && ai.value != null){
+    if(e.value == null) aiHtml = '<div class="bl-note info" style="margin-top:8px;padding:10px 12px"><span class="ic">🔍</span><span>The photo reads <b>' + blEsc(String(ai.value)) + ' kWh</b> <span style="color:var(--muted)">(' + blEsc(ai.confidence || 'low') + ' confidence' + (ai.note ? ' — ' + blEsc(ai.note) : '') + ')</span></span>' + (canMark && e.id ? '<button type="button" class="bl-btn sm pri" onclick="erUseAi(\'' + blEsc(e.id) + '\')">✓ Use</button>' : '') + '</div>';
+    else if(Math.abs(Number(e.value) - Number(ai.value)) > 0.5) aiHtml = '<div class="bl-note" style="margin-top:8px;padding:10px 12px"><span class="ic">⚠️</span><span>The photo reads <b>' + blEsc(String(ai.value)) + '</b> but <b>' + blEsc(String(e.value)) + '</b> was typed — worth a look' + (ai.note ? ' (' + blEsc(ai.note) + ')' : '') + '.</span>' + (canMark && e.id ? '<button type="button" class="bl-btn sm" onclick="erUseAi(\'' + blEsc(e.id) + '\')">Use photo</button>' : '') + '</div>';
+    else aiHtml = '<div class="bl-chk" style="margin-top:4px"><span class="ok">✓</span> matches what the photo shows</div>';
+  } else if(ai && (ai.error || ai.note)) aiHtml = '<div class="bl-chk" style="margin-top:4px">🔍 Couldn’t read the photo' + (ai.note ? ': ' + blEsc(ai.note) : '') + '</div>';
+  var driveHtml = drive.length ? '<div class="row"><span>Drive</span><b style="text-align:right">' + drive.map(function(f){ return '<a href="' + blEsc(f.url) + '" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">📁 ' + blEsc(f.name) + '</a>'; }).join('<br>') + '</b></div>' : (e && e.driveError ? '<div class="row"><span>Drive</span><b style="text-align:right;color:var(--bl-owe);font-weight:500">not filed: ' + blEsc(e.driveError) + '</b></div>' : '');
+  var canFile = canMark && e && e.id && (e.kind === 'form' || e.kind === 'manual') && (e.photos || []).length && ER.cfg && (ER.cfg.drive || ER.cfg.read) && ((ER.cfg.drive && !drive.length) || (ER.cfg.read && !ai));
+  var photos = (e && e.photos || []).map(function(p, i){ return '<img src="' + p.data + '" alt="meter photo" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);cursor:pointer" onclick="erPhoto(\'' + blEsc(e.id || '') + '\',' + i + ')">'; }).join('');
+  var more = '';
+  if(e){
+    more = '<div class="bl-lr-more" style="display:block;margin-top:8px">'
+      + '<div class="row"><span>Reading</span><b>' + (e.value != null ? blEsc(String(e.value)) + ' kWh' + (used != null ? ' <span style="font-weight:500;color:' + (used < 0 ? 'var(--bl-owe)' : 'var(--muted)') + '">· ' + used + ' used since ' + blEsc(blMonthName(prevMonth)) + '</span>' : '') : (e.valueRaw ? blEsc(e.valueRaw) : '<span style="color:var(--bl-owe);font-weight:500">not typed in yet</span>')) + '</b></div>'
+      + '<div class="row"><span>Received</span><b>' + blEsc(blDate(e.date || '', true)) + (x.entries.length > 1 ? ' <span style="font-weight:500;color:var(--muted)">· latest of ' + x.entries.length + '</span>' : '') + '</b></div>'
+      + '<div class="row"><span>How</span><b style="text-align:right">' + blEsc(src) + '</b></div>'
+      + (function(){ var a = erAgentState(e); return a ? '<div class="row"><span>Agent</span><b style="text-align:right;font-weight:500;color:' + (a.ok ? 'var(--text2)' : 'var(--bl-owe)') + '">' + (a.ok ? '✉️ ' : '⚠️ ') + blEsc(a.text) + '</b></div>' : ''; })()
+      + (e.note ? '<div class="row"><span>Note</span><b style="text-align:right;max-width:70%">' + blEsc(e.note) + '</b></div>' : '')
+      + (e.copyTo ? '<div class="row"><span>Copy</span><b style="text-align:right;font-weight:500;overflow-wrap:anywhere">' + (e.copySent ? '✉️ emailed to ' : '⚠️ not delivered to ') + blEsc(e.copyTo) + '</b></div>' : '')
+      + driveHtml
+      + (photos ? '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + photos + '</div>' : '')
+      + aiHtml
+      + (canMark ? '<div class="bl-doc-acts"><button type="button" class="bl-btn sm" onclick="erEdit(\'' + blEsc(k) + '\',true)">✏️ Edit' + (e.value == null ? ' · type the reading' : '') + '</button>'
+        + (canFile ? '<button type="button" class="bl-btn sm" onclick="erFileExisting(\'' + blEsc(e.id) + '\')">' + (ER.cfg.drive && !drive.length ? '📁 Save to Drive' + (ER.cfg.read && !ai ? ' &amp; read' : '') : '🔍 Read the photo') + '</button>' : '')
+        + (e.value != null && x.house.uid && typeof blRO === 'function' && !blRO() ? '<button type="button" class="bl-btn sm" onclick="erToBilling(\'' + x.house.uid + '\',\'' + blEsc(e.date || '') + '\',' + Number(e.value) + ')">📥 To billing</button>' : '') + '</div>' : '')
+      + (x.entries.length > 1 ? '<div style="margin-top:12px"><div style="font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:2px">Also this month · ' + (x.entries.length - 1) + '</div>' + x.entries.slice(1).map(function(o){ return erEntryMini(o, k, canMark); }).join('') + '</div>' : '')
+      + '</div>';
+  } else if(canMark){
+    more = '<div class="bl-doc-acts" style="margin-top:8px"><button type="button" class="bl-btn sm pri" onclick="erEdit(\'' + blEsc(k) + '\')">＋ Add reading</button></div>';
+  }
+  return '<div class="bl-lr" style="cursor:default"><div class="bl-lr-main"><div class="bl-lic">' + (x.received ? '✅' : '⬜') + '</div><div class="bl-ltx"><b>' + blEsc(x.house.label) + (x.house.unknown ? ' <span class="bl-st warn">not a house</span>' : '') + '</b><small>' + blEsc(blNice(x.house.owner || '')) + '</small></div>'
+    + '<div class="bl-lam"><b style="color:' + (x.received ? 'var(--green)' : 'var(--bl-owe)') + '">' + (x.received ? 'Received' : 'Outstanding') + '</b><small>' + (e ? blEsc(blDate(e.date || '')) + (e.value != null ? ' · ' + blEsc(String(e.value)) : '') : '—') + '</small></div></div>' + more + '</div>';
+}
+function erFindPhotoEntry(id){ var hit = null; Object.keys(ER.cache || {}).forEach(function(m){ if(ER.cache[m][id]) hit = ER.cache[m][id]; }); return hit; }
+function erPhoto(id, i){ var r = erFindPhotoEntry(id); var p = r && r.photos && r.photos[i]; if(!p) return; var w = window.open('', '_blank'); if(w){ w.document.write('<title>Meter photo</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="' + p.data + '" style="max-width:100%;max-height:100vh"></body>'); } }
+
+// ── Capture / edit one reading ──────────────────────────────────────────────
+var ER_MAX_PHOTOS = 3;
+function erEditPhotosHtml(){
+  var ed = ER.edit || { photos:[] };
+  return (ed.photos || []).map(function(p, i){ return '<div style="position:relative;width:76px;height:76px"><img src="' + p.data + '" alt="" style="width:76px;height:76px;object-fit:cover;border-radius:10px;border:1px solid var(--border2)"><button type="button" aria-label="Remove photo" onclick="erEditRemovePhoto(' + i + ')" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;border:none;background:rgba(0,0,0,.75);color:#fff;font-size:13px;cursor:pointer">✕</button></div>'; }).join('')
+    + (ed.busy ? '<div class="bl-hint" style="align-self:center">Adding photo…</div>' : '');
+}
+function erEditRemovePhoto(i){ ER.edit.photos.splice(i, 1); var h = blEl('ere-photos'); if(h) h.innerHTML = erEditPhotosHtml(); }
+async function erEditAddFiles(files){
+  var ed = ER.edit; if(!ed) return;
+  var list = Array.from(files || []), host = blEl('ere-photos');
+  ed.busy = true; if(host) host.innerHTML = erEditPhotosHtml();
+  for(var i = 0; i < list.length; i++){
+    if(ed.photos.length >= ER_MAX_PHOTOS){ blToast('Up to ' + ER_MAX_PHOTOS + ' photos per reading.', 'err'); break; }
+    try { var c = await publicCompressPhoto(list[i]); var small = await erShrink(c.data); ed.photos.push({ name:c.name || list[i].name || 'meter.jpg', type:'image/jpeg', data:small, _new:true, _full:c.data }); }
+    catch(e){ blToast('Couldn’t read that photo.', 'err'); }
+  }
+  ed.busy = false; if(host) host.innerHTML = erEditPhotosHtml();
+}
+// unit: house key or null (pick one in the dialog); editLatest: open the house's newest entry.
+async function erEdit(unit, editLatest){
+  if(!erCanMark()) return;
+  var data = erRowsFor(ER.month), today = new Date().toISOString().slice(0, 10), existing = null;
+  if(unit && editLatest){ data.houses.concat(data.stray).forEach(function(x){ if(x.house.key !== unit) return; existing = typeof editLatest === 'string' ? (x.entries.filter(function(o){ return o.id === editLatest; })[0] || null) : x.latest; }); }
+  if(existing && (existing.kind === 'ticket' || existing.kind === 'billing')) existing = null;      // tickets stay as they are; capture a fresh entry instead
+  var inMonth = today.slice(0, 7) === ER.month ? today : blLastOfMonth(ER.month);
+  ER.edit = { unit:unit, existing:existing, photos:existing && existing.photos ? existing.photos.slice() : [], busy:false };
+  var houses = erHouseList(), outstanding = data.houses.filter(function(x){ return !x.received; }).map(function(x){ return x.house.key; });
+  var prevVal = unit ? erValueOf(blAddMonths(ER.month, -1), unit) : null;
+  var body = (unit ? '' : '<div class="bl-f" style="margin-bottom:10px"><label class="bl-lbl" for="ere-unit">House</label><select id="ere-unit" class="bl-in">' + houses.map(function(hh){ return '<option value="' + blEsc(hh.key) + '"' + (outstanding[0] === hh.key ? ' selected' : '') + '>' + blEsc(hh.label) + (hh.owner ? ' · ' + blEsc(blNice(hh.owner)) : '') + (outstanding.indexOf(hh.key) < 0 ? ' ✓' : '') + '</option>'; }).join('') + '</select></div>')
+    + '<div class="bl-grid g2"><div class="bl-f"><label class="bl-lbl" for="ere-value">Reading (kWh)</label><input id="ere-value" type="number" step="0.0001" inputmode="decimal" class="bl-in" placeholder="digits on the meter" value="' + (existing && existing.value != null ? existing.value : '') + '"></div>'
+    + '<div class="bl-f"><label class="bl-lbl" for="ere-date">Received on</label><input id="ere-date" type="date" class="bl-in" value="' + blEsc((existing && existing.date) || inMonth) + '"></div></div>'
+    + (prevVal != null ? '<div class="bl-hint" style="margin-top:6px">Last month’s reading: <b>' + prevVal + '</b></div>' : '')
+    + '<div class="bl-f" style="margin-top:10px"><label class="bl-lbl">Photo of the meter</label><div id="ere-photos" style="display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 8px">' + erEditPhotosHtml() + '</div>'
+    + '<div style="display:flex;gap:8px"><label class="bl-btn" style="flex:1" for="ere-cam">📷 Take photo</label><label class="bl-btn" style="flex:1" for="ere-gal">🖼 Choose</label></div>'
+    + '<input id="ere-cam" type="file" accept="image/*" capture="environment" style="display:none" onchange="erEditAddFiles(this.files);this.value=\'\'"><input id="ere-gal" type="file" accept="image/*" multiple style="display:none" onchange="erEditAddFiles(this.files);this.value=\'\'"></div>'
+    + '<div class="bl-f" style="margin-top:10px"><label class="bl-lbl" for="ere-note">Note (optional)</label><input id="ere-note" type="text" class="bl-in" placeholder="e.g. sent by WhatsApp" value="' + blEsc((existing && existing.note) || '') + '"></div>'
+    + (function(){
+        var app = !!(existing && existing.emailed === true), on = app || !!(existing && existing.agentSent);
+        return '<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--border2);border-radius:12px"><label for="ere-agent" style="display:flex;align-items:center;gap:12px;min-height:44px;cursor:' + (app ? 'default' : 'pointer') + '"><input id="ere-agent" type="checkbox"' + (on ? ' checked' : '') + (app ? ' disabled' : '') + ' style="width:22px;height:22px;flex:none;accent-color:var(--accent)"><span style="font:600 14px var(--sans);color:var(--text2)">The managing agent has this reading</span></label>'
+          + '<div class="bl-hint" style="margin-top:2px">' + (app ? 'Emailed to them by the app when it was sent.' : 'Tick this if you sent it to them yourself, e.g. by email or WhatsApp.') + '</div></div>';
+      })()
+    + (ER.cfg && ER.cfg.read ? '<div class="bl-hint" style="margin-top:8px">Tip: leave the reading blank and it’s read from the photo for you to confirm.</div>' : '')
+    + (ER.tableMissing ? '<div class="warn" style="margin-top:10px">Photos can’t be saved until ELECTRICITY_READINGS_SETUP.sql has been run — the reading and note will be.</div>' : '');
+  var picked = null, collect = function(){ picked = { unit:unit || (blEl('ere-unit') || {}).value || '', date:(blEl('ere-date') || {}).value || inMonth, value:_mrNum((blEl('ere-value') || {}).value), note:_uStr('ere-note'), agent:!!((blEl('ere-agent') || {}).checked) }; };
+  var buttons = [{ label:existing ? 'Save changes' : 'Save reading', kind:'pri', value:'save', onClick:collect }];
+  if(existing) buttons.push({ label:'Remove this reading', kind:'dng', value:'remove' });
+  buttons.push({ label:'Cancel', value:false });
+  var title = (unit ? erLabel(unit, true) : 'Add a reading') + ' · ' + blMonthName(ER.month);
+  var res = await blDialog({ title:title, body:body, cancel:false, buttons:buttons });
+  var ed = ER.edit; ER.edit = null;
+  if(res === 'remove'){ await erRemoveEntry(ed.unit, existing); return; }
+  if(res !== 'save' || !picked) return;
+  if(!picked.unit){ blToast('Choose the house.', 'err'); return; }
+  await erSaveEntry(picked, existing, ed.photos || []);
+}
+async function erSaveEntry(p, existing, photos){
+  var fresh = (photos || []).filter(function(x){ return x._new; }).map(function(x){ return { name:x.name, type:x.type, dataUrl:x._full || x.data }; });
+  photos = (photos || []).map(function(x){ return { name:x.name, type:x.type, data:x.data }; });
+  var month = ER.month, isRow = existing && (existing.kind === 'form' || existing.kind === 'manual') && existing.id;
+  var id = isRow ? existing.id : 'er_m_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  var base = isRow ? Object.assign({}, (ER.cache[month] || {})[id] || {}) : { source:'manual', by:erWho(), submittedAt:Date.now() };
+  var data = Object.assign(base, { unit:String(p.unit), month:month, date:p.date, value:p.value, note:p.note, photos:photos });
+  if(p.value != null) data.valueRaw = String(p.value);
+  if(data.emailed !== true && 'agent' in p){                       // "the managing agent has this reading", set by hand
+    if(p.agent && !data.agentSent){ data.agentSent = true; data.agentSentBy = erWho(); data.agentSentAt = Date.now(); }
+    else if(!p.agent){ delete data.agentSent; delete data.agentSentBy; delete data.agentSentAt; }
+  }
+  if(isRow){ data.editedBy = erWho(); data.editedAt = Date.now(); }
+  var ok = await erUpsert(id, data);
+  if(ok){
+    ER.cache[month] = ER.cache[month] || {}; ER.cache[month][id] = data; ER.tableMissing = false;
+    if((ER.marks[month] || {})[p.unit]){ delete ER.marks[month][p.unit]; await erSaveMarks(); }      // superseded tick
+    renderElecRegister(); blToast(erLabel(p.unit, true) + (isRow ? ' updated' : ' recorded'), 'ok');
+    if(fresh.length && ER.cfg && (ER.cfg.drive || ER.cfg.read)) erFileAndRefresh(id, fresh, month);
+  } else {
+    ER.tableMissing = true;
+    ER.marks[month] = ER.marks[month] || {};
+    ER.marks[month][p.unit] = { received:true, date:p.date, value:p.value, note:p.note, by:erWho(), at:Date.now() };
+    await erSaveMarks(); renderElecRegister();
+    blToast(erLabel(p.unit, true) + ' ticked off' + (photos.length ? ' — the photo wasn’t saved (table not set up)' : ''), photos.length ? 'err' : 'ok');
+  }
+}
+// File photos / read the meter for a saved row, then show what came back.
+async function erFileAndRefresh(id, photos, month, opts){
+  blToast((ER.cfg && ER.cfg.drive && !(opts && opts.drive === false) ? 'Saving the photo to Drive' : 'Reading the photo') + '…');
+  var j = await erFile(id, photos, opts);
+  await erLoadMonth(month, true); if(ER.open) renderElecRegister();
+  if(!j || !j.ok){ blToast('Couldn’t file the photo: ' + ((j && j.error) || 'no connection'), 'err'); return; }
+  var bits = [];
+  if(j.drive && j.drive.files && j.drive.files.length) bits.push('saved to Drive as ' + j.drive.files.map(function(f){ return f.name; }).join(', '));
+  else if(j.drive && j.drive.error) bits.push('Drive: ' + j.drive.error);
+  if(j.read && j.read.value != null) bits.push('photo reads ' + j.read.value);
+  else if(j.read && j.read.error) bits.push('reading: ' + j.read.error);
+  if(bits.length) blToast(bits.join(' · '), (j.drive && j.drive.error) || (j.read && j.read.error) ? 'err' : 'ok');
+}
+// Older entries (photo stored, never filed): touch the row so the server accepts it, then file.
+async function erFileExisting(id){
+  if(!erCanMark()) return;
+  var month = ER.month, row = (ER.cache[month] || {})[id]; if(!row || !(row.photos || []).length) return;
+  if(!(await erUpsert(id, row))){ blToast('Couldn’t reach the database.', 'err'); return; }
+  await erFileAndRefresh(id, row.photos.map(function(p){ return { name:p.name, type:p.type, dataUrl:p.data }; }), month, { drive:!(row.driveFiles || []).length });
+}
+
+// ── Photos added straight into the Google Drive folder ──────────────────────
+// A photo dropped into "Park Manor Water Meter Readings / <Month Year>" by hand
+// (named "Unit 3.jpg") is a reading too. The register asks the server what is in
+// the folder, shows the ones it doesn't know yet, and adds them as readings:
+// house from the file name, date from when the file was added, the meter read
+// from the photo. The file stays where it is in Drive — nothing is uploaded again.
+async function erDriveCall(payload){
+  try {
+    var tok = (typeof getSessionToken === 'function') ? (getSessionToken() || '') : '';
+    var r = await fetch('/api/water-reading', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(Object.assign({ token:tok, kind:'electricity' }, payload)) });
+    var j = null; try { j = await r.json(); } catch(e){}
+    if(!j) return { ok:false, error:'status ' + r.status };
+    if(!r.ok) return { ok:false, error:j.error || ('status ' + r.status) };
+    return j;
+  } catch(e){ return { ok:false, error:String((e && e.message) || e) }; }
+}
+function erUnitFromName(name){
+  var s = String(name || ''), m = /^\s*(?:unit|house|door|no\.?|#)?[\s_\-]*0*(\d{1,3})(?!\d)/i.exec(s) || /(?:unit|house|door)[\s_\-#]*0*(\d{1,3})(?!\d)/i.exec(s);
+  if(!m) return '';
+  var k = String(Number(m[1]));
+  return erHouseList().some(function(h){ return h.key === k; }) ? k : '';
+}
+function erDriveKnown(month){
+  var known = {}, rows = (ER.cache || {})[month] || {};
+  Object.keys(rows).forEach(function(id){ if(id.indexOf('er_d_') === 0) known[id.slice(5)] = 1; ((rows[id] || {}).driveFiles || []).forEach(function(f){ if(f && f.id) known[f.id] = 1; }); });
+  return known;
+}
+async function erDriveCheck(month, announce){
+  if(!erCanMark() || !ER.cfg || !ER.cfg.drive || ER.tableMissing) return;
+  ER.drive = ER.drive || {};
+  var j = await erDriveCall({ action:'driveList', month:month });
+  if(!j.ok) ER.drive[month] = { files:[], error:j.error || 'failed', outdated:!!j.outdated };
+  else {
+    var known = erDriveKnown(month);
+    ER.drive[month] = { folder:j.folder || '', total:(j.files || []).length, files:(j.files || []).filter(function(f){ return f && f.id && !known[f.id]; }).sort(function(a, b){ return String(a.name).localeCompare(String(b.name), undefined, { numeric:true }); }) };
+  }
+  if(ER.open && ER.month === month) renderElecRegister();
+  if(announce){ var d = ER.drive[month]; if(d.error) blToast('Drive: ' + d.error, 'err'); else blToast(d.files.length ? d.files.length + ' new photo' + (d.files.length > 1 ? 's' : '') + ' in the Drive folder' : 'Up to date'); }
+}
+function erImgOk(dataUrl){ return new Promise(function(res){ try { var i = new Image(); i.onload = function(){ res(i.width > 0 && i.height > 0); }; i.onerror = function(){ res(false); }; i.src = dataUrl; } catch(e){ res(false); } }); }
+async function erDriveDownload(f){
+  var b64 = '', parts = 1, mime = '';
+  for(var p = 0; p < parts; p++){
+    var j = await erDriveCall({ action:'driveGet', id:f.id, part:p });
+    if(!j.ok) return { error:j.error || 'download failed' };
+    parts = Math.min(12, Number(j.parts) || 1); mime = j.mime || mime; b64 += j.data || '';
+  }
+  if(!/^image\//i.test(mime)) mime = /\.png$/i.test(f.name) ? 'image/png' : /\.webp$/i.test(f.name) ? 'image/webp' : /\.hei[cf]$/i.test(f.name) ? 'image/heic' : 'image/jpeg';
+  return { dataUrl:'data:' + mime + ';base64,' + b64, mime:mime };
+}
+async function erDriveImportUi(){
+  if(!erCanMark()) return;
+  var month = ER.month, d = (ER.drive || {})[month]; if(!d || !d.files.length) return;
+  var files = d.files.slice(), houses = erHouseList(), data = erRowsFor(month), have = {};
+  data.houses.forEach(function(x){ if(x.received) have[x.house.key] = 1; });
+  var body = '<div class="bl-hint" style="margin-bottom:10px">Each photo becomes a reading for ' + blEsc(blMonthName(month)) + '. The house comes from the file name — change it if it’s wrong, or choose “Skip”.' + (ER.cfg && ER.cfg.read ? ' The meter is read from the photo for you to confirm.' : '') + '</div>'
+    + files.map(function(f, i){
+        var guess = erUnitFromName(f.name), when = f.created ? blDate(erLocalDate(new Date(f.created)), true) : '';
+        return '<div class="bl-f" style="margin-bottom:12px"><label class="bl-lbl" for="erd-u-' + i + '" style="overflow-wrap:anywhere">📁 ' + blEsc(f.name) + (when ? ' · added ' + blEsc(when) : '') + '</label><select id="erd-u-' + i + '" class="bl-in"><option value="">Skip this photo</option>'
+          + houses.map(function(hh){ return '<option value="' + blEsc(hh.key) + '"' + (guess === hh.key ? ' selected' : '') + '>' + blEsc(hh.label) + (hh.owner ? ' · ' + blEsc(blNice(hh.owner)) : '') + (have[hh.key] ? ' ✓ has a reading' : '') + '</option>'; }).join('') + '</select></div>';
+      }).join('');
+  var picks = null, collect = function(){ picks = files.map(function(f, i){ return { f:f, unit:(blEl('erd-u-' + i) || {}).value || '' }; }).filter(function(x){ return x.unit; }); };
+  var res = await blDialog({ title:'Photos in the Drive folder', body:body, cancel:false, buttons:[{ label:'Add to the list', kind:'pri', value:'go', onClick:collect }, { label:'Cancel', value:false }] });
+  if(res !== 'go' || !picks) return;
+  if(!picks.length){ blToast('Nothing chosen.'); return; }
+  blProgressOpen('Adding photos from Drive', 'Starting…');
+  var done = 0, added = [], failed = [], today = erLocalDate(), fallbackDate = today.slice(0, 7) === month ? today : blLastOfMonth(month);
+  for(var i = 0; i < picks.length; i++){
+    var f = picks[i].f, unit = picks[i].unit, id = 'er_d_' + f.id;
+    blProgress(done, picks.length, erLabel(unit, true) + ' — fetching ' + f.name + '…');
+    var got = await erDriveDownload(f);
+    if(got.error){ failed.push(f.name + ' (' + got.error + ')'); done++; continue; }
+    var ok = await erImgOk(got.dataUrl), small = ok ? await erShrink(got.dataUrl) : '', full = ok ? await erShrink(got.dataUrl, 2000, 0.85) : '';
+    var made = f.date || (f.created ? erLocalDate(new Date(f.created)) : '');
+    var row = { unit:String(unit), unitTyped:String(unit), month:month, date:made.slice(0, 7) === month ? made : fallbackDate, submittedAt:Number(f.created) || Date.now(), value:null, note:ok ? '' : 'Photo is in Google Drive (this file type can’t be shown here).',
+      source:'manual', via:'drive', by:erWho(), photos:ok ? [{ name:f.name, type:'image/jpeg', data:small }] : [], photoCount:1,
+      driveFiles:[{ name:f.name, id:f.id, url:f.url }], driveFolder:d.folder || '' };
+    if(!(await erUpsert(id, row))){ failed.push(f.name + ' (couldn’t save)'); done++; continue; }
+    ER.cache[month] = ER.cache[month] || {}; ER.cache[month][id] = row; added.push(unit);
+    if(ok && ER.cfg && ER.cfg.read){
+      blProgress(done + 0.5, picks.length, erLabel(unit, true) + ' — reading the meter…');
+      await erFile(id, [{ name:f.name, type:'image/jpeg', dataUrl:full }], { drive:false });
+    }
+    done++; blProgress(done, picks.length);
+  }
+  await erLoadMonth(month, true);
+  var known = erDriveKnown(month); if(ER.drive[month]) ER.drive[month].files = ER.drive[month].files.filter(function(x){ return !known[x.id]; });
+  blDialogClose(); if(ER.open) renderElecRegister();
+  if(failed.length) blAlert('Some photos weren’t added', '<p>' + (added.length ? 'Added: house ' + added.map(blEsc).join(', ') + '.</p><p>' : '') + 'Not added: ' + failed.map(blEsc).join('; ') + '.</p>');
+  else blToast(added.length + ' reading' + (added.length > 1 ? 's' : '') + ' added from Drive', 'ok');
+}
+// Accept the reading taken from the photo.
+async function erUseAi(id){
+  if(!erCanMark()) return;
+  var month = ER.month, row = (ER.cache[month] || {})[id]; if(!row || !row.ai || row.ai.value == null) return;
+  var data = Object.assign({}, row, { value:Number(row.ai.value), valueRaw:String(row.ai.value), valueFrom:'photo', confirmedBy:erWho(), confirmedAt:Date.now() });
+  if(await erUpsert(id, data)){ ER.cache[month][id] = data; renderElecRegister(); blToast('Reading set to ' + data.value, 'ok'); }
+  else blToast('Couldn’t save — try again.', 'err');
+}
+async function erRemoveEntry(unit, e){
+  if(!e) return;
+  var ok = await blConfirm('Remove this reading?', '<p>' + blEsc(erLabel(unit, true)) + ' goes back to outstanding for ' + blEsc(blMonthName(ER.month)) + (e.kind === 'form' ? ' (the email that was sent isn’t affected)' : '') + '.</p>', 'Remove', { danger:true });
+  if(!ok) return;
+  if(e.kind === 'mark'){ if(ER.marks[ER.month]) delete ER.marks[ER.month][unit]; await erSaveMarks(); }
+  else if(e.id){ var row = Object.assign({}, (ER.cache[ER.month] || {})[e.id] || {}, { removed:true, removedBy:erWho(), removedAt:Date.now(), photos:[] }); if(await erUpsert(e.id, row)) ER.cache[ER.month][e.id] = row; else { blToast('Couldn’t remove it — try again.', 'err'); return; } }
+  renderElecRegister(); blToast('Reading removed');
+}
+async function erToBilling(uid, date, value){
+  var u = UNITS[uid]; if(!u) return;
+  var ok = await blConfirm('Add to Section ' + u.section + '’s meter readings?', '<p>Electricity <b>' + blEsc(String(value)) + '</b> on ' + blEsc(blDate(date, true)) + ' is added to the unit’s reading history, ready for the next invoice.</p>', 'Add');
+  if(!ok) return;
+  u.meterReadings = u.meterReadings || []; var row = u.meterReadings.filter(function(r){ return r.date === date; })[0];
+  if(!row){ row = { date:date }; u.meterReadings.push(row); }
+  row.elec = value; row.src = row.src || 'electricity register'; u.meterReadings.sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); }); u.updated = Date.now();
+  await saveUnits(); blToast('Added to Section ' + u.section, 'ok');
+}
+function erCopyReminder(){
+  var data = erRowsFor(ER.month), out = data.houses.filter(function(x){ return !x.received; }).map(function(x){ return x.house.label; });
+  var text = 'Hi all — electricity meter readings for ' + blMonthName(ER.month) + ' still outstanding: ' + out.join(', ') + '. Please send a photo of your meter via the Park Manor link: ' + location.origin + location.pathname + '?electricity  Thanks!';
+  if(typeof copyTextToClipboard === 'function') copyTextToClipboard(text); else { try { navigator.clipboard.writeText(text); } catch(e){} }
+  blToast('Reminder copied — paste it into WhatsApp', 'ok');
+}
+// Navigation: a "Electricity readings" item in the desktop sidebar and the burger
+// menu (both are built from the .tabs buttons), plus the Tracker header button.
+(function(){
+  var nav = document.querySelector('.tabs'); if(!nav || nav.querySelector('[data-tab="electricity"]')) return;
+  var b = document.createElement('button'); b.className = 'tab'; b.id = 'er-tab'; b.setAttribute('data-tab', 'electricity'); b.textContent = 'Electricity readings'; b.style.display = 'none';
+  b.addEventListener('click', function(){ openElecRegister(); });      // opens the register sheet; it isn't a panel
+  var after = nav.querySelector('[data-tab="water"]') || nav.querySelector('[data-tab="billing"]');
+  if(after && after.nextSibling) nav.insertBefore(b, after.nextSibling); else nav.appendChild(b);
+  if(typeof NAV_MENU_META !== 'undefined') NAV_MENU_META.electricity = { label:'Electricity readings', icon:'\u26a1' };
+})();
+function erApplyAccess(){
+  var on = erCanOpen(), b = blEl('er-open-btn'), t = blEl('er-tab');
+  if(b) b.style.display = on ? '' : 'none';
+  if(t) t.style.display = on ? 'inline-flex' : 'none';
+}
+(function(){ var o = applyBillingAccess; applyBillingAccess = function(u){ var r = o.apply(this, arguments); erApplyAccess(); return r; }; })();
+
+
+// ═══ Electricity-only parts ══════════════════════════════════════════════════
+// The meters: houses 1–12 plus the complex's main meter.
+function erLabel(k, house){ return String(k).toLowerCase() === 'main' ? (house ? 'Main meter' : 'the main meter') : (house ? 'House ' : 'Unit ') + k; }
+(function(){
+  var list0 = erHouseList, key0 = erUnitKey, name0 = erUnitFromName;
+  erHouseList = function(){ return list0().concat([{ key:'main', label:'Main meter', owner:'' }]); };
+  erUnitKey = function(u){ return /^\s*main/i.test(String(u || '')) ? 'main' : key0(u); };
+  erUnitFromName = function(n){ return /main/i.test(String(n || '')) ? 'main' : name0(n); };
+})();
+// Public form: tap the meter instead of typing a number. Meters already read this month get a tick,
+// and after each reading the next unread meter is selected, so a walk-round is: tap, snap, send, repeat.
+var ER_PUB = { done:{} };
+function erMeterKeys(){ var k = []; for(var i = 1; i <= ER_HOUSES; i++) k.push(String(i)); k.push('main'); return k; }
+function erChipsHtml(){
+  return '<div id="er-chips" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">' + erMeterKeys().map(function(k){
+    return '<button type="button" data-k="' + k + '" onclick="erPick(\'' + k + '\')" style="min-height:48px;' + (k === 'main' ? 'grid-column:span 4;' : '') + 'border-radius:10px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font:600 15px var(--sans);cursor:pointer">' + (k === 'main' ? 'Main meter' : k) + '</button>';
+  }).join('') + '</div>';
+}
+function erChipsPaint(){
+  var cur = (document.getElementById('er-unit') || {}).value || '';
+  Array.prototype.forEach.call(document.querySelectorAll('#er-chips button'), function(b){
+    var k = b.getAttribute('data-k'), on = k === cur, done = !!ER_PUB.done[k];
+    b.style.borderColor = on ? 'var(--accent)' : (done ? 'var(--green-bd,rgba(74,222,158,.5))' : 'var(--border2)');
+    b.style.background = on ? 'var(--accent)' : (done ? 'var(--green-bg,rgba(74,222,158,.12))' : 'var(--surface)');
+    b.style.color = on ? '#fff' : 'var(--text2)';
+    b.textContent = (k === 'main' ? 'Main meter' : k) + (done ? ' ✓' : '');
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+function erPick(k){ var el = document.getElementById('er-unit'); if(!el) return; el.value = k; erChipsPaint(); erPubLookup(); }
+async function erPubDone(){
+  var ym = erLocalDate().slice(0, 7), done = {};
+  try {
+    var r = await supa.from('electricity_readings').select('id, unit:data->>unit, month:data->>month, removed:data->removed').eq('data->>month', ym).limit(200);
+    ((r && r.data) || []).forEach(function(row){ var d = row.data || row; if(typeof idBelongsToCurrentScheme === 'function' && row.id && !idBelongsToCurrentScheme(row.id)) return; if(d.removed === true || d.removed === 'true' || d.month !== ym) return; done[erUnitKey(d.unit)] = 1; });
+  } catch(e){}
+  ER_PUB.done = done; return done;
+}
+(function(){
+  var render0 = renderElectricityReadingForm;
+  renderElectricityReadingForm = function(opts){
+    render0(opts);
+    var tries = 0, go = async function(){
+      if(!document.getElementById('er-chips')){ if(++tries < 20) setTimeout(go, 150); return; }      // the form waits for settings before it draws
+      var done = await erPubDone(), keys = erMeterKeys(), last = '';
+      try { last = localStorage.getItem('pm_er_unit') || ''; } catch(e){}
+      var start = Math.max(0, keys.indexOf(last) + 1), pick = '';
+      for(var i = 0; i < keys.length; i++){ var k = keys[(start + i) % keys.length]; if(!done[k]){ pick = k; break; } }
+      if(pick) erPick(pick); else erChipsPaint();
+    };
+    go();
+  };
+})();
 
 </script>
 
@@ -24867,6 +25788,7 @@ if(typeof _PUBLIC_MODE !== 'undefined' && _PUBLIC_MODE){
   setTimeout(function(){
     if(_PUBLIC_MODE.kind === 'submit') renderPublicReportForm();
     else if(_PUBLIC_MODE.kind === 'water') renderWaterReadingForm();
+    else if(_PUBLIC_MODE.kind === 'electricity') renderElectricityReadingForm();
     else if(_PUBLIC_MODE.kind === 'edit') renderPublicEditView(_PUBLIC_MODE.token);
     else if(_PUBLIC_MODE.kind === 'supplierQuote') renderSupplierQuoteView(_PUBLIC_MODE);
   }, 0);
@@ -25697,6 +26619,7 @@ function clearPublicErr(){
 }
 
 async function submitPublicReport(){
+  if(window._pubCategory === 'Water Reading'){ renderWaterReadingForm({ embedded:true }); return; }
   clearPublicErr();
   // Honeypot — if a bot filled this, silently pretend success.
   var honey = document.getElementById('pub-honey');

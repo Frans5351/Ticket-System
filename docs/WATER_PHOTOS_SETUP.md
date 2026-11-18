@@ -80,3 +80,12 @@ Drop a photo into `Park Manor Water Meter Readings / <Month Year>` named after t
 - Needs version 3 of the Google script. Opening the `/exec` link in a browser shows `"v":3` when it is deployed. If the app says the script is an older version: paste the whole of `docs/water-readings-drive.gs` into the script editor, put your password back on the `SECRET` line, save, then Deploy → Manage deployments → pencil → Version: New version → Deploy. The URL and the Netlify settings stay as they are.
 - "Please sign out and sign in again" — the app needs a fresh sign-in to prove who is asking; sign out, sign in, retry.
 - A photo that was removed from the list in the app is not offered again. iPhone `.heic` files are recorded and linked but can't be previewed or read automatically — type the reading in.
+
+## Electricity meter readings
+
+Same Google script, same Netlify settings. Two things to do once:
+
+1. Supabase → SQL Editor → run `ELECTRICITY_READINGS_SETUP.sql` (plain **Run**, not "Run and enable RLS").
+2. Google script: paste the whole of `docs/water-readings-drive.gs`, put your password back on the `SECRET` line, save, Deploy → Manage deployments → pencil → Version: New version → Deploy. Opening the `/exec` link then shows `"v":4`.
+
+Use `https://park-manor-bc.netlify.app/?electricity` on the walk-round (also the **Take readings now** button in Electricity readings). Photos land in `Park Manor Electricity Meter Readings / <day Month Year> / Unit N.jpg` and `Main Meter.jpg`.

@@ -91,16 +91,22 @@ export default async function handler(req) {
   const editUrl = (body.editUrl || "").toString().trim();
   const title = (body.title || "").toString().trim().slice(0, 300);
   const desc = (body.desc || "").toString().trim().slice(0, 4000);
-  const unit = (body.unit || "").toString().trim().slice(0, 50);
+  let unit = (body.unit || "").toString().trim().slice(0, 50);
   const reporter = (body.reporter || "").toString().trim().slice(0, 200);
   const phone = (body.phone || "").toString().trim().slice(0, 50);
   const category = (body.category || "").toString().trim().slice(0, 60);
   const isWaterReading = category === "Water Reading";
+  const isElecReading = category === "Electricity Reading";
+  const isMeterReading = isWaterReading || isElecReading;      // both go to the managing agent + Park Manor inbox only
+  if (isElecReading && /^main( meter)?$/i.test(unit)) unit = "Main meter";
   const ticketNumber = body.ticketNumber;
   const notifyOnly = !!body.notifyOnly;
   // Water readings only: skip the managing-agent email (used when testing the
   // form), leaving just the resident's own copy if they gave an address.
-  const skipAgent = !!body.skipAgent && isWaterReading;
+  const skipAgent = !!body.skipAgent && isMeterReading;
+  // Meter readings are not tickets: they live under Water / Electricity readings in the app.
+  const listName = isElecReading ? "Electricity readings" : "Water readings";
+  const whereElse = isMeterReading ? `see ${listName} in the Park Manor app, or the Google Drive folder` : "view in the tracker";
   // Optional Body Corporate inbox — added to the trustee/management notification
   // so that inbox receives a copy of every new-ticket email.
   const bcInbox = (body.bcInbox || "").toString().trim();
@@ -263,7 +269,7 @@ export default async function handler(req) {
       // Management users always receive the notification. Trustees receive it
       // for ordinary reports too — but NOT for water meter readings, which are
       // routed to the managing agent only (management role + AGENT_NOTIFY_EMAIL).
-      const wants = u && (u.role === "management" || (u.role === "trustee" && !isWaterReading));
+      const wants = u && (u.role === "management" || (u.role === "trustee" && !isMeterReading));
       if (wants) {
         recipSeen++;
         if (looksLikeEmail(u.email)) agentSet.add(u.email.trim().toLowerCase());
@@ -286,11 +292,13 @@ export default async function handler(req) {
   if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
   const agentList = Array.from(agentSet);
   if (agentList.length) {
-    const aSubject = isWaterReading
+    const aSubject = isElecReading
+      ? `⚡ Electricity meter reading — ${/^Main/.test(unit) ? unit : "Unit " + unit}`
+      : isWaterReading
       ? `💧 Water meter reading ${ref}${unit ? ` — Unit ${unit}` : ""}`.trim()
       : `New Park Manor report ${ref}${title ? ` — ${title}` : ""}`.trim();
     const aLines = [
-      "A new report was submitted via the Park Manor public report form.",
+      isMeterReading ? `${isElecReading ? "An electricity" : "A water"} meter reading was submitted through the Park Manor app.` : "A new report was submitted via the Park Manor public report form.",
       "",
       `Reference:  ${ref || "(no number)"}`,
       `Subject:    ${title || "(none)"}`,
@@ -306,11 +314,11 @@ export default async function handler(req) {
         ? `${emailAttachments.length} file${emailAttachments.length === 1 ? "" : "s"} attached to this email.`
         : null,
       skippedFiles.length
-        ? "Too large to attach (view in the tracker): " +
+        ? `Not attached because of size (${whereElse}): ` +
           skippedFiles.map((s) => `${s.name} (${s.sizeMB} MB)`).join(", ")
         : null,
       "",
-      "Log in to the Park Manor tracker to view and action this report.",
+      isMeterReading ? `It is recorded under ${listName} in the Park Manor app (not in the ticket tracker).` : "Log in to the Park Manor tracker to view and action this report.",
       "",
       "— Park Manor Body Corporate (automated notification)",
     ].filter((l) => l !== null);
@@ -318,10 +326,10 @@ export default async function handler(req) {
       ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#177a4c;margin-top:12px">\ud83d\udcce ${emailAttachments.length} file${emailAttachments.length === 1 ? "" : "s"} attached to this email.</div>`
       : "";
     const skipNote = skippedFiles.length
-      ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#9a6200;margin-top:6px">\u26a0 Too large to attach (view in the tracker): ${skippedFiles.map((x) => escH(x.name) + " (" + escH(x.sizeMB) + " MB)").join(", ")}</div>`
+      ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#9a6200;margin-top:6px">\u26a0 Not attached because of size (${escH(whereElse)}): ${skippedFiles.map((x) => escH(x.name) + " (" + escH(x.sizeMB) + " MB)").join(", ")}</div>`
       : "";
     const agentHtml = emailShell(`
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${isWaterReading ? "#177a4c" : "#8b96a5"};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${isWaterReading ? "💧 Water meter reading" : "New public report"}${ref ? " \u00b7 " + escH(ref) : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${isMeterReading ? "#177a4c" : "#8b96a5"};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${isElecReading ? "⚡ Electricity meter reading" : isWaterReading ? "💧 Water meter reading" : "New public report"}${ref ? " \u00b7 " + escH(ref) : ""}</div>
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:#3a4354;margin-bottom:16px">${escH(title || "(no subject)")}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:14px">
         ${detailRow("Reference", ref)}
@@ -334,7 +342,7 @@ export default async function handler(req) {
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8b96a5;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Details</div>
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#3a4354;line-height:1.7;background:#f5f7fa;border:1px solid #e4e9ef;border-radius:9px;padding:14px 16px">${escH(desc || "(none provided)").replace(/\n/g, "<br>")}</div>
       ${attNote}${skipNote}
-      ${emailButton(APP_URL, "Open the Park Manor Tracker")}
+      ${emailButton(APP_URL, isMeterReading ? "Open the Park Manor app" : "Open the Park Manor Tracker")}
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8b96a5;margin-top:6px">${looksLikeEmail(to) ? (isWaterReading ? "The resident was emailed their own copy \u2014 replying goes directly to them." : "The resident is CC\u2019d on this email \u2014 replying goes directly to them.") : ""}</div>
     `);
     agentResult = await sendEmail({
@@ -346,7 +354,7 @@ export default async function handler(req) {
       // copy the agent gets (their private edit link is NOT in this email
       // by design — it stays theirs alone via the opt-in email / WhatsApp).
       // (Water readings: the resident gets their own copy above instead of a CC.)
-      cc: looksLikeEmail(to) && !isWaterReading ? [to] : undefined,
+      cc: looksLikeEmail(to) && !isMeterReading ? [to] : undefined,
       // Let the agent reply straight to the resident when we have their address.
       replyTo: looksLikeEmail(to) ? to : undefined,
       attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),

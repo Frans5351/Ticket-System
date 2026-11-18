@@ -1,5 +1,22 @@
 # Billing changelog
 
+## v2.20 — a meter photo is never dropped for being too big
+- **Fix (water and electricity forms, including the Water Reading tile on the report link):** photos used to be attached to the email only while they fitted a size budget; any that didn't were left out of the email ("too large… view in the tracker") **and** were not stored or filed in Drive. Now every photo is resized until all of them fit, so each one is emailed, stored on the reading and filed in Drive. Tested with five 6.6 MB photos.
+- If filing still fails for any reason, the reading says "not filed: …" in the list and offers **Save to Drive** again, instead of failing silently.
+- A file the phone can't read as a photo (a video, some file types) is named in a clear message before anything is sent.
+- Emails about meter readings no longer mention the ticket tracker; they point to Water / Electricity readings in the app.
+- Safeguard: the general report form can no longer create a ticket with the category Water Reading — it always hands over to the water form. The tile and the `?water` link run the same code.
+
+## v2.19 — electricity meter readings (form, register, Drive, photo reading)
+- **New link `?electricity`** — a walk-round form: tap the meter (1–12 or **Main meter**), take the photo, send. Meters already read this month show a tick and the next unread meter is selected after each send. Optional typed reading and note. No "email me a copy" step. The "Email this reading to the managing agent" tick box behaves as on the water form (shown when signed in or with `&test`).
+- **Each reading is emailed** to the managing agent and the Park Manor inbox (not the trustees), subject `⚡ Electricity meter reading — Unit 7`, photo attached.
+- **Drive:** photos are filed in the existing structure, `Park Manor Electricity Meter Readings / 15 November 2026 / Unit 7.jpg` (`Main Meter.jpg` for the main meter). A month's readings go into that month's existing dated folder; the first reading of a new month creates one named after that day.
+- **Electricity readings** in the sidebar and burger menu (admin, trustees, managing agent): one line per meter per month from September 2026, usage since the previous month, photo, Drive link, reading taken from the photo to confirm, agent status, edit / add by hand, "To billing".
+- **Existing photos:** the register lists photos already in the month's Drive folder(s) that aren't on the list (September, October, November) and adds them as readings dated by the folder name.
+- Readings typed on the Billing meters tab count here too; readings that came with imported Davies invoices don't.
+- Needs: `ELECTRICITY_READINGS_SETUP.sql` run once in Supabase, and version 4 of the Google script (paste `docs/water-readings-drive.gs`, put the password back, Deploy → Manage deployments → New version). No new Netlify settings. Until the script is updated, electricity photos are not filed (nothing is misfiled) and the app says so.
+- Built from the water module by `gen_er.py` (same code with names, table, labels and units swapped), so fixes to one carry to the other.
+
 ## v2.18 — the unit lookup shows the photo whenever one is on file
 - **Fix:** when a house had two readings on the same day — one typed on the Billing meters tab and one that came with a photo — the residents' lookup showed the Billing one, which has no photo. It now ranks the same way as the Water readings list: by the reading's date, and on the same day the one that arrived with a photo first.
 - If the newest reading was typed in without a photo, the lookup shows the most recent photo on file for that month beside it, captioned with the photo's date.
