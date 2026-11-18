@@ -1,5 +1,8 @@
 # Billing changelog
 
+## v2.21 — electricity link on the Settings page
+- Settings → public links: the **Electricity meter reading link** (`…/?electricity`) is listed under the water link, with **Copy** and **Open**. It is shown and hidden together with the other public links.
+
 ## v2.20 — a meter photo is never dropped for being too big
 - **Fix (water and electricity forms, including the Water Reading tile on the report link):** photos used to be attached to the email only while they fitted a size budget; any that didn't were left out of the email ("too large… view in the tracker") **and** were not stored or filed in Drive. Now every photo is resized until all of them fit, so each one is emailed, stored on the reading and filed in Drive. Tested with five 6.6 MB photos.
 - If filing still fails for any reason, the reading says "not filed: …" in the list and offers **Save to Drive** again, instead of failing silently.

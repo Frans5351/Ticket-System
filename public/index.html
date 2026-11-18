@@ -11777,6 +11777,13 @@ function erLabel(k, house){ return String(k).toLowerCase() === 'main' ? (house ?
   erUnitKey = function(u){ return /^\s*main/i.test(String(u || '')) ? 'main' : key0(u); };
   erUnitFromName = function(n){ return /main/i.test(String(n || '')) ? 'main' : name0(n); };
 })();
+// Settings page: the electricity link sits under the water one and is shown whenever that is.
+function erSettingsLink(){
+  var row = document.getElementById('electricity-reading-url-row'), inp = document.getElementById('electricity-reading-url'), w = document.getElementById('water-reading-url-row');
+  if(row) row.style.display = w ? w.style.display : '';
+  if(inp) inp.value = location.origin + location.pathname + '?electricity';
+}
+function copyElectricityReadingUrl(btn){ var u = document.getElementById('electricity-reading-url'); if(u) copyTextToClipboard(u.value, btn); }
 // Public form: tap the meter instead of typing a number. Meters already read this month get a tick,
 // and after each reading the next unread meter is selected, so a walk-round is: tap, snap, send, repeat.
 var ER_PUB = { done:{} };
@@ -14515,6 +14522,15 @@ function deleteDuplicates(){
           <div style="display:flex;gap:6px">
             <input id="water-reading-url" type="text" readonly style="flex:1;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--mono);outline:none" onclick="this.select()">
             <button onclick="copyWaterReadingUrl(this)" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Copy</button>
+          </div>
+        </div>
+        <div id="electricity-reading-url-row" style="margin-top:14px;display:none;padding-top:12px;border-top:1px dashed var(--border2)">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">⚡ Electricity meter reading link (agent only)</div>
+          <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono);margin-bottom:6px;line-height:1.5">For the monthly walk-round — tap the meter (1–12 or the main meter), take the photo, send. Each reading goes to the managing agent only, not the trustees, and the photo is filed in Google Drive.</div>
+          <div style="display:flex;gap:6px">
+            <input id="electricity-reading-url" type="text" readonly style="flex:1;min-width:0;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--mono);outline:none" onclick="this.select()">
+            <button onclick="copyElectricityReadingUrl(this)" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Copy</button>
+            <button onclick="window.open(document.getElementById('electricity-reading-url').value,'_blank','noopener')" style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Open</button>
           </div>
         </div>
       </div>
@@ -23611,7 +23627,7 @@ function showSettingsModal(){
       var waterRow = document.getElementById('water-reading-url-row');
       var waterInput = document.getElementById('water-reading-url');
       if(waterRow) waterRow.style.display = PUBLIC_REPORTS_ENABLED ? '' : 'none';
-      if(waterInput) waterInput.value = location.origin + location.pathname + '?water';
+      if(waterInput) waterInput.value = location.origin + location.pathname + '?water'; if(typeof erSettingsLink === 'function') erSettingsLink();
     }
   }
   // Refresh devices section visibility + content based on session state
@@ -23630,7 +23646,7 @@ async function onPublicReportsToggle(enabled){
   var waterRow = document.getElementById('water-reading-url-row');
   if(waterRow) waterRow.style.display = enabled ? '' : 'none';
   var waterInput = document.getElementById('water-reading-url');
-  if(waterInput) waterInput.value = location.origin + location.pathname + '?water';
+  if(waterInput) waterInput.value = location.origin + location.pathname + '?water'; if(typeof erSettingsLink === 'function') erSettingsLink();
 }
 // Robust clipboard copy used by the various "Copy link" buttons. Three
 // layers of fallback because clipboard support varies a lot in the wild:
