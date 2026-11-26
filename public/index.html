@@ -10101,6 +10101,7 @@ var WR_HOUSES = 12;
 function pubSelectCategory(btn){
   var cat = btn.getAttribute('data-cat');
   if(cat === 'Water Reading'){ window._pubCategory = ''; renderWaterReadingForm({ embedded:true }); return; }
+  if(cat === 'Electricity Reading' && typeof renderElectricityReadingForm === 'function'){ window._pubCategory = ''; renderElectricityReadingForm({ embedded:true }); return; }
   window._pubCategory = (window._pubCategory === cat) ? '' : cat;
   var host = document.getElementById('pub-cat-tiles');
   if(host){
@@ -10977,7 +10978,7 @@ function renderElectricityReadingForm(opts){
     var lbl = function(t){ return '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + t + '</label>'; };
     host.innerHTML = ''
       + '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">⚡ Submit your electricity meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>'
-      + (false ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
+      + (opts.embedded ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
       + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Which meter?</b></span></div>' + erChipsHtml() + '<input id="er-unit" type="hidden"><div id="er-last" style="margin-top:10px"></div></div>'
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">2</span><span><b>Photo of your meter</b><i>the display must be readable</i></span></div>'
@@ -11776,6 +11777,48 @@ function erLabel(k, house){ return String(k).toLowerCase() === 'main' ? (house ?
   erHouseList = function(){ return list0().concat([{ key:'main', label:'Main meter', owner:'' }]); };
   erUnitKey = function(u){ return /^\s*main/i.test(String(u || '')) ? 'main' : key0(u); };
   erUnitFromName = function(n){ return /main/i.test(String(n || '')) ? 'main' : name0(n); };
+})();
+// "Last reading" panel: when this month's reading isn't in the app yet, show the newest photo that
+// is on file in the Google Drive folder for that meter (the monthly walk-round photos), with its date.
+var ER_DRIVE_LAST = {};
+async function erDriveLast(unit){
+  if(ER_DRIVE_LAST[unit] !== undefined) return ER_DRIVE_LAST[unit];
+  var out = null;
+  try {
+    var r = await fetch('/api/water-reading', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'elecLast', unit:unit }) });
+    var j = await r.json(); if(r.ok && j && j.ok && j.found) out = j;
+  } catch(e){}
+  ER_DRIVE_LAST[unit] = out; return out;
+}
+async function erDrivePhoto(btn, id){
+  var host = document.getElementById('er-drive-photo'); if(!host) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Loading the photo…'; }
+  try {
+    var b64 = '', parts = 1, mime = 'image/jpeg';
+    for(var p = 0; p < parts; p++){
+      var r = await fetch('/api/water-reading', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ action:'elecPhoto', id:id, part:p }) });
+      var j = await r.json(); if(!r.ok || !j || !j.ok) throw new Error((j && j.error) || 'failed');
+      parts = Math.min(12, Number(j.parts) || 1); if(/^image\//i.test(j.mime || '')) mime = j.mime; b64 += j.data || '';
+    }
+    var src = await erShrink('data:' + mime + ';base64,' + b64, 1600, 0.8);
+    host.innerHTML = '<button type="button" onclick="erPubZoom(this.firstChild.src)" aria-label="Enlarge the photo" style="padding:0;border:none;background:none;cursor:zoom-in;display:block;width:100%"><img src="' + src + '" alt="Meter photo on file" style="width:100%;max-height:260px;object-fit:cover;border-radius:10px;border:1px solid var(--border2);display:block"></button><div style="font:400 11px var(--sans);color:var(--muted);text-align:center;margin-top:3px">tap to enlarge</div>';
+  } catch(e){ if(btn){ btn.disabled = false; btn.textContent = 'Couldn’t load it — try again'; } }
+}
+(function(){
+  var lookup0 = erPubLookup;
+  erPubLookup = async function(){
+    await lookup0.apply(this, arguments);
+    var el = document.getElementById('er-unit'), host = document.getElementById('er-last'); if(!el || !host) return;
+    var unit = erUnitKey(el.value); if(!unit || /reading received/.test(host.textContent || '')) return;       // this month is already in the app
+    var d = await erDriveLast(unit);
+    if(!d || erUnitKey((document.getElementById('er-unit') || {}).value) !== unit || document.getElementById('er-drive-last')) return;
+    var thisMonth = erLocalDate().slice(0, 7), current = String(d.date || '').slice(0, 7) === thisMonth;
+    // A photo from THIS month in Drive means the meter has been read — say so, rather than "no reading yet".
+    if(current) host.innerHTML = '<div style="border:1px solid var(--green-bd,rgba(74,222,158,.35));background:var(--green-bg,rgba(74,222,158,.12));border-radius:12px;padding:12px 14px;font:400 13px/1.5 var(--sans);color:var(--text2)"><div style="font-weight:700;color:var(--green)">✅ ' + blEsc(erLongMonth(thisMonth)) + ' reading on file</div><div>The meter was photographed on <b>' + blEsc(blDate(d.date, true)) + '</b>. The photo is in the Google Drive folder; the reading hasn’t been typed into the app yet.</div></div>';
+    host.insertAdjacentHTML('beforeend', '<div id="er-drive-last" style="margin-top:8px;border:1px solid var(--border2);background:var(--surface2);border-radius:12px;padding:12px 14px;font:400 13px/1.5 var(--sans);color:var(--text2)">'
+      + '<div style="font-weight:700">📁 ' + (current ? 'Photo on file: ' : 'Last photo on file: ') + blEsc(blDate(d.date, true)) + '</div><div style="color:var(--muted);font-size:12px;overflow-wrap:anywhere">From the Google Drive folder “' + blEsc(d.folderName) + '” · ' + blEsc(d.name) + '</div>'
+      + '<div id="er-drive-photo" style="margin-top:8px"><button type="button" onclick="erDrivePhoto(this,\'' + blEsc(d.id) + '\')" style="width:100%;min-height:44px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font:600 13.5px var(--sans);cursor:pointer">📷 Show the photo</button></div></div>');
+  };
 })();
 // Settings page: the electricity link sits under the water one and is shown whenever that is.
 function erSettingsLink(){
@@ -26621,7 +26664,7 @@ function buildPublicFormFields(editing, existing){
   var catTiles = [
     ['Plumbing','\ud83d\udea0'], ['Electrical','\ud83d\udca1'], ['Common Area','\ud83c\udfde'],
     ['Security','\ud83d\udd12'], ['Structural','\ud83e\uddf1'], ['Pests','\ud83d\udc00'],
-    ['Water Reading','\ud83d\udca7'], ['Other','\u2753']
+    ['Water Reading','\ud83d\udca7'], ['Electricity Reading','\u26a1'], ['Other','\u2753']
   ];
   window._pubCategory = ex.category || '';
   window._pubFiles = [];   // fresh staging area every time the form renders
@@ -26902,6 +26945,7 @@ function clearPublicErr(){
 
 async function submitPublicReport(){
   if(window._pubCategory === 'Water Reading'){ renderWaterReadingForm({ embedded:true }); return; }
+  if(window._pubCategory === 'Electricity Reading' && typeof renderElectricityReadingForm === 'function'){ renderElectricityReadingForm({ embedded:true }); return; }
   clearPublicErr();
   var _pf = (typeof ptFlowRead === 'function') ? ptFlowRead() : { pub:true };
   if(!_pf) return;

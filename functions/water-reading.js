@@ -196,6 +196,25 @@ export default async function handler(req) {
   if (req.method === "GET") return jsonResponse(200, { drive: !!(process.env.WATER_DRIVE_URL && process.env.WATER_DRIVE_SECRET), read: !!process.env.ANTHROPIC_API_KEY });
   if (req.method !== "POST") return errorResponse(405, "POST only");
   let body; try { body = await req.json(); } catch (e) { return errorResponse(400, "Invalid JSON"); }
+  // Public (no login): the newest electricity photo on file for one meter, for the form's
+  // "last reading" panel when this month's hasn't been logged in the app. Only electricity
+  // meter photos can be fetched this way, and only by the id the first call returned.
+  if (body.action === "elecLast") {
+    const unit = String(body.unit || "").trim().toLowerCase();
+    if (!/^(main|\d{1,3})$/.test(unit)) return errorResponse(400, "unit missing");
+    const j = await driveScript({ action: "last", kind: "electricity", unit });
+    if (!j.ok) return jsonResponse(200, { ok: false, error: j.error });
+    if (!j.last) return jsonResponse(200, { ok: false, outdated: true, error: OLD_FOR_ELEC });
+    return jsonResponse(200, j.found ? { ok: true, found: true, id: String(j.id), name: String(j.name || ""), date: String(j.date || ""), folderName: String(j.folderName || "") } : { ok: true, found: false });
+  }
+  if (body.action === "elecPhoto") {
+    const id = String(body.id || "");
+    if (!/^[\w-]{10,100}$/.test(id)) return errorResponse(400, "id missing");
+    const j = await driveScript({ action: "get", kind: "electricity", only: "electricity", id, part: Math.max(0, Number(body.part) || 0) });
+    if (!j.ok) return jsonResponse(200, { ok: false, error: j.error });
+    if (!j.got || !(Number(j.v) >= 5)) return jsonResponse(200, { ok: false, outdated: true, error: OLD_FOR_ELEC });
+    return jsonResponse(200, { ok: true, mime: j.mime, parts: j.parts, part: j.part, data: j.data });
+  }
   if (body.action === "driveList" || body.action === "driveGet") {
     const denied = staffOnly(getConfig(), body.token);
     if (denied) return errorResponse(401, denied);

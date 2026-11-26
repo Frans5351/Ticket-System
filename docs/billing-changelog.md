@@ -1,5 +1,11 @@
 # Billing changelog
 
+## v2.24 — Electricity Reading on the report page; last photo from Google Drive
+- **Electricity Reading** tile on the report page (`?report`), next to Water Reading. It opens the same electricity form as the `?electricity` link (with a way back to the report form). It can never become a ticket.
+- **"Last reading" panel, with Google Drive as the fallback.** When a meter has no reading in the app for this month, the form looks in `Park Manor Electricity Meter Readings` for the newest photo of that meter (`Unit N…` / `Main Meter…`, newest dated folder first) and shows its date, with **Show the photo**. If that photo is from this month the panel says the reading is on file; if it is older it says none has come in this month and shows the last one.
+- Needs version 5 of the Google script (paste `docs/water-readings-drive.gs`, put the password back, Deploy → Manage deployments → New version; the `/exec` link then shows `"v":5`). Until then the panel simply shows what is in the app.
+- Server: `/api/water-reading` actions `elecLast` and `elecPhoto` (no login; only electricity meter photos can be fetched, and only by the id the first call returned).
+
 ## v2.23 — report form: a guided "how should we handle it?" flow
 - The single "urgent" tick box is replaced by a short flow where each answer opens the next question:
   - **Do you want to give your name?** (in "Where & who") — *Yes* shows the name, email and phone fields; *Stay anonymous* hides them and nothing is recorded.

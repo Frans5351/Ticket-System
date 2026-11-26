@@ -51,7 +51,7 @@ var SECRET       = 'CHANGE-ME-to-a-long-password';
 var ROOT_NAME    = 'Park Manor Water Meter Readings';
 var SIBLING_NAME = 'Park Manor Electricity Meter Readings';   // create ours beside this one
 var MAX_FILES    = 5;
-var VERSION      = 4;            // 4 = electricity readings too (3 = date/time in names + list/get)
+var VERSION      = 5;            // 5 = newest electricity photo per meter ("last"); 4 = electricity; 3 = names + list/get
 var ELEC_ROOT_NAME = 'Park Manor Electricity Meter Readings';   // dated folders inside: "15 November 2026" / Unit 7.jpg, Main Meter.jpg
 var PART_CHARS   = 3000000;      // base64 characters per "get" answer (keeps each answer small)
 var MAX_GET_BYTES = 15 * 1024 * 1024;
@@ -64,6 +64,7 @@ function doPost(e) {
     if (body.secret !== SECRET) return out_({ ok: false, error: 'unauthorised' });
     if (body.action === 'list') return out_(list_(body));
     if (body.action === 'get')  return out_(get_(body));
+    if (body.action === 'last') return out_(lastElec_(body));
     lock.waitLock(20000);                        // one upload at a time so names never clash
     var isElec = body.kind === 'electricity';
     var monthName = clean_(body.month, 40) || 'Unsorted';
@@ -112,6 +113,7 @@ function get_(body) {
   var file;
   try { file = DriveApp.getFileById(String(body.id || '')); } catch (e) { return { ok: false, error: 'file not found' }; }
   if (file.isTrashed() || !inRoot_(file)) return { ok: false, error: 'file is not in the water readings folder' };
+  if (body.only === 'electricity' && !inElecRoot_(file)) return { ok: false, error: 'file is not an electricity meter photo' };
   if (file.getSize() > MAX_GET_BYTES) return { ok: false, error: 'file is too large' };
   var b64 = Utilities.base64Encode(file.getBlob().getBytes());
   var parts = Math.max(1, Math.ceil(b64.length / PART_CHARS)), part = Math.min(parts - 1, Math.max(0, Number(body.part) || 0));
@@ -126,6 +128,40 @@ function inRoot_(file) {
     var p = ps.next(); if (ok[p.getId()]) return true;
     var gp = p.getParents(); while (gp.hasNext()) { if (ok[gp.next().getId()]) return true; }
   }
+  return false;
+}
+
+// The newest photo on file for one meter ("7" or "main"), looking through the dated folders from
+// the most recent backwards. Used by the form to show "last photo on file" when this month's
+// reading hasn't been logged in the app yet.
+var MONTHS_ = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+function lastElec_(body) {
+  var unit = clean_(body.unit, 12), isMain = /^main/i.test(unit), n = isMain ? 0 : Number(unit);
+  if (!isMain && !(n >= 1 && n <= 999)) return { ok: false, error: 'unit missing' };
+  var dated = [], it = elecRoot_().getFolders();
+  while (it.hasNext()) {
+    var f = it.next(); if (f.isTrashed()) continue;
+    var m = /^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/.exec(String(f.getName()).replace(/\s+/g, ' ').trim()); if (!m) continue;
+    var mi = MONTHS_.indexOf(m[2].toLowerCase()); if (mi < 0) continue;
+    dated.push({ f: f, key: Number(m[3]) * 10000 + (mi + 1) * 100 + Number(m[1]), date: m[3] + '-' + (mi < 9 ? '0' : '') + (mi + 1) + '-' + (Number(m[1]) < 10 ? '0' : '') + Number(m[1]) });
+  }
+  dated.sort(function (a, b) { return b.key - a.key; });
+  var want = isMain ? /^main\s*meter/i : new RegExp('^unit\\s*0*' + n + '(?!\\d)', 'i');
+  for (var i = 0; i < dated.length && i < 36; i++) {
+    var files = dated[i].f.getFiles(), hit = null;
+    while (files.hasNext()) {
+      var x = files.next(); if (x.isTrashed() || !want.test(x.getName())) continue;
+      if (!/^image\//i.test(String(x.getMimeType() || '')) && !/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(x.getName())) continue;
+      if (!hit || x.getDateCreated().getTime() > hit.getDateCreated().getTime()) hit = x;
+    }
+    if (hit) return { ok: true, v: VERSION, last: true, found: true, id: hit.getId(), name: hit.getName(), date: dated[i].date, folderName: String(dated[i].f.getName()).trim(), size: hit.getSize() };
+  }
+  return { ok: true, v: VERSION, last: true, found: false };
+}
+function inElecRoot_(file) {
+  var ok = {}, er = DriveApp.getFoldersByName(ELEC_ROOT_NAME); while (er.hasNext()) { var x = er.next(); if (!x.isTrashed()) ok[x.getId()] = 1; }
+  var ps = file.getParents();
+  while (ps.hasNext()) { var p = ps.next(); if (ok[p.getId()]) return true; var gp = p.getParents(); while (gp.hasNext()) { if (ok[gp.next().getId()]) return true; } }
   return false;
 }
 
