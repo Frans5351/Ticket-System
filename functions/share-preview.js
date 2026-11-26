@@ -30,6 +30,7 @@ const STATUS_LABELS = {
   awaiting_quote: "Obtaining Quotes",
   awaiting_trustee_approval: "Awaiting Trustee Approval",
   work_in_progress: "Work In Progress",
+  done: "Done",
   resolved: "Resolved",
   closed: "Closed",
 };

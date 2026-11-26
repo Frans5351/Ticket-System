@@ -26,6 +26,7 @@ const STATUS_META = {
   awaiting_quote: { color: "#9a6200", bg: "#faf3e3", note: "We\u2019re obtaining quotes from suppliers for this work." },
   awaiting_trustee_approval: { color: "#7a3fbf", bg: "#f3ecfb", note: "Quotes are in \u2014 the trustees are reviewing them for approval." },
   work_in_progress: { color: "#5b54c7", bg: "#eeedf9", note: "Good news \u2014 work on this is now underway." },
+  done: { color: "#177a4c", bg: "#e9f5ef", note: "The work on this has been completed. If anything is still not right, reply to this email or add an update on the Park Manor page." },
   closed: { color: "#177a4c", bg: "#e9f5ef", note: "This report has been resolved and closed. Thank you for reporting it!" },
 };
 

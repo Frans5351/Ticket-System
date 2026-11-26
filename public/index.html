@@ -5033,7 +5033,7 @@ function renderDashboard(){
   (TKT_FLOW||[]).forEach(function(s){ statusMeta[s.value] = s; });
   var counts = {};
   maintTks.forEach(function(t){ var s = t.status||'open'; counts[s] = (counts[s]||0)+1; });
-  var activeStatuses = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress'];
+  var activeStatuses = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done'];
   var activeCount = activeStatuses.reduce(function(a,s){ return a+(counts[s]||0); }, 0);
   var resolvedCount = (counts['resolved']||0) + (counts['closed']||0);
   var awaitingApproval = counts['awaiting_trustee_approval']||0;
@@ -11919,7 +11919,7 @@ async function ptLoad(){
     var j = await r.json();
     if(!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('status ' + r.status));
     PT.list = j.tickets || []; PT.keep = j.keepClosedDays || 14; PT.error = '';
-    var mine = ptMine(), open = {}, drop = false; PT.list.forEach(function(t){ if(t.status !== 'closed') open[t.id] = 1; });
+    var mine = ptMine(), open = {}, drop = false; PT.list.forEach(function(t){ if(t.status !== 'closed' && t.status !== 'done') open[t.id] = 1; });
     Object.keys(mine).forEach(function(k){ if(!open[k]){ delete mine[k]; drop = true; } }); if(drop) ptMineSave();
   } catch(e){ PT.error = String((e && e.message) || e); if(!PT.list) PT.list = null; }
   return PT.list;
@@ -11933,6 +11933,48 @@ async function ptPost(payload){
     if(!r.ok || !j) return { ok:false, error:(j && j.error) || ('status ' + r.status) };
     return j;
   } catch(e){ return { ok:false, error:'No connection — please try again.' }; }
+}
+// ── One look for the whole page ─────────────────────────────────────────────
+// Every entry on the report page is the same kind of row: an icon in a rounded tile, a title, one
+// line underneath, and an arrow that turns when the row is open. Same height, corners, spacing and
+// type everywhere; only the colour says what it is (red = emergency, green = managing agent,
+// teal = report, blue / amber = the two meters). Each issue in the list is its own card.
+var PT_CHEV = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg>';
+function ptStyle(){
+  if(document.getElementById('pt-style')) return;
+  var st = document.createElement('style'); st.id = 'pt-style';
+  st.textContent = [
+    '.pt-row{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;margin:0;padding:10px 14px;border-radius:14px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font-family:var(--sans);text-align:left;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.06);box-sizing:border-box;-webkit-tap-highlight-color:transparent}',
+    '.pt-row:focus-visible,.pt-item-head:focus-visible{outline:3px solid rgba(31,168,152,.5);outline-offset:2px}',
+    '.pt-ic{flex:none;width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;background:var(--surface2)}',
+    '.pt-tx{flex:1;min-width:0}',
+    '.pt-tt{display:block;font:700 16px/1.25 var(--sans);overflow-wrap:anywhere}',
+    '.pt-st{display:block;margin-top:2px;font:400 12.5px/1.35 var(--sans);color:var(--muted);overflow-wrap:anywhere}',
+    '.pt-cv{flex:none;display:flex;color:var(--muted);transition:transform .15s ease}',
+    '[aria-expanded="true"]>.pt-cv{transform:rotate(90deg)}',
+    '.pt-row-em{background:var(--red-bg,rgba(240,111,111,.08));border-color:var(--red-bd,rgba(240,111,111,.45))}.pt-row-em .pt-tt{color:var(--red,#d9534f)}.pt-row-em .pt-ic{background:rgba(217,83,79,.14)}',
+    '.pt-row-ag{background:#1b6b45;border-color:#1b6b45;color:#fff;box-shadow:0 3px 10px rgba(27,107,69,.25)}.pt-row-ag .pt-st,.pt-row-ag .pt-cv{color:rgba(255,255,255,.88)}.pt-row-ag .pt-ic{background:rgba(255,255,255,.16)}',
+    '.pt-row-report{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(31,168,152,.28)}.pt-row-report .pt-st,.pt-row-report .pt-cv{color:rgba(255,255,255,.92)}.pt-row-report .pt-ic{background:rgba(255,255,255,.18)}',
+    '.pt-row-water{background:var(--info-bg,rgba(90,160,230,.1));border-color:var(--info-bd,rgba(90,160,230,.45))}.pt-row-water .pt-ic{background:rgba(59,130,196,.16)}',
+    '.pt-row-elec{background:rgba(217,164,65,.12);border-color:rgba(217,164,65,.5)}.pt-row-elec .pt-ic{background:rgba(217,164,65,.24)}',
+    '.pt-row-issues{border-color:var(--accent-bd,rgba(31,168,152,.5))}.pt-row-issues .pt-ic{background:var(--accent-bg,rgba(31,168,152,.12))}',
+    '.pt-row-install{border-style:dashed;border-color:var(--accent-bd,rgba(31,168,152,.55));background:var(--accent-bg,rgba(31,168,152,.06));box-shadow:none}.pt-row-install .pt-ic{background:rgba(31,168,152,.14)}',
+        '.pt-item{position:relative;margin:0 0 12px;border:1px solid var(--border2);border-radius:14px;background:var(--surface);box-shadow:0 1px 3px rgba(16,24,40,.08);overflow:hidden}',
+    '.pt-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent)}',
+    '.pt-item-urgent::before{background:var(--red,#d9534f)}.pt-item-done::before{background:var(--green,#1e9e6a)}',
+    '.pt-item-head{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;width:100%;margin:0;padding:14px 14px 14px 19px;background:none;border:none;text-align:left;cursor:pointer;font-family:var(--sans);color:var(--text2);box-sizing:border-box;-webkit-tap-highlight-color:transparent}',
+    '.pt-item-meta{display:block;font:600 11.5px/1.4 var(--sans);letter-spacing:.2px;color:var(--muted);overflow-wrap:anywhere}',
+    '.pt-item-title{display:block;margin-top:3px;font:700 16px/1.3 var(--sans);color:var(--text);overflow-wrap:anywhere}',
+    '.pt-item-body{padding:0 14px 14px 19px}',
+    '.pt-metoo{padding:8px 14px 8px 19px;border-top:1px solid var(--border2);background:var(--surface2)}',
+    '.pt-group{display:flex;align-items:center;gap:10px;margin:18px 2px 10px;font:700 11.5px var(--sans);letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}.pt-group::after{content:"";flex:1;height:1px;background:var(--border2)}'
+  ].join('\n');
+  document.head.appendChild(st);
+}
+function ptRowHtml(o){
+  ptStyle();
+  return '<button type="button"' + (o.id ? ' id="' + o.id + '"' : '') + ' class="pt-row pt-row-' + o.kind + (o.half ? ' pt-row-half' : '') + '" aria-expanded="' + !!o.open + '"' + (o.controls ? ' aria-controls="' + o.controls + '"' : '') + ' onclick="' + o.onclick + '"' + (o.style ? ' style="' + o.style + '"' : '') + '>'
+    + '<span class="pt-ic" aria-hidden="true">' + o.icon + '</span><span class="pt-tx"><span class="pt-tt">' + o.title + '</span>' + (o.sub ? '<span class="pt-st">' + o.sub + '</span>' : '') + '</span><span class="pt-cv" aria-hidden="true">' + PT_CHEV + '</span></button>';
 }
 function ptPut(t){ if(!t || !PT.list) return; PT.list = PT.list.map(function(x){ return x.id === t.id ? (x.metooUnits && !t.metooUnits ? Object.assign({}, t, { metooUnits:x.metooUnits }) : t) : x; }); }      // (the units behind “Me too” only come with a signed-in load)
 
@@ -11956,7 +11998,7 @@ function ptMeTooText(n, mine){
 }
 function ptMeTooHtml(t){
   var id = ptEsc(t.id), n = Number(t.metoo) || 0, mine = !!ptMine()[t.id], busy = PT.busy === t.id + ':metoo', err = PT.mtErr && PT.mtErr[t.id];
-  return '<div class="pt-metoo" style="display:flex;align-items:center;gap:10px;padding:0 0 12px;font-family:var(--sans)">'
+  return '<div class="pt-metoo" style="display:flex;align-items:center;gap:10px;font-family:var(--sans)">'
     + '<span style="flex:1;min-width:0;font:' + (n || mine ? '600' : '400') + ' 12.5px/1.4 var(--sans);color:' + (err ? 'var(--red,#d9534f)' : n || mine ? 'var(--text2)' : 'var(--muted)') + ';overflow-wrap:anywhere">' + (err ? ptEsc(err) : (n || mine ? '<span aria-hidden="true">👥 </span>' : '') + ptMeTooText(n, mine)) + '</span>'
     + '<button type="button" aria-pressed="' + mine + '" aria-label="' + (mine ? 'Me too — tap to take it back' : 'Me too — I have this problem as well') + '" ' + (PT.busy ? 'disabled ' : '') + 'onclick="ptMeToo(\'' + id + '\')" style="flex:none;min-height:44px;padding:8px 16px;border-radius:99px;white-space:nowrap;cursor:pointer;font:700 13.5px var(--sans);'
     +   (mine ? 'border:1.5px solid var(--accent);background:var(--accent);color:#fff' : 'border:1.5px solid var(--accent-bd,rgba(31,168,152,.5));background:var(--accent-bg,rgba(31,168,152,.1));color:var(--accent2)') + '">' + (busy ? 'Saving…' : mine ? '✓ Me too' : '🙋 Me too') + '</button></div>';
@@ -11982,13 +12024,14 @@ function ptChip(t){
   return h;
 }
 // Where an issue stands, as five steps (an issue can skip steps — a small job goes straight to "In progress").
-var PT_STEPS = [['open', 'Reported'], ['awaiting_quote', 'Quotes'], ['awaiting_trustee_approval', 'Approval'], ['work_in_progress', 'In progress'], ['closed', 'Done']];
+var PT_STEPS = [['open', 'Reported'], ['awaiting_quote', 'Quotes'], ['awaiting_trustee_approval', 'Approval'], ['work_in_progress', 'In progress'], ['done', 'Done']];
 function ptStepsHtml(t){
-  var cur = 0; PT_STEPS.forEach(function(x, i){ if(x[0] === t.status) cur = i; });
+  var cur = 0; PT_STEPS.forEach(function(x, i){ if(x[0] === t.status) cur = i; }); if(t.status === 'closed') cur = PT_STEPS.length - 1;
+  var fin = cur === PT_STEPS.length - 1, on = fin ? 'var(--green,#1e9e6a)' : 'var(--accent)';
   return '<span class="pt-steps" role="img" aria-label="Step ' + (cur + 1) + ' of ' + PT_STEPS.length + ': ' + PT_STEPS[cur][1] + '" style="display:grid;grid-template-columns:repeat(' + PT_STEPS.length + ',minmax(0,1fr));gap:4px;margin-top:9px">'
     + PT_STEPS.map(function(x, i){
-        return '<span style="min-width:0"><span style="display:block;height:5px;border-radius:99px;background:' + (i <= cur ? 'var(--accent)' : 'var(--border2)') + '"></span>'
-          + '<span style="display:block;margin-top:4px;font:' + (i === cur ? '700' : '400') + ' 10.5px/1.2 var(--sans);letter-spacing:-.1px;text-align:center;color:' + (i === cur ? 'var(--accent2,var(--accent))' : 'var(--muted)') + '">' + x[1] + '</span></span>';
+        return '<span style="min-width:0"><span style="display:block;height:5px;border-radius:99px;background:' + (i <= cur ? on : 'var(--border2)') + '"></span>'
+          + '<span style="display:block;margin-top:4px;font:' + (i === cur ? '700' : '400') + ' 10.5px/1.2 var(--sans);letter-spacing:-.1px;text-align:center;color:' + (i === cur ? (fin ? on : 'var(--accent2,var(--accent))') : 'var(--muted)') + '">' + x[1] + '</span></span>';
       }).join('') + '</span>';
 }
 function ptAgo(ts){
@@ -12008,7 +12051,7 @@ function ptExpectedHtml(t){
 }
 // ── Photos a trustee has put on the report page ──
 function ptPhotoUrl(t, ph, size){ return '/api/public-tickets?prefix=' + encodeURIComponent(ptPrefix()) + '&photo=' + encodeURIComponent(t.id) + '&p=' + encodeURIComponent(ph.id) + (size === 'thumb' ? '&size=thumb' : ''); }
-function ptPhotos(t){ var p = (t.photos || []).slice(); if(t.status === 'closed') p.sort(function(a, b){ return (b.after ? 1 : 0) - (a.after ? 1 : 0); }); return p; }      // on a finished job the "after" photo leads
+function ptPhotos(t){ var p = (t.photos || []).slice(); if(t.status === 'closed' || t.status === 'done') p.sort(function(a, b){ return (b.after ? 1 : 0) - (a.after ? 1 : 0); }); return p; }      // on a finished job the "after" photo leads
 function ptLeadPhotoHtml(t){
   var p = ptPhotos(t)[0]; if(!p) return '';
   return '<span class="pt-lead" style="flex:none;position:relative;width:58px;height:58px;border-radius:10px;overflow:hidden;background:var(--surface2);border:1px solid var(--border2)"><img src="' + ptEsc(ptPhotoUrl(t, p, 'thumb')) + '" alt="" loading="lazy" onerror="this.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block">'
@@ -12051,34 +12094,33 @@ function ptUpdatesHtml(t){
       }).join('') + '</div>';
 }
 function ptItemHtml(t){
-  var open = !!PT.open[t.id], closed = t.status === 'closed', id = ptEsc(t.id), msg = PT.msg[t.id], chips = ptChip(t);
-  var meta = [t.number != null ? '#' + t.number : '', t.category, t.unit ? 'Unit ' + t.unit : '', closed ? 'closed ' + ptDay(t.closed) : 'logged ' + ptDay(t.logged)].filter(Boolean).map(ptEsc).join(' · ');
-  var h = '<div class="pt-item" style="border-top:1px solid var(--border2)">'
-    + '<button type="button" aria-expanded="' + open + '" onclick="ptToggle(\'' + id + '\')" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;width:100%;min-height:56px;padding:12px 0;background:none;border:none;text-align:left;cursor:pointer;font-family:var(--sans);color:var(--text2)">'
-    +   '<span style="flex:1;min-width:0"><span style="display:block;font:600 14.5px/1.35 var(--sans);overflow-wrap:anywhere;' + (closed ? 'color:var(--muted)' : '') + '">' + ptEsc(t.title || '(no title)') + '</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere">' + meta + '</span>' + (chips ? '<span style="display:block;margin-top:6px">' + chips + '</span>' : '') + '</span>'
+  var open = !!PT.open[t.id], done = t.status === 'done' || t.status === 'closed', id = ptEsc(t.id), msg = PT.msg[t.id], chips = ptChip(t);
+  var meta = [t.number != null ? '#' + t.number : '', t.category, t.unit ? 'Unit ' + t.unit : '', ptDay(t.logged)].filter(Boolean).map(ptEsc).join(' · ');
+  var h = '<div class="pt-item' + (done ? ' pt-item-done' : t.urgent ? ' pt-item-urgent' : '') + '">'
+    + '<button type="button" class="pt-item-head" aria-expanded="' + open + '" onclick="ptToggle(\'' + id + '\')">'
+    +   '<span style="flex:1;min-width:0"><span class="pt-item-meta">' + meta + '</span><span class="pt-item-title">' + ptEsc(t.title || '(no title)') + '</span>' + (chips ? '<span style="display:block;margin-top:8px">' + chips + '</span>' : '') + '</span>'
     +   ptLeadPhotoHtml(t)
-    +   '<span aria-hidden="true" style="flex:none;font-size:18px;color:var(--muted);line-height:1.6">' + (open ? '▾' : '▸') + '</span>'
-    +   '<span style="flex:1 1 100%;min-width:0;margin-top:-4px">' + (closed ? '' : ptStepsHtml(t)) + ptExpectedHtml(t) + (open ? '' : ptLatestHtml(t)) + '</span></button>';      // steps, date and latest update run the full width, under the photo
-  if(!closed) h += ptMeTooHtml(t);
+    +   '<span class="pt-cv" aria-hidden="true" style="margin-top:1px">' + PT_CHEV + '</span>'
+    +   '<span style="flex:1 1 100%;min-width:0">' + ptStepsHtml(t) + ptExpectedHtml(t) + (open ? '' : ptLatestHtml(t)) + '</span></button>';      // steps, date and latest update run the full width, under the photo
   if(open){
     var inCss = 'width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 16px var(--sans);outline:none;box-sizing:border-box';
     var nm = ''; try { nm = localStorage.getItem('pm_pt_name') || ''; } catch(e){}
-    h += '<div style="padding:0 0 14px">'
+    h += '<div class="pt-item-body">'
       + ptPhotoStripHtml(t)
       + (t.desc ? '<div style="font:400 13.5px/1.55 var(--sans);color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);border-radius:10px;padding:10px 12px">' + ptEsc(t.desc) + '</div>' : '')
-      + (t.fixed ? '<div style="margin-top:10px;font:400 13px/1.5 var(--sans);color:var(--green,#1e9e6a)">✓ ' + ptEsc(t.fixed.by || 'A resident') + ' said this is fixed (' + ptEsc(ptDay(t.fixed.at)) + '). The trustees will confirm and close it.</div>' : '')
-      + ptUpdatesHtml(t);
-    if(closed) h += '<div style="margin-top:10px;font:400 12.5px/1.5 var(--sans);color:var(--muted)">This one is closed. If the problem is back, report it again with “Report an issue”.</div>';
-    else h += '<div style="margin-top:12px"><label for="pt-text-' + id + '" style="display:block;font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Add an update</label>'
-      + '<textarea id="pt-text-' + id + '" rows="2" maxlength="600" placeholder="e.g. Still leaking this morning, or: the plumber came today" style="' + inCss + ';resize:vertical"></textarea>'
+      + (done ? '<div style="margin-top:10px;font:600 13px/1.5 var(--sans);color:var(--green,#1e9e6a)">✓ The trustees have marked this as done. <span style="font-weight:400;color:var(--muted)">If something is still not right, say so below.</span></div>' : '')
+      + (t.fixed && !done ? '<div style="margin-top:10px;font:400 13px/1.5 var(--sans);color:var(--green,#1e9e6a)">✓ ' + ptEsc(t.fixed.by || 'A resident') + ' said this is fixed (' + ptEsc(ptDay(t.fixed.at)) + '). The trustees will confirm it.</div>' : '')
+      + ptUpdatesHtml(t)
+      + '<div style="margin-top:12px"><label for="pt-text-' + id + '" style="display:block;font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Add an update</label>'
+      + '<textarea id="pt-text-' + id + '" rows="2" maxlength="600" placeholder="' + (done ? 'e.g. It is leaking again' : 'e.g. Still leaking this morning, or: the plumber came today') + '" style="' + inCss + ';resize:vertical"></textarea>'
       + '<input id="pt-name-' + id + '" type="text" maxlength="60" autocomplete="name" placeholder="Your name or unit (optional)" value="' + ptEsc(nm) + '" style="' + inCss + ';margin-top:8px">'
       + (msg ? '<div role="status" style="margin-top:8px;font:400 13px/1.45 var(--sans);color:' + (msg.ok ? 'var(--green,#1e9e6a)' : 'var(--red,#d9534f)') + '">' + ptEsc(msg.text) + '</div>' : '')
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
       +   '<button type="button" ' + (PT.busy ? 'disabled ' : '') + 'onclick="ptAct(\'' + id + '\',\'comment\')" style="flex:1 1 140px;min-height:46px;padding:10px 14px;border-radius:10px;border:none;background:var(--accent);color:#fff;font:700 14px var(--sans);cursor:pointer">' + (PT.busy === t.id + ':comment' ? 'Posting…' : 'Post update') + '</button>'
-      +   (t.fixed ? '' : '<button type="button" ' + (PT.busy ? 'disabled ' : '') + 'onclick="ptAct(\'' + id + '\',\'fixed\')" style="flex:1 1 140px;min-height:46px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--green-bd,rgba(74,222,158,.5));background:var(--green-bg,rgba(74,222,158,.12));color:var(--green,#1e9e6a);font:700 14px var(--sans);cursor:pointer">' + (PT.busy === t.id + ':fixed' ? 'Saving…' : '✓ This has been fixed') + '</button>')
-      + '</div></div>';
-    h += '</div>';
+      +   (t.fixed || done ? '' : '<button type="button" ' + (PT.busy ? 'disabled ' : '') + 'onclick="ptAct(\'' + id + '\',\'fixed\')" style="flex:1 1 140px;min-height:46px;padding:10px 14px;border-radius:10px;border:1.5px solid var(--green-bd,rgba(74,222,158,.5));background:var(--green-bg,rgba(74,222,158,.12));color:var(--green,#1e9e6a);font:700 14px var(--sans);cursor:pointer">' + (PT.busy === t.id + ':fixed' ? 'Saving…' : '✓ This has been fixed') + '</button>')
+      + '</div></div></div>';
   }
+  if(!done) h += ptMeTooHtml(t);
   return h + '</div>';
 }
 function ptRender(){
@@ -12088,18 +12130,23 @@ function ptRender(){
   Object.keys(typed).forEach(function(k){ var el = document.getElementById(k); if(el && typed[k]) el.value = typed[k]; });      // keep what is being typed
 }
 function ptRenderInto(host){
-  // The list rolls up and down like the other sections (tap the title). It starts rolled up, and the
-  // title always shows how many are open, so the count is visible without opening it.
-  var shut = PT.listOpen !== true, nOpen = PT.list ? PT.list.filter(function(t){ return t.status !== 'closed'; }).length : 0;
-  var head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:' + (shut ? '0' : '2px') + '"><button type="button" id="pt-list-btn" aria-expanded="' + !shut + '" aria-controls="pt-list-body" onclick="ptListToggle()" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;padding:0;background:none;border:none;text-align:left;cursor:pointer;font:700 16px var(--sans);color:var(--text2)"><span style="flex:1;min-width:0">📋 Current issues logged' + (PT.list ? ' <span style="font-weight:600;color:var(--muted)">· ' + nOpen + ' open</span>' : '') + '</span><span aria-hidden="true" style="flex:none;font-size:14px;color:var(--muted)">' + (shut ? '▸' : '▾') + '</span></button>'
-    + (shut ? '' : '<button type="button" onclick="ptRefresh()" style="flex:none;white-space:nowrap;min-height:44px;padding:0 6px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button>') + '</div>';
+  // The list rolls up and down like the other rows. It starts rolled up; the line under the title
+  // always says how many are open, so the count is visible without opening it. Issues the trustees
+  // have marked Done stay at the bottom until the ticket is closed, which takes it off the list.
+  var isDone = function(t){ return t.status === 'done' || t.status === 'closed'; };
+  var shut = PT.listOpen !== true, cur = (PT.list || []).filter(function(t){ return !isDone(t); }), fin = (PT.list || []).filter(isDone);
+  var sub = PT.list ? cur.length + ' open' + (fin.length ? ' · ' + fin.length + ' done' : '') : (PT.error ? 'Couldn’t be loaded just now' : 'Loading…');
+  var head = ptRowHtml({ id:'pt-list-btn', kind:'issues', icon:'📋', title:'Current issues logged', sub:sub, open:!shut, controls:'pt-list-body', onclick:'ptListToggle()' });
   if(shut){ host.innerHTML = head; return; }
-  if(PT.list == null){ host.innerHTML = head + '<div style="font:400 13px var(--sans);color:var(--muted);padding:6px 0 4px">' + (PT.error ? 'The list couldn’t be loaded just now. You can still report an issue above.' : 'Loading…') + '</div>'; return; }
-  var cur = PT.list.filter(function(t){ return t.status !== 'closed'; }), done = PT.list.filter(function(t){ return t.status === 'closed'; });
-  var h = head + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:6px">What has been reported and where it stands. Have the same problem? Tap <b>Me too</b> instead of reporting it again. Tap an issue to read it, add an update, or say it’s been fixed.</div>';
-  h += cur.length ? cur.map(ptItemHtml).join('') : '<div style="font:400 13.5px var(--sans);color:var(--text2);padding:12px 0;border-top:1px solid var(--border2)">✓ Nothing is open right now.</div>';
-  if(done.length) h += '<div style="font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:14px 0 0;padding-top:12px;border-top:1px solid var(--border2)">Sorted in the last ' + PT.keep + ' days</div>' + done.map(ptItemHtml).join('').replace('border-top:1px solid var(--border2)', 'border-top:none');
-  host.innerHTML = h;
+  var box = function(t){ return '<div style="padding:14px 16px;border:1px solid var(--border2);border-radius:14px;background:var(--surface);font:400 13.5px/1.5 var(--sans);color:var(--text2)">' + t + '</div>'; };
+  var h = head + '<div id="pt-list-body" style="margin-top:10px"><div style="display:flex;align-items:flex-start;gap:8px;margin:0 2px 10px"><div style="flex:1;min-width:0;font:400 12.5px/1.5 var(--sans);color:var(--muted)">Have the same problem? Tap <b>Me too</b> instead of reporting it again. Tap an issue to read it, add an update, or say it’s been fixed.</div>'
+    + '<button type="button" onclick="ptRefresh()" style="flex:none;white-space:nowrap;min-height:44px;margin-top:-10px;padding:0 4px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button></div>';
+  if(PT.list == null) h += box(PT.error ? 'The list couldn’t be loaded just now. You can still report an issue above.' : 'Loading…');
+  else {
+    h += cur.length ? cur.map(ptItemHtml).join('') : box('✓ Nothing is open right now.');
+    if(fin.length) h += '<div class="pt-group">✓ Done</div>' + fin.map(ptItemHtml).join('');
+  }
+  host.innerHTML = h + '</div>';
 }
 function ptToggle(id){ PT.open[id] = !PT.open[id]; ptRender(); }
 function ptListToggle(){ PT.listOpen = PT.listOpen !== true; ptRender(); }
@@ -12135,7 +12182,7 @@ function ptUnpark(){
 function ptMeterPaint(){
   [['water', 'pt-water-btn', 'var(--info,#3b82c4)'], ['elec', 'pt-elec-btn', '#c8902a']].forEach(function(x){
     var b = document.getElementById(x[1]); if(!b) return; var on = PT.meter === x[0];
-    b.setAttribute('aria-expanded', on ? 'true' : 'false'); b.style.boxShadow = on ? '0 0 0 2.5px ' + x[2] : 'none';
+    b.setAttribute('aria-expanded', on ? 'true' : 'false'); b.style.boxShadow = on ? '0 0 0 2.5px ' + x[2] : '';
   });
 }
 function ptMeterToggle(kind){
@@ -12145,6 +12192,7 @@ function ptMeterToggle(kind){
   if(closing){ ptUnpark(); ptMeterPaint(); return; }
   ptFormToggle(false, true); ptPark();
   PT.meter = kind; panel.style.display = ''; ptMeterPaint();
+  var mb = document.getElementById(kind === 'water' ? 'pt-water-btn' : 'pt-elec-btn'); if(mb) mb.insertAdjacentElement('afterend', panel);      // the form opens right under the row that was tapped
   var opts = { inline:true, hostId:'pt-meter-panel' };
   if(kind === 'water') renderWaterReadingForm(opts); else renderElectricityReadingForm(opts);
   try { document.getElementById('pt-meters').scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){}
@@ -12166,13 +12214,13 @@ function ptInject(){
       // and the list of current issues, which is always visible.
       var rest = [], n = hero.nextSibling; while(n){ rest.push(n); n = n.nextSibling; }
       hero.insertAdjacentHTML('afterend', '<div id="pt-notices" style="display:none;margin-bottom:12px"></div><div id="pt-c-em" style="margin-bottom:10px"></div><div id="pt-c-ag" style="margin-bottom:10px"></div><div id="pt-c-doc" style="margin-bottom:10px"></div>'
-        + '<button type="button" id="pt-report-btn" aria-expanded="false" aria-controls="pt-form" onclick="ptFormToggle()" style="display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:14px 18px;margin-bottom:10px;border-radius:14px;border:none;background:var(--accent);color:#fff;text-align:left;cursor:pointer;font-family:var(--sans);box-shadow:0 4px 14px rgba(31,168,152,.28)"><span aria-hidden="true" style="font-size:24px;flex:none">📝</span><span style="flex:1;min-width:0"><span style="display:block;font:700 17px/1.25 var(--sans)">Report an issue</span><span style="display:block;font:400 12.5px/1.4 var(--sans);opacity:.92">A problem, a request or a question for the trustees</span></span><span id="pt-report-caret" aria-hidden="true" style="flex:none;font-size:15px">▸</span></button>'
+        + ptRowHtml({ id:'pt-report-btn', kind:'report', icon:'📝', title:'Report an issue', sub:'A problem, request or question', controls:'pt-form', onclick:'ptFormToggle()', style:'margin-bottom:10px' })
         + '<div id="pt-form" style="display:none;margin-bottom:14px"></div>'
-        + '<div id="pt-meters" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">'
-        +   '<button type="button" id="pt-water-btn" aria-expanded="false" aria-controls="pt-meter-panel" onclick="ptMeterToggle(\'water\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 8px;border-radius:14px;border:1.5px solid var(--info-bd,rgba(90,160,230,.45));background:var(--info-bg,rgba(90,160,230,.1));color:var(--text2);font:700 14px/1.25 var(--sans);cursor:pointer;text-align:center"><span aria-hidden="true" style="font-size:22px">💧</span>Water meter reading</button>'
-        +   '<button type="button" id="pt-elec-btn" aria-expanded="false" aria-controls="pt-meter-panel" onclick="ptMeterToggle(\'elec\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 8px;border-radius:14px;border:1.5px solid rgba(217,164,65,.5);background:rgba(217,164,65,.12);color:var(--text2);font:700 14px/1.25 var(--sans);cursor:pointer;text-align:center"><span aria-hidden="true" style="font-size:22px">⚡</span>Electricity meter reading</button>'
+        + '<div id="pt-meters">'
+        +   ptRowHtml({ id:'pt-water-btn', kind:'water', icon:'💧', title:'Water meter reading', sub:'Send this month’s reading', controls:'pt-meter-panel', onclick:'ptMeterToggle(\'water\')', style:'margin-bottom:10px' })
+        +   ptRowHtml({ id:'pt-elec-btn', kind:'elec', icon:'⚡', title:'Electricity meter reading', sub:'Send this month’s reading', controls:'pt-meter-panel', onclick:'ptMeterToggle(\'elec\')', style:'margin-bottom:10px' })
         + '</div><div id="pt-meter-panel" style="display:none;margin-bottom:14px"></div>'
-        + '<div id="pt-card" class="pub-card" style="margin-bottom:14px;border:1.5px solid var(--accent-bd,rgba(31,168,152,.45));box-shadow:0 2px 10px rgba(0,0,0,.05)"></div><div id="pt-install" style="display:none;margin-bottom:14px"></div>');
+        + '<div id="pt-card" style="margin-bottom:10px"></div><div id="pt-install" style="display:none;margin-bottom:14px"></div>');
       var form = document.getElementById('pt-form'); rest.forEach(function(x){ form.appendChild(x); });
       // the two meter readings now have their own buttons, so they leave the category tiles
       Array.prototype.forEach.call(form.querySelectorAll('#pub-cat-tiles button[data-cat="Water Reading"], #pub-cat-tiles button[data-cat="Electricity Reading"]'), function(b){ b.remove(); });
@@ -12289,7 +12337,7 @@ function ptTktRender(id){
   var t = id && typeof TICKETS !== 'undefined' ? TICKETS[id] : null, pub = t ? ptIsPublic(t) : false, can = ptCanManage();
   var p = (id && PT.list) ? PT.list.filter(function(x){ return x.id === id; })[0] : null;
   var h = '<label for="tkt-public" style="display:flex;align-items:center;gap:10px;min-height:40px;cursor:' + (can ? 'pointer' : 'default') + '"><input id="tkt-public" type="checkbox"' + (pub ? ' checked' : '') + (can ? '' : ' disabled') + ' onchange="ptTktPublic(this.checked)" style="width:20px;height:20px;flex:none;accent-color:var(--accent)"><span style="font:600 13px var(--sans);color:var(--text2)">🌐 Visible to everyone on the report page</span></label>'
-    + '<div style="font:400 11.5px/1.5 var(--sans);color:var(--muted)">Residents see the title, unit, status and description without logging in — never the name, phone or email of whoever reported it or the activity log, and only the photos you choose below. Closed tickets stay on the list for 14 days.</div>';
+    + '<div style="font:400 11.5px/1.5 var(--sans);color:var(--muted)">Residents see the title, unit, status and description without logging in — never the name, phone or email of whoever reported it or the activity log, and only the photos you choose below. Mark a ticket <b>Done</b> to show residents the work is finished; closing it takes it off their list.</div>';
   if(t && id && (t.type || 'maintenance') === 'maintenance' && !t.parentId) h += ptTktExtraHtml(t, pub, can);
   if(p && p.fixed) h += '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--green-bd,rgba(74,222,158,.4));background:var(--green-bg,rgba(74,222,158,.12));font:400 13px/1.5 var(--sans);color:var(--text2)"><b style="color:var(--green,#1e9e6a)">✓ ' + ptEsc(p.fixed.by || 'A resident') + ' reported this fixed on ' + ptEsc(ptDay(p.fixed.at)) + '.</b> Close the ticket to confirm.' + (can ? ' <button type="button" onclick="ptTktAct(\'notfixed\')" style="display:block;margin-top:8px;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 12.5px var(--sans);cursor:pointer">Not fixed yet</button>' : '') + '</div>';
   if(p && p.metoo) h += '<div id="pt-tkt-metoo" style="margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid var(--accent-bd,rgba(31,168,152,.45));background:var(--accent-bg,rgba(31,168,152,.1));font:400 13px/1.5 var(--sans);color:var(--text2)"><b>🙋 Me too: ' + p.metoo + ' other resident' + (p.metoo > 1 ? 's have' : ' has') + ' this as well</b>' + (p.metooUnits && p.metooUnits.length ? ' — unit' + (p.metooUnits.length > 1 ? 's ' : ' ') + p.metooUnits.map(ptEsc).join(', ') + (p.metooUnits.length < p.metoo ? ' and others' : '') : '') + '</div>';
@@ -12336,6 +12384,19 @@ async function ptTktPhoto(photoId, v){
   try { await saveTickets([id]); if(typeof blToast === 'function') blToast(v ? (ptIsPublic(t) ? 'Photo now shows on the report page' + (v === 'after' ? ' as “After”' : '') : 'Saved — it will show once the ticket is visible to everyone') : 'Photo hidden from the report page', 'ok'); }
   catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
   if(PT.tktId === id) ptTktRender(id);
+}
+// Tracker shortcut: the work is finished. Residents see step 5 "Done"; the ticket stays open for a trustee to close.
+async function ptMarkDone(){
+  var t = (typeof _currentTicketId !== 'undefined' && _currentTicketId && typeof TICKETS !== 'undefined') ? TICKETS[_currentTicketId] : null;
+  if(!t || (typeof userCan === 'function' && !userCan('canChangeStatus', t))) return;
+  t.status = 'done'; t.updated = Date.now(); t.log = t.log || [];
+  var by = (typeof _currentUserObj !== 'undefined' && _currentUserObj) ? (_currentUserObj.name || _currentUserObj.username || 'user') : 'user';
+  t.log.push({ type:'status', text:'✓ Marked done by ' + by, ts:Date.now() });
+  try { if(typeof _refreshTicketStatusUi === 'function') _refreshTicketStatusUi(t); } catch(e){}
+  try { await saveTickets([t.id]); } catch(e){ console.warn('done save', e); }
+  try { if(typeof notifyReporterStatusChange === 'function') notifyReporterStatusChange(t, 'done'); } catch(e){}
+  try { if(typeof updateTicketBadge === 'function') updateTicketBadge(); if(typeof renderTickets === 'function') renderTickets(); } catch(e){}
+  if(PT.tktId === t.id){ await ptLoad(); ptTktRender(t.id); }
 }
 async function ptTktOpen(id){
   PT.tktId = id || null; ptTktRender(PT.tktId);
@@ -12426,7 +12487,7 @@ function ptCRender(kind){
   // emergency: red-tinted; managing agent: solid deep green with white text (Davies' colours), distinct from the teal "Report an issue"
   var GREEN = '#1b6b45';
   var col = c.red ? 'var(--red,#d9534f)' : '#fff', bd = c.red ? 'var(--red-bd,rgba(240,111,111,.5))' : GREEN, bg = c.red ? 'var(--red-bg,rgba(240,111,111,.08))' : GREEN, pill = c.red ? 'var(--red,#d9534f)' : GREEN;
-  var h = '<button type="button" aria-expanded="' + !!st.open + '" aria-controls="pt-c-list-' + kind + '" onclick="ptCToggle(\'' + kind + '\')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px solid ' + bd + ';background:' + bg + ';color:' + col + ';font:700 15.5px var(--sans);cursor:pointer' + (c.red ? '' : ';box-shadow:0 3px 10px rgba(27,107,69,.25)') + '">' + c.icon + ' ' + ptEsc(title) + ' <span aria-hidden="true" style="font-size:13px">' + (st.open ? '▾' : '▸') + '</span></button>';
+  var h = ptRowHtml({ kind:c.red ? 'em' : 'ag', icon:c.icon, title:ptEsc(title), sub:c.red ? 'Police, ambulance and fire' : 'Managing agent — call or email', open:st.open, controls:'pt-c-list-' + kind, onclick:'ptCToggle(\'' + kind + '\')' });
   if(st.open){
     h += '<div id="pt-c-list-' + kind + '" class="pub-card" style="margin-top:8px;' + (c.red ? 'border-color:var(--red-bd,rgba(240,111,111,.4))' : 'border-color:rgba(27,107,69,.45)') + '"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">' + ptEsc(intro) + '</div>'
       + list.map(function(e, i){
@@ -12522,7 +12583,7 @@ function ptDRender(){
   var st = PT.d, list = st.list || ptDDefault();
   if(!list.length){ host.innerHTML = ''; host.style.display = 'none'; return; }
   host.style.display = '';
-  var h = '<button type="button" id="pt-doc-btn" aria-expanded="' + !!st.open + '" aria-controls="pt-doc-list" onclick="ptDToggle()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);font:700 15.5px var(--sans);cursor:pointer">' + PT_D.icon + ' ' + ptEsc(PT_D.title) + ' <span aria-hidden="true" style="font-size:13px">' + (st.open ? '▾' : '▸') + '</span></button>';
+  var h = ptRowHtml({ id:'pt-doc-btn', kind:'doc', icon:PT_D.icon, title:ptEsc(PT_D.title), sub:ptEsc(list.slice(0, 2).map(function(e){ return e.title; }).join(' · ')) + (list.length > 2 ? ' and ' + (list.length - 2) + ' more' : ''), open:st.open, controls:'pt-doc-list', onclick:'ptDToggle()' });
   if(st.open){
     h += '<div id="pt-doc-list" class="pub-card" style="margin-top:8px"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">' + ptEsc(PT_D.intro) + '</div>'
       + list.map(function(e, i){
@@ -12673,7 +12734,7 @@ function ptARender(){
     host.innerHTML = '<button type="button" id="pt-install-back" onclick="ptAShow()" style="display:block;width:100%;min-height:44px;padding:0;background:none;border:none;color:var(--muted);font:600 12.5px var(--sans);text-decoration:underline;cursor:pointer">📲 Add Park Manor to your home screen</button>';
     return;
   }
-  var h = '<button type="button" id="pt-install-btn" aria-expanded="' + !!a.open + '" aria-controls="pt-install-how" onclick="ptAToggle()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px dashed var(--accent-bd,rgba(31,168,152,.55));background:var(--accent-bg,rgba(31,168,152,.08));color:var(--text2);font:700 15px var(--sans);cursor:pointer"><span aria-hidden="true">📲</span> Add Park Manor to your home screen <span aria-hidden="true" style="font-size:13px">' + (a.open ? '▾' : '▸') + '</span></button>';
+  var h = ptRowHtml({ id:'pt-install-btn', kind:'install', icon:'📲', title:'Add to your home screen', sub:'Open Park Manor like an app', open:a.open, controls:'pt-install-how', onclick:'ptAToggle()' });
   if(a.open){
     var step = function(n, t){ return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;font:400 14px/1.5 var(--sans);color:var(--text2)"><span aria-hidden="true" style="flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:700 12.5px/24px var(--sans);text-align:center">' + n + '</span><span style="flex:1;min-width:0">' + t + '</span></div>'; };
     var note = function(t, good){ return '<div role="status" style="margin:6px 0 8px;padding:10px 12px;border-radius:10px;font:' + (good ? '600' : '400') + ' 13.5px/1.5 var(--sans);color:var(--text2);border:1px solid ' + (good ? 'var(--green-bd,rgba(74,222,158,.5));background:var(--green-bg,rgba(74,222,158,.12))' : 'var(--border2);background:var(--surface2)') + '">' + t + '</div>'; };
@@ -13692,6 +13753,7 @@ async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
               <option value="awaiting_quote">Obtaining Quotes</option>
               <option value="awaiting_trustee_approval">Awaiting Trustee Approval</option>
               <option value="work_in_progress">Work In Progress</option>
+              <option value="done">Done</option>
               <option value="closed">Closed</option>
             </select>
             <div id="tkt-reqappr-wrap" style="margin-top:7px;display:none">
@@ -18808,7 +18870,7 @@ var _ticketStatusFilter = (function(){
   var s = {};
   // Default: show only active work, hide resolved/closed. User can toggle
   // them on from the chip strip when they want history.
-  ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress']
+  ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done']
     .forEach(function(k){ s[k] = true; });
   return s;
 })();
@@ -19044,6 +19106,7 @@ var TKT_STATUS = {
   awaiting_quote: {label:'Obtaining Quotes', bg:'var(--st-quote-bg)',  color:'var(--st-quote)',  border:'var(--st-quote-bd)'},
   awaiting_trustee_approval: {label:'Awaiting Trustee Approval', bg:'var(--st-appr-bg)', color:'var(--st-appr)', border:'var(--st-appr-bd)'},
   work_in_progress:{label:'Work In Progress', bg:'var(--st-wip-bg)',   color:'var(--st-wip)',    border:'var(--st-wip-bd)'},
+  done:           {label:'Done',             bg:'rgba(30,158,106,.12)', color:'#1e9e6a', border:'rgba(30,158,106,.38)'},
   closed:         {label:'Closed',           bg:'var(--st-closed-bg)', color:'var(--st-closed)', border:'var(--st-closed-bd)'}
 };
 // Legacy aliases: data carrying retired status keys still needs a definition
@@ -19071,6 +19134,7 @@ var TKT_FLOW = [
   {value:'awaiting_quote',label:'Obtaining Quotes', color:'#f59e0b'},
   {value:'awaiting_trustee_approval', label:'Awaiting Approval', color:'var(--st-appr)'},
   {value:'work_in_progress', label:'Work In Progress', color:'#a78bfa'},
+  {value:'done',          label:'Done',           color:'#1e9e6a'},
   {value:'closed',        label:'Closed',         color:'#4ade9e'}
 ];
 
@@ -19261,7 +19325,8 @@ function _journeyInsights(t, ms){
     var nextMap = {
       open: 'Next: obtain quotes',
       awaiting_quote: 'Next: upload supplier quotes',
-      work_in_progress: 'Next: close when the work is done',
+      work_in_progress: 'Next: mark it Done when the work is finished',
+      done: 'Next: close it once you have checked the work',
     };
     if(nextMap[t.status]) chips.push({icon:'\u27a1', text:nextMap[t.status]});
   } catch(e){}
@@ -19704,7 +19769,7 @@ function renderStatusFlow(currentStatus){
   var _flowT = _currentTicketId ? TICKETS[_currentTicketId] : null;
   var _simple = _flowT && !ticketRequiresApproval(_flowT);
   var FLOW = _simple
-    ? TKT_FLOW.filter(function(s){ return s.value === 'open' || s.value === 'work_in_progress' || s.value === 'closed'; })
+    ? TKT_FLOW.filter(function(s){ return s.value === 'open' || s.value === 'work_in_progress' || s.value === 'done' || s.value === 'closed'; })
     : TKT_FLOW;
   if(FLOW.findIndex(function(s){ return s.value === currentStatus; }) < 0) FLOW = TKT_FLOW;
   var currentIdx = FLOW.findIndex(function(s){ return s.value===currentStatus; });
@@ -19894,12 +19959,17 @@ function renderTicketApprovalPanel(t){
       ? '<div style="font-size:10px;color:var(--green);font-family:var(--sans);margin-top:6px">\u2713 ' + approvals.length + ' trustee approval' + (approvals.length===1?'':'s') + ' recorded before work began</div>'
       : '';
     panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-      + '<div style="flex:1;min-width:180px"><div style="font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">Work is under way. When it\u2019s finished, close the ticket \u2014 the reporter gets notified and the close date is recorded automatically.</div>' + slimAudit + '</div>'
-      + '<button onclick="markTicketClosedSimple()" style="padding:10px 18px;background:var(--green);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2713 Mark as Closed</button>'
+      + '<div style="flex:1;min-width:180px"><div style="font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">Work is under way. When it\u2019s finished, mark it Done \u2014 residents see that on the report page and the reporter is notified. Close the ticket afterwards to take it off their list.</div>' + slimAudit + '</div>'
+      + '<button onclick="ptMarkDone()" style="padding:10px 18px;background:var(--green);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2713 Mark as Done</button>'
       + '</div>';
     return;
   }
 
+  if(status === 'done' && userCan('canChangeStatus', t)){
+    panel.style.display = '';
+    panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">The work is done, and residents can see that on the report page. Close the ticket once you\u2019re satisfied \u2014 that takes it off the report page and records the close date.</div><button onclick="markTicketClosedSimple()" style="padding:10px 18px;background:var(--green);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2713 Close ticket</button></div>';
+    return;
+  }
   // Open tickets: the fork in the road — start the work, or bring in a quote
   var reqQuotesBtn = _canTogglePath()
     ? '<button onclick="requestQuotesFlow()" style="padding:10px 14px;background:none;border:1px solid var(--border2);border-radius:9px;color:var(--muted);font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer" title="Move to Obtaining Quotes and open the supplier tools">\ud83d\udce8 Request quotes</button>'
@@ -20835,6 +20905,7 @@ function refreshStatusDropdownGating(t){
   // Reset
   wipOption.disabled = false;
   wipOption.textContent = 'Work In Progress';
+  var doneOption = sel.querySelector('option[value="done"]'); if(doneOption) doneOption.disabled = false;
   // Simple-path tickets don't show the quoted-path steps at all (the current
   // status stays visible if a legacy ticket is already sitting there)
   var requires = t ? ticketRequiresApproval(t) : true;
@@ -20847,6 +20918,7 @@ function refreshStatusDropdownGating(t){
   if(requires && preWork && !thresholdMet && !isAdmin){
     wipOption.disabled = true;
     wipOption.textContent = 'Work In Progress (locked — needs '+TRUSTEE_APPROVAL_THRESHOLD+' trustee approvals)';
+    if(doneOption) doneOption.disabled = true;
   }
 }
 
@@ -21332,7 +21404,7 @@ function toggleTicketFilter(statusKey){
 function renderTicketFilterChips(){
   var host = document.getElementById('tkt-filter-chips');
   if(!host) return;
-  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
+  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','closed'];
   host.innerHTML = order.filter(function(k){ return TKT_STATUS[k]; }).map(function(k){
     var s = TKT_STATUS[k];
     var active = !!_ticketStatusFilter[k];
@@ -21528,7 +21600,7 @@ function renderTickets(){
   // left border. Clicking a card toggles that status filter (same behaviour
   // as the chips — the two stay in sync because both re-render together).
   if(stats){
-    var statOrder = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
+    var statOrder = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','closed'];
     stats.innerHTML = statOrder.filter(function(k){ return TKT_STATUS[k]; }).map(function(k){
       var s=TKT_STATUS[k];
       var on = !!_ticketStatusFilter[k];
@@ -21622,7 +21694,7 @@ function renderTickets(){
   // ── Board view (desktop): columns per status, admin drags to move ──
   if(_tktView === 'board'){
     empty.style.display = 'none';
-    var cols = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','closed'];
+    var cols = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','closed'];
     var canDrag = _currentRole === 'admin';
     list.innerHTML = '<div class="tkt-board">' + cols.map(function(k){
       var meta = TKT_STATUS[k];
@@ -22827,7 +22899,7 @@ function autoSaveTicket(){
     // proposal), is blocked. This is defense-in-depth — the dropdown option is
     // also disabled in the UI.
     var _preWorkStatuses = ['open','awaiting_quote','awaiting_trustee_approval'];
-    if(status === 'work_in_progress'
+    if((status === 'work_in_progress' || status === 'done')
        && _preWorkStatuses.indexOf(prev.status) !== -1
        && _currentRole !== 'admin'
        && ticketRequiresApproval(prev)
@@ -26345,7 +26417,7 @@ async function renderOverviewShare(){
   function childrenOf(id){ return tickets.filter(function(t){ return t.parentId === id; }); }
   function parentOf(id){ return tickets.find(function(t){ return t.id === id; }); }
 
-  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress'];
+  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done'];
   var groups = {}; order.forEach(function(k){ groups[k] = []; });
   openT.forEach(function(t){ var s = normalizeStatus(t.status); (groups[s] = groups[s] || []).push(t); });
 

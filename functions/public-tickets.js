@@ -8,8 +8,9 @@
 //                                             → one photo a trustee has approved
 //
 // A ticket is on the list when it is PUBLIC — it was logged through the report
-// form, or a trustee ticked "Visible to everyone" on it — and it is still open,
-// or was closed in the last 14 days (so people can see it was dealt with).
+// form, or a trustee ticked "Visible to everyone" on it — and it is not closed.
+// "Done" is a status of its own: the work is finished and residents see that
+// (step 5 of 5) until a trustee closes the ticket, which takes it off the list.
 //
 // What leaves this function: number, title, category, unit, status, dates, the
 // description, the public updates, the "expected by" date a trustee set, and
@@ -40,14 +41,14 @@ import { sendEmail, emailConfigError } from "./_email-shared.js";
 export const config = { path: "/api/public-tickets" };
 
 const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwYWdjbXpobG5ndHF2cnlkenZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MTA1OTgsImV4cCI6MjA5NDA4NjU5OH0.TfRrz2iUPFm7AUL55BRNJtyhNl--s8yBbtejcD9yjPU";
-const KEEP_CLOSED_DAYS = 14;
+const KEEP_CLOSED_DAYS = 0;        // closed tickets leave the list at once ("Done" is what residents see first)
 const MAX_UPDATES = 40;          // per ticket
 const MIN_GAP_MS = 15 * 1000;    // between public updates on one ticket
 const MAX_METOO = 60;            // per ticket
 const MAX_PHOTOS = 6;            // per ticket, on the public list
 const PHOTO_ID = /^[\w.-]{3,80}$/;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];   // never SVG or HTML
-const STATUS_LABEL = { open: "Open", awaiting_quote: "Obtaining quotes", awaiting_trustee_approval: "Awaiting trustee approval", work_in_progress: "Work in progress", closed: "Closed" };
+const STATUS_LABEL = { open: "Open", awaiting_quote: "Obtaining quotes", awaiting_trustee_approval: "Awaiting trustee approval", work_in_progress: "Work in progress", done: "Done", closed: "Closed" };
 const HIDDEN_CATEGORIES = ["Water Reading", "Electricity Reading"];
 
 async function supa(cfg, path, init = {}) {
@@ -71,7 +72,7 @@ function isPublic(d) {
 function closedAt(d) { return (d.dateClosed ? Date.parse(d.dateClosed) : 0) || Number(d.updated) || Number(d.added) || 0; }
 function onList(d, now) {
   if (!isPublic(d)) return false;
-  return normStatus(d.status) !== "closed" || now - closedAt(d) <= KEEP_CLOSED_DAYS * 86400000;
+  return normStatus(d.status) !== "closed" || (KEEP_CLOSED_DAYS > 0 && now - closedAt(d) <= KEEP_CLOSED_DAYS * 86400000);
 }
 // The photos a trustee ticked, limited to ones still attached to the ticket.
 function publicPhotoIds(d) {
@@ -80,20 +81,20 @@ function publicPhotoIds(d) {
 }
 const validDay = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) && !isNaN(Date.parse(v + "T00:00:00Z")) ? String(v) : "");
 function shape(id, prefix, d, pub, staffView) {
-  const status = normStatus(d.status), p = pub || {};
+  const status = normStatus(d.status), p = pub || {}, finished = status === "closed" || status === "done";
   const metoo = (Array.isArray(p.metoo) ? p.metoo : []).filter((m) => m && m.d);
   const out = {
     id: prefix ? id.slice(prefix.length) : id,
     number: d.ticketNumber == null ? null : d.ticketNumber,
     title: clean(d.title, 200), category: clean(d.category, 60), unit: clean(d.unit, 30),
-    status, statusLabel: STATUS_LABEL[status], urgent: d.priority === "urgent" && status !== "closed",
+    status, statusLabel: STATUS_LABEL[status], urgent: d.priority === "urgent" && !finished,
     logged: Number(d.added) || (d.dateOpen ? Date.parse(d.dateOpen) : 0) || 0,
     closed: status === "closed" ? closedAt(d) : 0,
     desc: clean(d.desc, 1200),
-    fixed: status !== "closed" && p.fixed ? { at: Number(p.fixed.at) || 0, by: clean(p.fixed.by, 60) } : null,
+    fixed: !finished && p.fixed ? { at: Number(p.fixed.at) || 0, by: clean(p.fixed.by, 60) } : null,
     updates: (Array.isArray(p.updates) ? p.updates : []).slice(-MAX_UPDATES).map((u) => ({ ts: Number(u.ts) || 0, text: clean(u.text, 600), by: clean(u.by, 60), role: u.role === "trustee" ? "trustee" : "resident", kind: u.kind === "fixed" || u.kind === "notfixed" ? u.kind : "" })),
     metoo: metoo.length,
-    expected: status === "closed" ? "" : validDay(d.expectedBy),
+    expected: finished ? "" : validDay(d.expectedBy),
     photos: (() => { const after = (Array.isArray(d.afterPhotos) ? d.afterPhotos : []).map(String); return publicPhotoIds(d).map((x) => ({ id: x, after: after.includes(x) })); })(),
   };
   if (staffView) out.metooUnits = [...new Set(metoo.map((m) => cleanUnit(m.unit)).filter(Boolean))];
@@ -132,7 +133,8 @@ async function list(cfg, prefix, staffView) {
   (pubs || []).forEach((r) => { let v = r.value; if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { v = null; } } if (v) pubBy[String(r.key).slice(5)] = v; });
   const now = Date.now();
   const out = (tickets || []).filter((r) => r && r.data && inScheme(String(r.id), prefix) && onList(r.data, now)).map((r) => shape(String(r.id), prefix, r.data, pubBy[r.id], staffView));
-  out.sort((a, b) => (a.status === "closed") - (b.status === "closed") || (b.urgent - a.urgent) || (a.status === "closed" ? b.closed - a.closed : b.logged - a.logged));
+  const fin = (t) => (t.status === "closed" || t.status === "done" ? 1 : 0);
+  out.sort((a, b) => fin(a) - fin(b) || (b.urgent - a.urgent) || b.logged - a.logged);
   return jsonResponse(200, { ok: true, keepClosedDays: KEEP_CLOSED_DAYS, tickets: out });
 }
 
@@ -200,6 +202,7 @@ export default async function handler(req) {
   } catch (e) { return errorResponse(502, "Could not load the issue: " + e.message); }
   if (!d || !isPublic(d)) return errorResponse(404, "That issue is not on the public list.");
   if (normStatus(d.status) === "closed") return errorResponse(409, "This issue is closed. If the problem is back, please log a new report.");
+  if (normStatus(d.status) === "done" && (action === "metoo" || action === "fixed")) return errorResponse(409, "The trustees have already marked this one as done. If it is not right, add an update to say so.");
 
   let pub;
   try { pub = await loadPub(cfg, rowId); } catch (e) { return errorResponse(502, "Could not load the updates: " + e.message); }
@@ -245,7 +248,7 @@ export default async function handler(req) {
           `${name || "A resident"} ${what} on the Park Manor report page.`, "",
           `Issue:  ${ref}${clean(d.title, 200)}`, d.unit ? `Unit:   ${clean(d.unit, 30)}` : null, "",
           text ? `"${text}"` : null, text ? "" : null,
-          action === "fixed" ? "If it really is fixed, close the ticket in the tracker to confirm. If not, open the ticket and choose \"Not fixed yet\"." : "Open the ticket in the tracker to reply.",
+          action === "fixed" ? "If it really is fixed, mark the ticket Done in the tracker (residents then see it as done), and close it when you are satisfied. If not, open the ticket and choose \"Not fixed yet\"." : "Open the ticket in the tracker to reply.",
           "", "— Park Manor (automated notification)",
         ].filter((l) => l !== null).join("\n"),
       });

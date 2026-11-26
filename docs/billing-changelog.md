@@ -1,5 +1,17 @@
 # Billing changelog
 
+## v2.34 — A "Done" status, one look for the whole report page, and each issue as its own card
+**Done**
+- New ticket status **Done**, between Work In Progress and Closed: the work is finished, but the ticket has not been closed yet. It is in the status list in the ticket editor, the progress strip, the filter chips, the summary cards and the board, and it counts as active (shown by default).
+- In a ticket that is in Work In Progress the shortcut button is now **Mark as Done**; in a Done ticket it is **Close ticket**. The reporter is emailed on both, as with every status change. Done cannot be used to skip the trustee-approval step.
+- On the report page a Done issue shows step 5 of 5 in green and moves to the bottom of the list under a **Done** heading. Residents can still add an update to it ("it is leaking again"); Me too and "This has been fixed" are no longer offered on it.
+- **Closing a ticket now takes it off the report page straight away** (it used to stay for 14 days). Its photos stop being served at the same moment.
+
+**The report page**
+- Every entry — Emergency numbers, Davies contact numbers, Documents, Report an issue, Water meter reading, Electricity meter reading, Current issues logged, Add to your home screen — is now the same kind of row: an icon in a rounded tile, a title, one line underneath and an arrow that turns when it is open. Same height, width, corners, spacing and type; the colours are unchanged (red, green, white, teal, blue, amber).
+- The two meter readings are full-width rows like the rest, and each form opens directly under the row that was tapped.
+- **Current issues logged:** each issue is its own card with a border, a shadow and space around it, and a coloured edge (teal, red for urgent, green for done). The number, category, unit and date sit in a small line above the title; Me too is a footer on the card.
+
 ## v2.33 — A clearer issues list (steps, latest update, expected date, photos) and a fix to "Add to home screen"
 **Current issues logged**
 - **Progress steps.** Each open issue shows five steps — Reported · Quotes · Approval · In progress · Done — with the current one highlighted, in place of the single status label. (Urgent and "Reported fixed" labels stay; closed issues keep "Closed".)
