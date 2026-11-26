@@ -11961,7 +11961,12 @@ function ptItemHtml(t){
 }
 function ptRender(){
   var host = document.getElementById('pt-card'); if(!host) return;
-  var head = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px"><b style="flex:1;min-width:0;font:700 16px var(--sans);color:var(--text2)">📋 Current issues logged' + (PT.list && PT.list.length ? ' <span style="font-weight:600;color:var(--muted)">· ' + PT.list.filter(function(t){ return t.status !== 'closed'; }).length + ' open</span>' : '') + '</b><button type="button" onclick="ptRefresh()" style="flex:none;white-space:nowrap;min-height:44px;padding:0 6px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button></div>';
+  // The list rolls up and down like the other sections (tap the title). It starts open, and the title
+  // always shows how many are open, so nothing is hidden by rolling it up.
+  var shut = PT.listOpen === false, nOpen = PT.list ? PT.list.filter(function(t){ return t.status !== 'closed'; }).length : 0;
+  var head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:' + (shut ? '0' : '2px') + '"><button type="button" id="pt-list-btn" aria-expanded="' + !shut + '" aria-controls="pt-list-body" onclick="ptListToggle()" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;padding:0;background:none;border:none;text-align:left;cursor:pointer;font:700 16px var(--sans);color:var(--text2)"><span style="flex:1;min-width:0">📋 Current issues logged' + (PT.list ? ' <span style="font-weight:600;color:var(--muted)">· ' + nOpen + ' open</span>' : '') + '</span><span aria-hidden="true" style="flex:none;font-size:14px;color:var(--muted)">' + (shut ? '▸' : '▾') + '</span></button>'
+    + (shut ? '' : '<button type="button" onclick="ptRefresh()" style="flex:none;white-space:nowrap;min-height:44px;padding:0 6px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button>') + '</div>';
+  if(shut){ host.innerHTML = head; return; }
   if(PT.list == null){ host.innerHTML = head + '<div style="font:400 13px var(--sans);color:var(--muted);padding:6px 0 4px">' + (PT.error ? 'The list couldn’t be loaded just now. You can still report an issue above.' : 'Loading…') + '</div>'; return; }
   var cur = PT.list.filter(function(t){ return t.status !== 'closed'; }), done = PT.list.filter(function(t){ return t.status === 'closed'; });
   var h = head + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:6px">What has been reported and where it stands. Tap one to read it, add an update, or say it’s been fixed. Check here before reporting the same thing twice.</div>';
@@ -11970,6 +11975,7 @@ function ptRender(){
   host.innerHTML = h;
 }
 function ptToggle(id){ PT.open[id] = !PT.open[id]; ptRender(); }
+function ptListToggle(){ PT.listOpen = PT.listOpen === false; ptRender(); }
 async function ptRefresh(){ PT.list = null; PT.error = ''; ptRender(); await ptLoad(); ptRender(); }
 async function ptAct(id, action){
   if(PT.busy) return;

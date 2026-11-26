@@ -1,5 +1,8 @@
 # Billing changelog
 
+## v2.28 — Current issues logged rolls up too
+- The **Current issues logged** card on the report page now rolls up and down from its title, like the other sections. It starts open; the title always shows how many are open, so the count is visible even when it is rolled up.
+
 ## v2.27 — the report page is now a menu; everything opens in place
 - The report page (`?report`) shows, top to bottom: **Emergency numbers** · **Davies contact numbers** · **Report an issue** · **Water meter reading** and **Electricity meter reading** · **Current issues logged**.
 - Every button works the same way: tap it and its content opens underneath; tap it again and it closes. Nothing leaves the page.
