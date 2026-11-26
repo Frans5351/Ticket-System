@@ -1,5 +1,15 @@
 # Billing changelog
 
+## v2.27 — the report page is now a menu; everything opens in place
+- The report page (`?report`) shows, top to bottom: **Emergency numbers** · **Davies contact numbers** · **Report an issue** · **Water meter reading** and **Electricity meter reading** · **Current issues logged**.
+- Every button works the same way: tap it and its content opens underneath; tap it again and it closes. Nothing leaves the page.
+  - **Report an issue** opens the form (steps 1–5 and Send my report), which used to be on the page all the time.
+  - **Water / Electricity meter reading** open their forms in place instead of replacing the page. They have left the category tiles inside the report form.
+  - Only one form is open at a time. Opening a meter form while a report is half-written keeps the report — text and photos — and brings it back when the meter form closes. A half-written report also re-opens the form when the page is loaded again.
+- **Davies contact numbers** is a solid green button with white text; **Report an issue** is the main teal button; the meter buttons are tinted blue and amber.
+- **Current issues logged** (renamed, with the number open) stays on the page in a bordered card.
+- The dedicated `?water` and `?electricity` links are unchanged.
+
 ## v2.26 — Davies contact numbers on the report page
 - A second button under Emergency numbers: **Davies contact numbers** — who at the managing agent deals with what, with tap-to-call and tap-to-email.
 - Starting list, as set out by the portfolio manager by email on 20 November 2026: **Ruaan Rossouw** and **Myolisi** — accounts (levies, water and electricity charges, payments, statements, general account queries); **Cheryl** — maintenance, repairs, insurance and related operational issues. All on the office line 021 419 5392; office hours Monday–Thursday 08:30–17:00, Friday until 16:00.

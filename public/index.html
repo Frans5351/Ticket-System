@@ -10130,9 +10130,14 @@ function wrEmailToggle(){
   if(btn) btn.textContent = on ? '💧 Send my reading' : '🧪 Save test reading (no email)';
   if(n) n.innerHTML = on ? 'The managing agent and the Park Manor inbox will get this reading by email, as normal.' : '<b style="color:var(--amber,#d9a441)">Test mode — the managing agent and the Park Manor inbox will not be emailed.</b> The reading is still saved, the photo filed in Google Drive and the meter read from it. If you fill in “Email me a copy”, that copy is still sent.';
 }
+// Where the form draws itself: the whole public page (the dedicated link), or a panel on the report
+// page when it is opened from the button there ({ inline:true, hostId:'…' }). The choice sticks, so
+// "Submit another reading" re-draws in the same place.
+function wrHost(){ return document.getElementById((WR.lastOpts && WR.lastOpts.hostId) || 'public-view-content'); }
+function wrInline(){ return !!(WR.lastOpts && WR.lastOpts.inline); }
 function renderWaterReadingForm(opts){
-  opts = opts || {};
-  var host = document.getElementById('public-view-content');
+  opts = opts || WR.lastOpts || {}; WR.lastOpts = opts;
+  var host = wrHost();
   if(!host) return;
   window._pubFiles = [];
   function showForm(){
@@ -10143,7 +10148,7 @@ function renderWaterReadingForm(opts){
     var inputCss = 'width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;font-family:var(--sans);outline:none;box-sizing:border-box';
     var lbl = function(t){ return '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + t + '</label>'; };
     host.innerHTML = ''
-      + '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">💧 Submit your water meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>'
+      + (opts.inline ? '' : '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">💧 Submit your water meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>')
       + (opts.embedded ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
       + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Your unit</b></span></div>' + lbl('Unit number *') + '<input id="wr-unit" type="text" inputmode="numeric" placeholder="e.g. 12" maxlength="20" oninput="wrPubUnitInput()" style="' + inputCss + '"><div id="wr-last" style="margin-top:10px"></div></div>'
@@ -10178,7 +10183,7 @@ function wrParseValue(s){ var m = /(\d[\d ]{1,8}(?:[.,]\d+)?)/.exec(String(s || 
 async function submitWaterReading(){
   clearPublicErr();
   var honey = document.getElementById('pub-honey');
-  if(honey && honey.value){ document.getElementById('public-view-content').innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>'; return; }
+  if(honey && honey.value){ wrHost().innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>'; return; }
   if(!publicRateLimitOk()){ showPublicErr('You’ve submitted several times recently. Please wait a bit before submitting another.'); return; }
   var unit = (document.getElementById('wr-unit').value || '').trim().replace(/^unit\s*/i, '');
   var note = (document.getElementById('wr-note').value || '').trim();
@@ -10253,14 +10258,14 @@ async function submitWaterReading(){
     } catch(e){ console.warn('water reading not recorded', e); saveErr = String((e && e.message) || e); setTimeout(function(){ wrPubFiled(null); }, 0); }
     // Test mode sends no email, so if the reading wasn't stored nothing happened at all — say so.
     if(!sendEmail && !saved){ var te = new Error('test reading not saved: ' + saveErr); te.wrTest = true; throw te; }
-    document.getElementById('public-view-content').innerHTML = ''
+    wrHost().innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">' + (sendEmail ? 'Reading sent' : 'Test reading saved') + '</div>'
       + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">' + (sendEmail ? 'Thanks! Your water meter reading for <b>Unit ' + escHtml(unit) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.' : '🧪 <b>The managing agent was not emailed.</b> The reading for <b>Unit ' + escHtml(unit) + '</b> is saved on this month’s list.') + '</div>'
       + (copyTo ? '<div style="font-size:13px;font-family:var(--sans);line-height:1.6;max-width:420px;margin:10px auto 0;overflow-wrap:anywhere;color:' + (copySent ? 'var(--text2)' : 'var(--bl-owe,#b4570f)') + '">' + (copySent ? '✉️ A copy has been emailed to <b>' + escHtml(copyTo) + '</b>.' : '⚠️ We couldn’t email your copy to ' + escHtml(copyTo) + (copyErr ? ' (' + escHtml(copyErr) + ')' : '') + ' — your reading itself was received.') + '</div>' : '')
       + '<div id="wr-filed" style="font-size:12px;color:var(--muted);font-family:var(--sans);line-height:1.6;max-width:420px;margin:12px auto 0;overflow-wrap:anywhere">' + (files.length ? (sendEmail ? 'Filing your photo in the Park Manor records… you can close this page.' : 'Filing the photo in Google Drive and reading the meter… keep this page open to see the result.') : '') + '</div></div>'
       + '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap"><button onclick="renderWaterReadingForm()" style="padding:11px 22px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Submit another reading</button>'
-      + '<button onclick="renderPublicReportForm()" style="padding:11px 22px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Report something else</button></div>';
+      + (wrInline() ? '' : '<button onclick="renderPublicReportForm()" style="padding:11px 22px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer">Report something else</button>') + '</div>';
     window.scrollTo(0, 0);
   } catch(e){
     console.warn('water reading submit', e);
@@ -10964,9 +10969,14 @@ function erEmailToggle(){
   if(btn) btn.textContent = on ? '⚡ Send my reading' : '🧪 Save test reading (no email)';
   if(n) n.innerHTML = on ? 'The managing agent and the Park Manor inbox will get this reading by email, as normal.' : '<b style="color:var(--amber,#d9a441)">Test mode — the managing agent and the Park Manor inbox will not be emailed.</b> The reading is still saved, the photo filed in Google Drive and the meter read from it. If you fill in “Email me a copy”, that copy is still sent.';
 }
+// Where the form draws itself: the whole public page (the dedicated link), or a panel on the report
+// page when it is opened from the button there ({ inline:true, hostId:'…' }). The choice sticks, so
+// "Submit another reading" re-draws in the same place.
+function erHost(){ return document.getElementById((ER.lastOpts && ER.lastOpts.hostId) || 'public-view-content'); }
+function erInline(){ return !!(ER.lastOpts && ER.lastOpts.inline); }
 function renderElectricityReadingForm(opts){
-  opts = opts || {};
-  var host = document.getElementById('public-view-content');
+  opts = opts || ER.lastOpts || {}; ER.lastOpts = opts;
+  var host = erHost();
   if(!host) return;
   window._pubFiles = [];
   function showForm(){
@@ -10977,7 +10987,7 @@ function renderElectricityReadingForm(opts){
     var inputCss = 'width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:16px;font-family:var(--sans);outline:none;box-sizing:border-box';
     var lbl = function(t){ return '<label style="display:block;font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 0 4px">' + t + '</label>'; };
     host.innerHTML = ''
-      + '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">⚡ Submit your electricity meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>'
+      + (opts.inline ? '' : '<div class="pub-hero"><img src="park-manor-entrance.jpg" alt=""><div class="pub-hero-shade"></div><div class="pub-hero-text"><div class="pub-hero-brand">PARK MANOR</div><div class="pub-hero-sub">⚡ Submit your electricity meter reading</div><div class="pub-hero-trust">✓ A photo of your meter is all we need &nbsp;·&nbsp; ✓ Goes straight to the managing agent</div></div></div>')
       + (opts.embedded ? '<button type="button" onclick="renderPublicReportForm()" style="margin:0 0 12px;min-height:44px;padding:10px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-size:13px;font-family:var(--sans);cursor:pointer">← Not a meter reading? Report something else</button>' : '')
       + '<input id="pub-honey" name="website" type="text" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">'
       + '<div class="pub-card"><div class="pub-card-head"><span class="pub-step">1</span><span><b>Which meter?</b></span></div>' + erChipsHtml() + '<input id="er-unit" type="hidden"><div id="er-last" style="margin-top:10px"></div></div>'
@@ -11009,7 +11019,7 @@ function erParseValue(s){ var m = /(\d[\d ]{1,8}(?:[.,]\d+)?)/.exec(String(s || 
 async function submitElectricityReading(){
   clearPublicErr();
   var honey = document.getElementById('pub-honey');
-  if(honey && honey.value){ document.getElementById('public-view-content').innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>'; return; }
+  if(honey && honey.value){ erHost().innerHTML = '<div style="text-align:center;padding:60px 20px"><div style="font-size:48px">✓</div><div style="font-size:16px;color:var(--text2);margin-top:10px">Thanks!</div></div>'; return; }
   if(!publicRateLimitOk()){ showPublicErr('You’ve submitted several times recently. Please wait a bit before submitting another.'); return; }
   var unit = (document.getElementById('er-unit').value || '').trim().replace(/^unit\s*/i, '');
   var note = (document.getElementById('er-note').value || '').trim();
@@ -11084,7 +11094,7 @@ async function submitElectricityReading(){
     } catch(e){ console.warn('electricity reading not recorded', e); saveErr = String((e && e.message) || e); setTimeout(function(){ erPubFiled(null); }, 0); }
     // Test mode sends no email, so if the reading wasn't stored nothing happened at all — say so.
     if(!sendEmail && !saved){ var te = new Error('test reading not saved: ' + saveErr); te.erTest = true; throw te; }
-    document.getElementById('public-view-content').innerHTML = ''
+    erHost().innerHTML = ''
       + '<div style="text-align:center;padding:48px 16px 24px"><svg class="pub-check" viewBox="0 0 56 56"><circle cx="28" cy="28" r="26.4"/><path d="M16 29.5 L24.4 37.6 L40 20.5"/></svg>'
       + '<div style="font-size:20px;font-weight:600;color:var(--text2);margin:10px 0 8px">' + (sendEmail ? 'Reading sent' : 'Test reading saved') + '</div>'
       + '<div style="font-size:13px;color:var(--muted);font-family:var(--mono);line-height:1.6;max-width:420px;margin:0 auto">' + (sendEmail ? 'Thanks! Your electricity meter reading for <b>' + escHtml(erLabel(unit)) + '</b> has gone to the managing agent and Park Manor, and is ticked off on this month’s list.' : '🧪 <b>The managing agent was not emailed.</b> The reading for <b>' + escHtml(erLabel(unit)) + '</b> is saved on this month’s list.') + '</div>'
@@ -11936,7 +11946,7 @@ function ptItemHtml(t){
       + (t.desc ? '<div style="font:400 13.5px/1.55 var(--sans);color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);border-radius:10px;padding:10px 12px">' + ptEsc(t.desc) + '</div>' : '')
       + (t.fixed ? '<div style="margin-top:10px;font:400 13px/1.5 var(--sans);color:var(--green,#1e9e6a)">✓ ' + ptEsc(t.fixed.by || 'A resident') + ' said this is fixed (' + ptEsc(ptDay(t.fixed.at)) + '). The trustees will confirm and close it.</div>' : '')
       + ptUpdatesHtml(t);
-    if(closed) h += '<div style="margin-top:10px;font:400 12.5px/1.5 var(--sans);color:var(--muted)">This one is closed. If the problem is back, log a new report below.</div>';
+    if(closed) h += '<div style="margin-top:10px;font:400 12.5px/1.5 var(--sans);color:var(--muted)">This one is closed. If the problem is back, report it again with “Report an issue”.</div>';
     else h += '<div style="margin-top:12px"><label for="pt-text-' + id + '" style="display:block;font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Add an update</label>'
       + '<textarea id="pt-text-' + id + '" rows="2" maxlength="600" placeholder="e.g. Still leaking this morning, or: the plumber came today" style="' + inCss + ';resize:vertical"></textarea>'
       + '<input id="pt-name-' + id + '" type="text" maxlength="60" autocomplete="name" placeholder="Your name or unit (optional)" value="' + ptEsc(nm) + '" style="' + inCss + ';margin-top:8px">'
@@ -11951,10 +11961,10 @@ function ptItemHtml(t){
 }
 function ptRender(){
   var host = document.getElementById('pt-card'); if(!host) return;
-  var head = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px"><b style="font:700 16px var(--sans);color:var(--text2)">Current issues</b><button type="button" onclick="ptRefresh()" style="min-height:44px;padding:0 6px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button></div>';
-  if(PT.list == null){ host.innerHTML = head + '<div style="font:400 13px var(--sans);color:var(--muted);padding:6px 0 4px">' + (PT.error ? 'The list couldn’t be loaded just now. You can still log a report below.' : 'Loading…') + '</div>'; return; }
+  var head = '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px"><b style="flex:1;min-width:0;font:700 16px var(--sans);color:var(--text2)">📋 Current issues logged' + (PT.list && PT.list.length ? ' <span style="font-weight:600;color:var(--muted)">· ' + PT.list.filter(function(t){ return t.status !== 'closed'; }).length + ' open</span>' : '') + '</b><button type="button" onclick="ptRefresh()" style="flex:none;white-space:nowrap;min-height:44px;padding:0 6px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button></div>';
+  if(PT.list == null){ host.innerHTML = head + '<div style="font:400 13px var(--sans);color:var(--muted);padding:6px 0 4px">' + (PT.error ? 'The list couldn’t be loaded just now. You can still report an issue above.' : 'Loading…') + '</div>'; return; }
   var cur = PT.list.filter(function(t){ return t.status !== 'closed'; }), done = PT.list.filter(function(t){ return t.status === 'closed'; });
-  var h = head + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:6px">What has been reported and where it stands. Tap one to read it, add an update, or say it’s been fixed. Check here before logging the same thing twice.</div>';
+  var h = head + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:6px">What has been reported and where it stands. Tap one to read it, add an update, or say it’s been fixed. Check here before reporting the same thing twice.</div>';
   h += cur.length ? cur.map(ptItemHtml).join('') : '<div style="font:400 13.5px var(--sans);color:var(--text2);padding:12px 0;border-top:1px solid var(--border2)">✓ Nothing is open right now.</div>';
   if(done.length) h += '<div style="font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:14px 0 0;padding-top:12px;border-top:1px solid var(--border2)">Sorted in the last ' + PT.keep + ' days</div>' + done.map(ptItemHtml).join('').replace('border-top:1px solid var(--border2)', 'border-top:none');
   host.innerHTML = h;
@@ -11976,14 +11986,66 @@ async function ptAct(id, action){
 
 // ── Report form: the list on top, and the "urgent" tick box by the Send button ──
 // (The report form lives in a later script block, so the hooks are installed once the page has loaded.)
+// Everything on the report page opens in place and closes when its button is tapped again — the
+// same way the two contact lists do. Only one form is open at a time: the report form and the two
+// meter forms share field ids (photos, error line, Send button), so while a meter form is open the
+// report form is set aside with whatever was typed into it, and put back when the meter form closes.
+function ptPark(){
+  var form = document.getElementById('pt-form'); if(!form || PT.park) return;
+  PT.park = document.createDocumentFragment(); PT.parkFiles = window._pubFiles;
+  while(form.firstChild) PT.park.appendChild(form.firstChild);
+}
+function ptUnpark(){
+  var form = document.getElementById('pt-form'); if(!form || !PT.park) return;
+  form.appendChild(PT.park); PT.park = null; window._pubFiles = PT.parkFiles || []; PT.parkFiles = null;
+}
+function ptMeterPaint(){
+  [['water', 'pt-water-btn', 'var(--info,#3b82c4)'], ['elec', 'pt-elec-btn', '#c8902a']].forEach(function(x){
+    var b = document.getElementById(x[1]); if(!b) return; var on = PT.meter === x[0];
+    b.setAttribute('aria-expanded', on ? 'true' : 'false'); b.style.boxShadow = on ? '0 0 0 2.5px ' + x[2] : 'none';
+  });
+}
+function ptMeterToggle(kind){
+  var panel = document.getElementById('pt-meter-panel'); if(!panel) return;
+  var closing = !kind || PT.meter === kind;
+  panel.innerHTML = ''; panel.style.display = 'none'; PT.meter = '';
+  if(closing){ ptUnpark(); ptMeterPaint(); return; }
+  ptFormToggle(false, true); ptPark();
+  PT.meter = kind; panel.style.display = ''; ptMeterPaint();
+  var opts = { inline:true, hostId:'pt-meter-panel' };
+  if(kind === 'water') renderWaterReadingForm(opts); else renderElectricityReadingForm(opts);
+  try { document.getElementById('pt-meters').scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){}
+}
+function ptFormToggle(open, quiet){
+  var form = document.getElementById('pt-form'), btn = document.getElementById('pt-report-btn'), car = document.getElementById('pt-report-caret'); if(!form || !btn) return;
+  var on = open == null ? form.style.display === 'none' : !!open;
+  if(on && PT.meter) ptMeterToggle('');                 // a meter form is open: close it and bring the report form back
+  form.style.display = on ? '' : 'none'; btn.setAttribute('aria-expanded', on ? 'true' : 'false'); if(car) car.textContent = on ? '▾' : '▸';
+  if(on && !quiet){ try { btn.scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){} }
+}
 function ptInject(){
   var tries = 0, go = function(){
     var hero = document.querySelector('#public-view-content .pub-hero'), err = document.getElementById('pub-err'), btn = document.getElementById('pub-submit-btn');
     if(!hero || !err || !btn || !/submitPublicReport/.test(btn.getAttribute('onclick') || '')){ if(++tries < 40) setTimeout(go, 150); return; }
     if(!document.getElementById('pt-card')){
-      hero.insertAdjacentHTML('afterend', '<div id="pt-c-em" style="margin-bottom:8px"></div><div id="pt-c-ag" style="margin-bottom:14px"></div><div id="pt-card" class="pub-card" style="margin-bottom:14px"></div><div style="font:700 16px var(--sans);color:var(--text2);margin:18px 2px 10px">Report something new</div>');
+      // The landing screen is a short menu: emergency numbers · managing agent contacts · Report an issue
+      // (the form — steps 1–5 and the Send button — opens underneath it) · water / electricity readings ·
+      // and the list of current issues, which is always visible.
+      var rest = [], n = hero.nextSibling; while(n){ rest.push(n); n = n.nextSibling; }
+      hero.insertAdjacentHTML('afterend', '<div id="pt-c-em" style="margin-bottom:10px"></div><div id="pt-c-ag" style="margin-bottom:10px"></div>'
+        + '<button type="button" id="pt-report-btn" aria-expanded="false" aria-controls="pt-form" onclick="ptFormToggle()" style="display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:14px 18px;margin-bottom:10px;border-radius:14px;border:none;background:var(--accent);color:#fff;text-align:left;cursor:pointer;font-family:var(--sans);box-shadow:0 4px 14px rgba(31,168,152,.28)"><span aria-hidden="true" style="font-size:24px;flex:none">📝</span><span style="flex:1;min-width:0"><span style="display:block;font:700 17px/1.25 var(--sans)">Report an issue</span><span style="display:block;font:400 12.5px/1.4 var(--sans);opacity:.92">A problem, a request or a question for the trustees</span></span><span id="pt-report-caret" aria-hidden="true" style="flex:none;font-size:15px">▸</span></button>'
+        + '<div id="pt-form" style="display:none;margin-bottom:14px"></div>'
+        + '<div id="pt-meters" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">'
+        +   '<button type="button" id="pt-water-btn" aria-expanded="false" aria-controls="pt-meter-panel" onclick="ptMeterToggle(\'water\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 8px;border-radius:14px;border:1.5px solid var(--info-bd,rgba(90,160,230,.45));background:var(--info-bg,rgba(90,160,230,.1));color:var(--text2);font:700 14px/1.25 var(--sans);cursor:pointer;text-align:center"><span aria-hidden="true" style="font-size:22px">💧</span>Water meter reading</button>'
+        +   '<button type="button" id="pt-elec-btn" aria-expanded="false" aria-controls="pt-meter-panel" onclick="ptMeterToggle(\'elec\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 8px;border-radius:14px;border:1.5px solid rgba(217,164,65,.5);background:rgba(217,164,65,.12);color:var(--text2);font:700 14px/1.25 var(--sans);cursor:pointer;text-align:center"><span aria-hidden="true" style="font-size:22px">⚡</span>Electricity meter reading</button>'
+        + '</div><div id="pt-meter-panel" style="display:none;margin-bottom:14px"></div>'
+        + '<div id="pt-card" class="pub-card" style="margin-bottom:14px;border:1.5px solid var(--accent-bd,rgba(31,168,152,.45));box-shadow:0 2px 10px rgba(0,0,0,.05)"></div>');
+      var form = document.getElementById('pt-form'); rest.forEach(function(x){ form.appendChild(x); });
+      // the two meter readings now have their own buttons, so they leave the category tiles
+      Array.prototype.forEach.call(form.querySelectorAll('#pub-cat-tiles button[data-cat="Water Reading"], #pub-cat-tiles button[data-cat="Electricity Reading"]'), function(b){ b.remove(); });
       err.insertAdjacentHTML('beforebegin', '<div id="pf-flow" class="pub-card" style="margin-bottom:12px"></div>');
-      PT.flow = { notify:null, urgent:false, pub:null, anon:null };
+      setTimeout(function(){ var t = document.getElementById('pub-title'), d = document.getElementById('pub-desc'); if((t && t.value.trim()) || (d && d.value.trim())) ptFormToggle(true, true); }, 450);      // an unfinished draft: show it
+      PT.flow = { notify:null, urgent:false, pub:null, anon:null }; PT.meter = ''; PT.park = null;
       ptAnonMount(); ptFlowRender();
     }
     ptRender(); ptLoad().then(ptRender);
@@ -12016,7 +12078,7 @@ function ptFlowSummary(){
   var f = PT.flow || {}, bits = ['Logged on the trustees’ and managing agent’s board.'];
   if(f.notify === 'none') bits.push('Nobody is emailed.');
   else if(f.notify) bits.push((f.notify === 'agent' ? 'The managing agent is' : f.notify === 'trustees' ? 'The trustees are' : 'The trustees and the managing agent are') + ' emailed now' + (f.urgent ? ', marked <b style="color:var(--red,#d9534f)">URGENT</b>' : '') + '.');
-  if(f.pub === true) bits.push('Everyone can follow it on the list above.'); else if(f.pub === false) bits.push('It stays private — not on the list.');
+  if(f.pub === true) bits.push('Everyone can follow it on the “Current issues logged” list.'); else if(f.pub === false) bits.push('It stays private — not on the list.');
   if(f.anon === true) bits.push('Your name is not recorded.');
   return bits.join(' ');
 }
@@ -12026,7 +12088,7 @@ function ptFlowRender(){
   var h = '<div class="pub-card-head"><span class="pub-step">5</span><span><b>How should we handle it?</b><i>it is always logged — you choose the rest</i></span></div>'
     + '<div id="pf-q-notify" role="radiogroup" aria-label="Who should be emailed right now?">' + ptQ(1, 'Who should be emailed right now?') + '<div style="display:grid;gap:8px">' + PT_NOTIFY.map(function(o){ return ptOpt('notify', o, f.notify); }).join('') + '</div></div>';
   if(f.notify && f.notify !== 'none') h += '<label for="pub-urgent" style="display:flex;align-items:flex-start;gap:12px;min-height:48px;margin-top:10px;padding:10px 12px;border-radius:12px;cursor:pointer;border:1.5px solid ' + (f.urgent ? 'var(--red-bd,rgba(240,111,111,.5))' : 'var(--border2)') + ';background:' + (f.urgent ? 'var(--red-bg,rgba(240,111,111,.08))' : 'var(--surface)') + '"><input id="pub-urgent" type="checkbox"' + (f.urgent ? ' checked' : '') + ' onchange="ptPick(\'urgent\',this.checked)" style="width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--red,#d9534f)"><span><span style="display:block;font:700 14.5px var(--sans);color:var(--text2)">🚨 It’s urgent</span><span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);margin-top:1px">The email is marked URGENT. For things that can’t wait — a burst pipe, a security problem, no power.</span></span></label>';
-  if(f.notify) h += '<div id="pf-q-pub" role="radiogroup" aria-label="Can everyone follow this on the list?">' + ptQ(2, 'Can everyone follow this on the list?', 'The list at the top of this page, which anyone at Park Manor can open.')
+  if(f.notify) h += '<div id="pf-q-pub" role="radiogroup" aria-label="Can everyone follow this on the list?">' + ptQ(2, 'Can everyone follow this on the list?', 'The “Current issues logged” list on this page, which anyone at Park Manor can open.')
     + '<div style="display:grid;gap:8px">' + ptOpt('pub', { v:'yes', ic:'🌐', t:'Yes, show it', d:'Neighbours see the issue and its status, and can add updates. ' + (f.anon === false ? 'Your name is never shown.' : 'No names are shown.') }, f.pub === true ? 'yes' : f.pub === false ? 'no' : null)
     + ptOpt('pub', { v:'no', ic:'🔒', t:'No, keep it private', d:'Only the trustees and the managing agent can see it.' }, f.pub === true ? 'yes' : f.pub === false ? 'no' : null) + '</div></div>';
   if(f.notify && f.pub != null) h += '<div aria-live="polite" style="margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--surface2);font:400 13px/1.55 var(--sans);color:var(--text2)"><b>So:</b> ' + ptFlowSummary() + '</div>';
@@ -12180,15 +12242,17 @@ function ptTel(n){ var s = String(n || '').trim(), plus = s.charAt(0) === '+'; r
 function ptCRender(kind){
   var host = document.getElementById('pt-c-' + kind); if(!host) return;
   var c = PT_C[kind], st = PT.c[kind], list = st.list || c.def, title = st.title || c.title, intro = st.intro || c.intro;
-  var col = c.red ? 'var(--red,#d9534f)' : 'var(--accent2)', bd = c.red ? 'var(--red-bd,rgba(240,111,111,.5))' : 'var(--border2)', bg = c.red ? 'var(--red-bg,rgba(240,111,111,.08))' : 'var(--surface)', pill = c.red ? 'var(--red,#d9534f)' : 'var(--accent)';
-  var h = '<button type="button" aria-expanded="' + !!st.open + '" aria-controls="pt-c-list-' + kind + '" onclick="ptCToggle(\'' + kind + '\')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px solid ' + bd + ';background:' + bg + ';color:' + col + ';font:700 15.5px var(--sans);cursor:pointer">' + c.icon + ' ' + ptEsc(title) + ' <span aria-hidden="true" style="font-size:13px">' + (st.open ? '▾' : '▸') + '</span></button>';
+  // emergency: red-tinted; managing agent: solid deep green with white text (Davies' colours), distinct from the teal "Report an issue"
+  var GREEN = '#1b6b45';
+  var col = c.red ? 'var(--red,#d9534f)' : '#fff', bd = c.red ? 'var(--red-bd,rgba(240,111,111,.5))' : GREEN, bg = c.red ? 'var(--red-bg,rgba(240,111,111,.08))' : GREEN, pill = c.red ? 'var(--red,#d9534f)' : GREEN;
+  var h = '<button type="button" aria-expanded="' + !!st.open + '" aria-controls="pt-c-list-' + kind + '" onclick="ptCToggle(\'' + kind + '\')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px solid ' + bd + ';background:' + bg + ';color:' + col + ';font:700 15.5px var(--sans);cursor:pointer' + (c.red ? '' : ';box-shadow:0 3px 10px rgba(27,107,69,.25)') + '">' + c.icon + ' ' + ptEsc(title) + ' <span aria-hidden="true" style="font-size:13px">' + (st.open ? '▾' : '▸') + '</span></button>';
   if(st.open){
-    h += '<div id="pt-c-list-' + kind + '" class="pub-card" style="margin-top:8px;' + (c.red ? 'border-color:var(--red-bd,rgba(240,111,111,.4))' : '') + '"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">' + ptEsc(intro) + '</div>'
+    h += '<div id="pt-c-list-' + kind + '" class="pub-card" style="margin-top:8px;' + (c.red ? 'border-color:var(--red-bd,rgba(240,111,111,.4))' : 'border-color:rgba(27,107,69,.45)') + '"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">' + ptEsc(intro) + '</div>'
       + list.map(function(e, i){
           return '<div class="pt-c-row" style="padding:10px 0;' + (i ? 'border-top:1px solid var(--border2);' : '') + 'font-family:var(--sans);color:var(--text2)"><div style="display:flex;align-items:center;gap:12px;min-height:44px">'
             + '<span style="flex:1;min-width:0"><span style="display:block;font:700 15px/1.3 var(--sans);overflow-wrap:anywhere">' + ptEsc(e.name) + '</span>' + (e.note ? '<span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);overflow-wrap:anywhere">' + ptEsc(e.note) + '</span>' : '') + '</span>'
             + (e.number ? '<a href="' + ptEsc(ptTel(e.number)) + '" aria-label="Call ' + ptEsc(e.name) + ' on ' + ptEsc(e.number) + '" style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:99px;background:' + pill + ';color:#fff;font:700 15px var(--sans);white-space:nowrap;text-decoration:none"><span aria-hidden="true">📞</span>' + ptEsc(e.number) + '</a>' : '') + '</div>'
-            + (e.email ? '<a href="mailto:' + ptEsc(e.email) + '" style="display:flex;align-items:center;gap:6px;min-height:44px;color:var(--accent2);font:600 13.5px var(--sans);text-decoration:none;overflow-wrap:anywhere"><span aria-hidden="true">✉️</span>' + ptEsc(e.email) + '</a>' : '') + '</div>';
+            + (e.email ? '<a href="mailto:' + ptEsc(e.email) + '" style="display:flex;align-items:center;gap:6px;min-height:44px;color:' + (c.red ? 'var(--accent2)' : GREEN) + ';font:600 13.5px var(--sans);text-decoration:none;overflow-wrap:anywhere"><span aria-hidden="true">✉️</span>' + ptEsc(e.email) + '</a>' : '') + '</div>';
         }).join('') + '</div>';
   }
   host.innerHTML = h;
