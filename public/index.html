@@ -11917,7 +11917,7 @@ async function ptPost(payload){
     return j;
   } catch(e){ return { ok:false, error:'No connection — please try again.' }; }
 }
-function ptPut(t){ if(!t || !PT.list) return; PT.list = PT.list.map(function(x){ return x.id === t.id ? t : x; }); }
+function ptPut(t){ if(!t || !PT.list) return; PT.list = PT.list.map(function(x){ return x.id === t.id ? (x.metooUnits && !t.metooUnits ? Object.assign({}, t, { metooUnits:x.metooUnits }) : t) : x; }); }      // (the units behind “Me too” only come with a signed-in load)
 
 // ── "Me too" — one tap instead of logging the same thing again ──────────────
 // The phone keeps a random id (so it counts once) and remembers which issues it ticked, so a second
