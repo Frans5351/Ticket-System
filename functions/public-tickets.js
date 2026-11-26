@@ -22,6 +22,12 @@
 // ticket for a trustee to confirm by closing it. They cannot close it.
 // Trustees / admin / managing agent (signed in) can: reply publicly ("reply")
 // and clear a wrong "fixed" flag ("notfixed").
+//
+// "Me too": a resident taps once to say they have the same problem, instead of
+// logging it again ("metoo"; "unmetoo" takes it back). Kept in the same tpub
+// row as metoo:[{d,ts,unit}] — d is a random id the page keeps on that phone so
+// one phone counts once. Everyone sees only the COUNT; the units (when the
+// phone remembers one from a meter reading) go to signed-in trustees only.
 
 import { jsonResponse, errorResponse, getConfig, verifySessionJwt } from "./_passkey-shared.js";
 import { sendEmail, emailConfigError } from "./_email-shared.js";
@@ -32,6 +38,7 @@ const ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const KEEP_CLOSED_DAYS = 14;
 const MAX_UPDATES = 40;          // per ticket
 const MIN_GAP_MS = 15 * 1000;    // between public updates on one ticket
+const MAX_METOO = 60;            // per ticket
 const STATUS_LABEL = { open: "Open", awaiting_quote: "Obtaining quotes", awaiting_trustee_approval: "Awaiting trustee approval", work_in_progress: "Work in progress", closed: "Closed" };
 const HIDDEN_CATEGORIES = ["Water Reading", "Electricity Reading"];
 
@@ -58,9 +65,10 @@ function onList(d, now) {
   if (!isPublic(d)) return false;
   return normStatus(d.status) !== "closed" || now - closedAt(d) <= KEEP_CLOSED_DAYS * 86400000;
 }
-function shape(id, prefix, d, pub) {
+function shape(id, prefix, d, pub, staffView) {
   const status = normStatus(d.status), p = pub || {};
-  return {
+  const metoo = (Array.isArray(p.metoo) ? p.metoo : []).filter((m) => m && m.d);
+  const out = {
     id: prefix ? id.slice(prefix.length) : id,
     number: d.ticketNumber == null ? null : d.ticketNumber,
     title: clean(d.title, 200), category: clean(d.category, 60), unit: clean(d.unit, 30),
@@ -70,7 +78,17 @@ function shape(id, prefix, d, pub) {
     desc: clean(d.desc, 1200),
     fixed: status !== "closed" && p.fixed ? { at: Number(p.fixed.at) || 0, by: clean(p.fixed.by, 60) } : null,
     updates: (Array.isArray(p.updates) ? p.updates : []).slice(-MAX_UPDATES).map((u) => ({ ts: Number(u.ts) || 0, text: clean(u.text, 600), by: clean(u.by, 60), role: u.role === "trustee" ? "trustee" : "resident", kind: u.kind === "fixed" || u.kind === "notfixed" ? u.kind : "" })),
+    metoo: metoo.length,
   };
+  if (staffView) out.metooUnits = [...new Set(metoo.map((m) => cleanUnit(m.unit)).filter(Boolean))];
+  return out;
+}
+const cleanUnit = (u) => { const s = clean(u, 12); return /^[\w ]{1,12}$/.test(s) ? s : ""; };
+// Signed-in trustee / admin / managing agent, proven by a real session token (never "open" just because the site has no sessions).
+function isStaffView(cfg, token) {
+  if (!cfg.jwtSecret || !token) return false;
+  const s = verifySessionJwt(cfg, String(token));
+  return !!s && ["admin", "trustee", "management"].includes(String(s.role || ""));
 }
 async function loadPub(cfg, rowId) {
   const rows = await supa(cfg, "/rest/v1/settings?key=eq." + encodeURIComponent("tpub:" + rowId) + "&select=value&limit=1");
@@ -89,7 +107,7 @@ function staff(cfg, token) {
   return { ok: true, name: clean(s.name || s.username, 60) };
 }
 
-async function list(cfg, prefix) {
+async function list(cfg, prefix, staffView) {
   const [tickets, pubs] = await Promise.all([
     supa(cfg, "/rest/v1/tickets?select=id,data"),
     supa(cfg, "/rest/v1/settings?key=like." + encodeURIComponent("tpub:*") + "&select=key,value"),
@@ -97,7 +115,7 @@ async function list(cfg, prefix) {
   const pubBy = {};
   (pubs || []).forEach((r) => { let v = r.value; if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { v = null; } } if (v) pubBy[String(r.key).slice(5)] = v; });
   const now = Date.now();
-  const out = (tickets || []).filter((r) => r && r.data && inScheme(String(r.id), prefix) && onList(r.data, now)).map((r) => shape(String(r.id), prefix, r.data, pubBy[r.id]));
+  const out = (tickets || []).filter((r) => r && r.data && inScheme(String(r.id), prefix) && onList(r.data, now)).map((r) => shape(String(r.id), prefix, r.data, pubBy[r.id], staffView));
   out.sort((a, b) => (a.status === "closed") - (b.status === "closed") || (b.urgent - a.urgent) || (a.status === "closed" ? b.closed - a.closed : b.logged - a.logged));
   return jsonResponse(200, { ok: true, keepClosedDays: KEEP_CLOSED_DAYS, tickets: out });
 }
@@ -107,14 +125,14 @@ export default async function handler(req) {
   if (req.method === "GET") {
     const prefix = new URL(req.url).searchParams.get("prefix") || "";
     if (!validPrefix(prefix)) return errorResponse(400, "bad prefix");
-    try { return await list(cfg, prefix); } catch (e) { return errorResponse(502, "Could not load the issues: " + e.message); }
+    try { return await list(cfg, prefix, isStaffView(cfg, req.headers.get("x-pm-session") || "")); } catch (e) { return errorResponse(502, "Could not load the issues: " + e.message); }
   }
   if (req.method !== "POST") return errorResponse(405, "GET or POST only");
   let body; try { body = await req.json(); } catch (e) { return errorResponse(400, "Invalid JSON"); }
   if (body.website) return jsonResponse(200, { ok: true });                         // honeypot: pretend it worked
   const prefix = String(body.prefix || ""), id = String(body.id || ""), action = String(body.action || "");
   if (!validPrefix(prefix) || !/^[\w.-]{3,80}$/.test(id)) return errorResponse(400, "ticket missing");
-  if (!["comment", "fixed", "reply", "notfixed"].includes(action)) return errorResponse(400, "unknown action");
+  if (!["comment", "fixed", "reply", "notfixed", "metoo", "unmetoo"].includes(action)) return errorResponse(400, "unknown action");
   const isStaffAction = action === "reply" || action === "notfixed";
   let who = { name: "" };
   if (isStaffAction) { who = staff(cfg, body.token); if (!who.ok) return errorResponse(401, who.error); }
@@ -134,6 +152,18 @@ export default async function handler(req) {
   try { pub = await loadPub(cfg, rowId); } catch (e) { return errorResponse(502, "Could not load the updates: " + e.message); }
   pub.updates = Array.isArray(pub.updates) ? pub.updates : [];
   const now = Date.now(), last = pub.updates[pub.updates.length - 1];
+  if (action === "metoo" || action === "unmetoo") {
+    const device = String(body.device || "");
+    if (!/^[\w-]{8,40}$/.test(device)) return errorResponse(400, "Please reload the page and try again.");
+    pub.metoo = (Array.isArray(pub.metoo) ? pub.metoo : []).filter((m) => m && m.d);
+    const has = pub.metoo.some((m) => m.d === device);
+    if (action === "metoo" && !has) {
+      if (pub.metoo.length >= MAX_METOO) return errorResponse(429, "A lot of residents have already added themselves — the trustees know it affects many units.");
+      pub.metoo.push({ d: device, ts: now, unit: cleanUnit(body.unit) });
+    } else if (action === "unmetoo" && has) pub.metoo = pub.metoo.filter((m) => m.d !== device);
+    if (has !== (action === "metoo")) { try { await savePub(cfg, rowId, pub); } catch (e) { return errorResponse(502, "Could not save: " + e.message); } }
+    return jsonResponse(200, { ok: true, mine: action === "metoo", ticket: shape(rowId, prefix, d, pub) });
+  }
   if (!isStaffAction) {
     if (pub.updates.length >= MAX_UPDATES) return errorResponse(429, "This issue already has a lot of updates — please contact a trustee directly.");
     if (last && now - Number(last.ts) < MIN_GAP_MS) return errorResponse(429, "An update was added a moment ago — please wait a few seconds and try again.");

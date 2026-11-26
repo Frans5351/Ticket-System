@@ -1,5 +1,16 @@
 # Billing changelog
 
+## v2.30 — "Me too" on current issues, and a Documents button
+- **Me too.** Every open issue on the report page has a **Me too** button. One tap adds the resident to that issue instead of logging it again; a second tap takes it back. The line next to it shows how many have it ("3 other residents have this too").
+  - No login. The phone keeps a random id so it counts once, and remembers which issues it ticked.
+  - Everyone sees only the count. In the tracker, the ticket shows the count to trustees, plus unit numbers where the phone remembered one from a meter reading.
+  - No email is sent for a Me too. Closed issues have no button. At most 60 per issue.
+  - Stored with the public updates (`tpub:<ticket>` in `settings`, field `metoo`), so saving a ticket in the tracker never wipes it. Server: `functions/public-tickets.js`, actions `metoo` / `unmetoo`.
+- **Documents.** A new **Documents** button sits under Davies contact numbers and opens in place like the others. It lists the **Conduct rules** (CSOS approved 23 November 2023) and the **Management rules**; a tap opens the PDF.
+  - The two PDFs ship with the site in `public/documents/`. They are the copies Azure emailed on 30 April 2026; the scanned management rules were reduced from 7 MB to under 1 MB (black and white, same pages) so they open quickly on a phone.
+  - Admins can add, rename or remove documents in **Settings → Documents on the report page**. A link must start with `https://` (for example a Google Drive file shared as "Anyone with the link") or be a file on the site.
+- Typing an update in one issue is no longer lost when another part of the list refreshes.
+
 ## v2.29 — Current issues logged starts rolled up
 - When the report page opens, **Current issues logged** is now rolled up like the other sections. The title still shows how many are open (for example "Current issues logged · 2 open"); tap it to see the list, tap again to close it.
 
