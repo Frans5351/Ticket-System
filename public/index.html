@@ -11939,17 +11939,93 @@ function ptInject(){
     if(!hero || !err || !btn || !/submitPublicReport/.test(btn.getAttribute('onclick') || '')){ if(++tries < 40) setTimeout(go, 150); return; }
     if(!document.getElementById('pt-card')){
       hero.insertAdjacentHTML('afterend', '<div id="pt-card" class="pub-card" style="margin-bottom:14px"></div><div style="font:700 16px var(--sans);color:var(--text2);margin:18px 2px 10px">Report something new</div>');
-      err.insertAdjacentHTML('beforebegin', '<div class="pub-card" style="margin-bottom:12px"><label for="pub-urgent" style="display:flex;align-items:flex-start;gap:12px;min-height:44px;cursor:pointer"><input id="pub-urgent" type="checkbox" onchange="ptUrgentPaint()" style="width:22px;height:22px;flex:none;margin-top:2px;accent-color:var(--red,#d9534f)"><span><span style="display:block;font:700 14.5px var(--sans);color:var(--text2)">🚨 This is urgent</span><span id="pub-urgent-note" style="display:block;font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-top:2px"></span></span></label></div>');
-      ptUrgentPaint();
+      err.insertAdjacentHTML('beforebegin', '<div id="pf-flow" class="pub-card" style="margin-bottom:12px"></div>');
+      PT.flow = { notify:null, urgent:false, pub:null, anon:null };
+      ptAnonMount(); ptFlowRender();
     }
     ptRender(); ptLoad().then(ptRender);
   };
   go();
 }
-function ptUrgentPaint(){
-  var on = !!((document.getElementById('pub-urgent') || {}).checked), n = document.getElementById('pub-urgent-note');
-  if(n) n.innerHTML = on ? '<b style="color:var(--red,#d9534f)">All the trustees and the managing agent will be emailed straight away.</b> Use this for things that can’t wait — a burst pipe, a security problem, no power.'
-                         : 'Tick only if it can’t wait. Otherwise your report is logged for the trustees and everyone can follow it on the list above.';
+// ── "How should we handle this?" — a short guided flow instead of a row of tick boxes ──
+// Each answer opens the next question:
+//   (in "Where & who")  Give your name?        yes → name / email / phone appear · no → anonymous
+//   1  Who should be emailed right now?        nobody (just log it) · managing agent · trustees · both
+//        └ if anybody: Is it urgent?           adds URGENT to the email and the ticket
+//   2  Can everyone follow it on the list?     yes (public) · no (trustees and agent only)
+// Whatever is chosen, the report is always logged on the tracker the trustees and managing agent use.
+var PT_NOTIFY = [
+  { v:'none',     ic:'📋', t:'Just log it',      d:'No email. It goes on the board the trustees and managing agent work from.' },
+  { v:'agent',    ic:'🏢', t:'Managing agent',   d:'Email the managing agent now.' },
+  { v:'trustees', ic:'🛡', t:'Trustees',         d:'Email the trustees now.' },
+  { v:'both',     ic:'👥', t:'Both',             d:'Email the trustees and the managing agent now.' }
+];
+function ptOpt(group, o, cur, wide){
+  var on = cur === o.v;
+  return '<button type="button" role="radio" aria-checked="' + on + '" onclick="ptPick(\'' + group + '\',\'' + o.v + '\')" style="display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;min-height:56px;padding:11px 12px;border-radius:12px;cursor:pointer;font-family:var(--sans);'
+    + 'border:1.5px solid ' + (on ? 'var(--accent)' : 'var(--border2)') + ';background:' + (on ? 'var(--accent-bg,rgba(31,168,152,.1))' : 'var(--surface)') + ';color:var(--text2)">'
+    + '<span aria-hidden="true" style="flex:none;font-size:20px;line-height:1.2">' + o.ic + '</span><span style="flex:1;min-width:0"><span style="display:block;font:700 14.5px/1.3 var(--sans)">' + o.t + '</span><span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);margin-top:1px">' + o.d + '</span></span>'
+    + '<span aria-hidden="true" style="flex:none;width:20px;height:20px;border-radius:50%;margin-top:2px;box-sizing:border-box;border:' + (on ? '6px solid var(--accent)' : '2px solid var(--border2)') + ';background:var(--surface)"></span></button>';
+}
+function ptQ(n, title, sub){ return '<div style="margin:' + (n > 1 ? '18px' : '2px') + ' 0 8px"><div style="font:700 14.5px var(--sans);color:var(--text2)">' + title + '</div>' + (sub ? '<div style="font:400 12.5px/1.45 var(--sans);color:var(--muted);margin-top:1px">' + sub + '</div>' : '') + '</div>'; }
+function ptFlowSummary(){
+  var f = PT.flow || {}, bits = ['Logged on the trustees’ and managing agent’s board.'];
+  if(f.notify === 'none') bits.push('Nobody is emailed.');
+  else if(f.notify) bits.push((f.notify === 'agent' ? 'The managing agent is' : f.notify === 'trustees' ? 'The trustees are' : 'The trustees and the managing agent are') + ' emailed now' + (f.urgent ? ', marked <b style="color:var(--red,#d9534f)">URGENT</b>' : '') + '.');
+  if(f.pub === true) bits.push('Everyone can follow it on the list above.'); else if(f.pub === false) bits.push('It stays private — not on the list.');
+  if(f.anon === true) bits.push('Your name is not recorded.');
+  return bits.join(' ');
+}
+function ptFlowRender(){
+  var host = document.getElementById('pf-flow'); if(!host) return;
+  var f = PT.flow || (PT.flow = { notify:null, urgent:false, pub:null, anon:null });
+  var h = '<div class="pub-card-head"><span class="pub-step">5</span><span><b>How should we handle it?</b><i>it is always logged — you choose the rest</i></span></div>'
+    + '<div id="pf-q-notify" role="radiogroup" aria-label="Who should be emailed right now?">' + ptQ(1, 'Who should be emailed right now?') + '<div style="display:grid;gap:8px">' + PT_NOTIFY.map(function(o){ return ptOpt('notify', o, f.notify); }).join('') + '</div></div>';
+  if(f.notify && f.notify !== 'none') h += '<label for="pub-urgent" style="display:flex;align-items:flex-start;gap:12px;min-height:48px;margin-top:10px;padding:10px 12px;border-radius:12px;cursor:pointer;border:1.5px solid ' + (f.urgent ? 'var(--red-bd,rgba(240,111,111,.5))' : 'var(--border2)') + ';background:' + (f.urgent ? 'var(--red-bg,rgba(240,111,111,.08))' : 'var(--surface)') + '"><input id="pub-urgent" type="checkbox"' + (f.urgent ? ' checked' : '') + ' onchange="ptPick(\'urgent\',this.checked)" style="width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--red,#d9534f)"><span><span style="display:block;font:700 14.5px var(--sans);color:var(--text2)">🚨 It’s urgent</span><span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);margin-top:1px">The email is marked URGENT. For things that can’t wait — a burst pipe, a security problem, no power.</span></span></label>';
+  if(f.notify) h += '<div id="pf-q-pub" role="radiogroup" aria-label="Can everyone follow this on the list?">' + ptQ(2, 'Can everyone follow this on the list?', 'The list at the top of this page, which anyone at Park Manor can open.')
+    + '<div style="display:grid;gap:8px">' + ptOpt('pub', { v:'yes', ic:'🌐', t:'Yes, show it', d:'Neighbours see the issue and its status, and can add updates. ' + (f.anon === false ? 'Your name is never shown.' : 'No names are shown.') }, f.pub === true ? 'yes' : f.pub === false ? 'no' : null)
+    + ptOpt('pub', { v:'no', ic:'🔒', t:'No, keep it private', d:'Only the trustees and the managing agent can see it.' }, f.pub === true ? 'yes' : f.pub === false ? 'no' : null) + '</div></div>';
+  if(f.notify && f.pub != null) h += '<div aria-live="polite" style="margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--surface2);font:400 13px/1.55 var(--sans);color:var(--text2)"><b>So:</b> ' + ptFlowSummary() + '</div>';
+  host.innerHTML = h;
+}
+function ptPick(group, v){
+  var f = PT.flow || (PT.flow = {});
+  if(group === 'notify'){ f.notify = v; if(v === 'none') f.urgent = false; }
+  else if(group === 'urgent') f.urgent = !!v;
+  else if(group === 'pub') f.pub = v === 'yes';
+  else if(group === 'anon'){ f.anon = v === 'yes'; ptAnonPaint(); }
+  ptFlowRender();
+  if(typeof clearPublicErr === 'function') clearPublicErr();
+}
+// The name question lives in "Where & who": the contact fields only appear if the resident wants to be named.
+function ptAnonMount(){
+  var nameEl = document.getElementById('pub-name'); if(!nameEl || document.getElementById('pf-anon')) return;
+  var first = nameEl.previousElementSibling && nameEl.previousElementSibling.tagName === 'LABEL' ? nameEl.previousElementSibling : nameEl;
+  var box = document.createElement('div'); box.id = 'pf-anon'; box.style.cssText = 'margin-top:14px';
+  first.parentNode.insertBefore(box, first);
+  var wrap = document.createElement('div'); wrap.id = 'pf-contact'; wrap.style.display = 'none';
+  box.parentNode.insertBefore(wrap, box.nextSibling);
+  while(wrap.nextSibling) wrap.appendChild(wrap.nextSibling);          // name, email, phone and their hints move inside
+  ptAnonPaint();
+}
+function ptAnonPaint(){
+  var box = document.getElementById('pf-anon'), wrap = document.getElementById('pf-contact'); if(!box) return;
+  var f = PT.flow || {}, cur = f.anon === true ? 'yes' : f.anon === false ? 'no' : null;
+  box.innerHTML = '<div role="radiogroup" aria-label="Do you want to give your name?">' + ptQ(1, 'Do you want to give your name?', 'Either way it is logged and dealt with.')
+    + '<div style="display:grid;gap:8px">' + ptOpt('anon', { v:'no', ic:'🙂', t:'Yes, here are my details', d:'So the trustees or the agent can ask you about it. Never shown publicly.' }, cur)
+    + ptOpt('anon', { v:'yes', ic:'🕶', t:'Stay anonymous', d:'No name, phone or email is recorded. Nobody can contact you about it.' }, cur) + '</div></div>';
+  if(wrap) wrap.style.display = f.anon === false ? '' : 'none';
+}
+// Read at Send. Returns null (and says what is missing) if a question hasn't been answered.
+function ptFlowRead(){
+  if(!document.getElementById('pf-flow')) return { notify:'', urgent:false, pub:true, anon:false, legacy:true };      // flow not on screen — behave as before
+  var f = PT.flow || {}, miss = function(msg, id){ if(typeof showPublicErr === 'function') showPublicErr(msg); var el = document.getElementById(id); if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'center' }); return null; };
+  if(document.getElementById('pf-anon') && f.anon == null) return miss('Please choose whether to give your name or stay anonymous.', 'pf-anon');
+  if(!f.notify) return miss('Please choose who should be emailed — or “Just log it”.', 'pf-q-notify');
+  if(f.pub == null) return miss('Please choose whether everyone can follow this on the list.', 'pf-q-pub');
+  if(f.anon){ ['pub-name', 'pub-email', 'pub-phone'].forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
+    var wrap = document.getElementById('pf-contact'); if(wrap) Array.prototype.forEach.call(wrap.querySelectorAll('input[type=checkbox]'), function(c){ c.checked = false; }); }
+  return { notify:f.notify, urgent:!!f.urgent && f.notify !== 'none', pub:f.pub !== false, anon:!!f.anon };
 }
 
 // ── Tracker (signed in): who can see a ticket, public updates, "reported fixed" ──
@@ -26826,8 +26902,10 @@ function clearPublicErr(){
 
 async function submitPublicReport(){
   if(window._pubCategory === 'Water Reading'){ renderWaterReadingForm({ embedded:true }); return; }
-  window._ptUrgentNow = !!((document.getElementById('pub-urgent') || {}).checked);
   clearPublicErr();
+  var _pf = (typeof ptFlowRead === 'function') ? ptFlowRead() : { pub:true };
+  if(!_pf) return;
+  window._ptFlow = _pf; window._ptUrgentNow = !!_pf.urgent;
   // Honeypot — if a bot filled this, silently pretend success.
   var honey = document.getElementById('pub-honey');
   if(honey && honey.value){
@@ -26935,7 +27013,9 @@ async function submitPublicReport(){
       unit: unit,
       category: window._pubCategory || 'Other',
       priority: window._ptUrgentNow ? 'urgent' : 'medium',
-      public: true,
+      public: !(window._ptFlow && window._ptFlow.pub === false),
+      notify: (window._ptFlow || {}).notify || '',
+      anonymous: !!(window._ptFlow && window._ptFlow.anon),
       status: 'open',
       reporter: name || 'Anonymous',
       reporterEmail: email,
@@ -27011,7 +27091,7 @@ async function submitPublicReport(){
               reporter: name,
               phone: phone,
               category: window._pubCategory || 'Other',
-              urgent: !!window._ptUrgentNow,
+              urgent: !!window._ptUrgentNow, notify: (window._ptFlow || {}).notify || '', anonymous: !!(window._ptFlow && window._ptFlow.anon),
               bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
               attachments: notifyAtt
             })
@@ -27054,7 +27134,7 @@ async function submitPublicReport(){
           phone: phone,
           email: email,
           category: window._pubCategory || 'Other',
-          urgent: !!window._ptUrgentNow,
+          urgent: !!window._ptUrgentNow, notify: (window._ptFlow || {}).notify || '', anonymous: !!(window._ptFlow && window._ptFlow.anon),
           bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
           attachments: notifyAtt
         })

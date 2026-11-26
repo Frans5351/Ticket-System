@@ -109,7 +109,13 @@ export default async function handler(req) {
   // follow it on the public list. (If no inbox is set up we fall back to emailing everyone,
   // so a report is never left without a single notification.)
   const urgent = !!body.urgent && !isMeterReading;
-  const quietReport = !isMeterReading && !urgent && looksLikeEmail(bareAddress((body.bcInbox || "").toString().trim()));
+  // The report form now asks who to email: "none" (just log it), "agent", "trustees" or "both".
+  // Whatever is chosen the report is on the tracker; this only decides who gets an email now.
+  // (No value = an older copy of the form: urgent → everyone, otherwise the Park Manor inbox.)
+  const notify = !isMeterReading && ["none", "agent", "trustees", "both"].includes(String(body.notify || "")) ? String(body.notify) : "";
+  const anonymous = !!body.anonymous && !isMeterReading;
+  const mgmtSet = new Set(), trusteeSet = new Set();
+  const quietReport = !notify && !isMeterReading && !urgent && looksLikeEmail(bareAddress((body.bcInbox || "").toString().trim()));
   // Meter readings are not tickets: they live under Water / Electricity readings in the app.
   const listName = isElecReading ? "Electricity readings" : "Water readings";
   const whereElse = isMeterReading ? `see ${listName} in the Park Manor app, or the Google Drive folder` : "view in the tracker";
@@ -275,6 +281,7 @@ export default async function handler(req) {
       // Management users always receive the notification. Trustees receive it
       // for ordinary reports too — but NOT for water meter readings, which are
       // routed to the managing agent only (management role + AGENT_NOTIFY_EMAIL).
+      if (u && looksLikeEmail(u.email)) { if (u.role === "management") mgmtSet.add(u.email.trim().toLowerCase()); else if (u.role === "trustee") trusteeSet.add(u.email.trim().toLowerCase()); }
       const wants = u && (u.role === "management" || (u.role === "trustee" && !isMeterReading));
       if (wants) {
         recipSeen++;
@@ -297,6 +304,17 @@ export default async function handler(req) {
   // the role filter above.)
   if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
   if (quietReport) { agentSet.clear(); agentSet.add(bareAddress(bcInbox).toLowerCase()); }
+  if (notify) {
+    agentSet.clear();
+    if (notify === "agent" || notify === "both") {
+      mgmtSet.forEach((e) => agentSet.add(e));
+      (process.env.AGENT_NOTIFY_EMAIL || "").split(",").map((x) => bareAddress(x.trim())).filter(looksLikeEmail).forEach((e) => agentSet.add(e.toLowerCase()));
+    }
+    if (notify === "trustees" || notify === "both") {
+      trusteeSet.forEach((e) => agentSet.add(e));
+      if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());      // the trustees' own mailbox
+    }
+  }
   const agentList = Array.from(agentSet);
   if (agentList.length) {
     const aSubject = isElecReading
@@ -311,6 +329,7 @@ export default async function handler(req) {
       `Subject:    ${title || "(none)"}`,
       unit ? `Unit:       ${unit}` : null,
       reporter ? `Name:       ${reporter}` : null,
+      anonymous ? "Reported anonymously — no name or contact details were given." : null,
       phone ? `Phone:      ${phone}` : null,
       looksLikeEmail(to) ? `Email:      ${to}` : null,
       "",
@@ -342,7 +361,7 @@ export default async function handler(req) {
         ${detailRow("Reference", ref)}
         ${detailRow("Category", category)}
         ${detailRow("Unit", unit)}
-        ${detailRow("Name", reporter)}
+        ${detailRow("Name", anonymous ? "Anonymous — no contact details given" : reporter)}
         ${detailRow("Phone", phone)}
         ${detailRow("Email", looksLikeEmail(to) ? to : "")}
       </table>
@@ -384,7 +403,7 @@ export default async function handler(req) {
     ok: true,
     id: residentResult && residentResult.id,
     agentNotified: !!(agentResult && agentResult.ok),
-    urgent, notified: agentList.length,
+    urgent, notify, notified: agentList.length,
     residentCopy: !!(copyResult && copyResult.ok),
     residentCopyError: copyResult && !copyResult.ok ? String(copyResult.msg || "failed").slice(0, 200) : "",
   });

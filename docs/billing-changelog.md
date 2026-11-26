@@ -1,5 +1,16 @@
 # Billing changelog
 
+## v2.23 — report form: a guided "how should we handle it?" flow
+- The single "urgent" tick box is replaced by a short flow where each answer opens the next question:
+  - **Do you want to give your name?** (in "Where & who") — *Yes* shows the name, email and phone fields; *Stay anonymous* hides them and nothing is recorded.
+  - **Who should be emailed right now?** — *Just log it* (no email), *Managing agent*, *Trustees*, or *Both*.
+  - **It's urgent** — appears only when someone is being emailed; marks the email URGENT and the ticket's priority Urgent.
+  - **Can everyone follow this on the list?** — *Yes, show it* or *No, keep it private* (trustees and managing agent only).
+  - A one-line summary of what will happen sits above the Send button.
+- Whatever is chosen, the report is always logged on the tracker.
+- Emails: *Managing agent* = users with the managing-agent role (plus `AGENT_NOTIFY_EMAIL`); *Trustees* = trustee users plus the Park Manor inbox; *Just log it* sends no email at all. Anonymous reports say so in the email.
+- The ticket stores `notify`, `anonymous` and `public`. Older copies of the form still work as in v2.22.
+
 ## v2.22 — report page: current issues for everyone, and an "urgent" tick box
 - **Current issues list on the report page (`?report`), no login.** Every public ticket that is still open is listed with its status; closed ones stay for 14 days under "Sorted in the last 14 days". Tap one to read the description and updates.
 - **Residents can add an update and say "This has been fixed".** That flags the ticket ("Reported fixed") and emails the Park Manor inbox; a trustee confirms by closing it, or chooses **Not fixed yet**. Residents cannot close a ticket themselves.
