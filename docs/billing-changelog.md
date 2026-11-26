@@ -1,5 +1,24 @@
 # Billing changelog
 
+## v2.33 — A clearer issues list (steps, latest update, expected date, photos) and a fix to "Add to home screen"
+**Current issues logged**
+- **Progress steps.** Each open issue shows five steps — Reported · Quotes · Approval · In progress · Done — with the current one highlighted, in place of the single status label. (Urgent and "Reported fixed" labels stay; closed issues keep "Closed".)
+- **Latest update on the row.** The newest update and when it was posted ("Plumber booked for Friday · 2 days ago") show without opening the issue.
+- **Expected date.** In the ticket editor, under "Visible to everyone", a trustee can set **Expected by**. Residents see "Expected by Fri, 5 Dec", or "Was expected by … — running late" once the date has passed.
+- **Photos, chosen by a trustee.** The same block lists the ticket's photos, each with **Hidden / Show / Show: After**. Nothing is shown until a trustee chooses it — that includes every existing ticket. Shown photos appear as a small picture on the row and a strip inside the issue; a tap enlarges one. "After" marks the photo of the finished job, which leads on a closed issue. Up to six per issue; only JPEG, PNG, WebP and GIF; videos and documents are never offered.
+- The report form now tells residents that a trustee may show their photo on the list, and asks them to keep faces, number plates and the inside of their home out of the picture.
+- Server: `functions/public-tickets.js` serves an approved photo at `/api/public-tickets?photo=…&p=…` only while the issue is on the public list and that photo is ticked. Ticket fields: `expectedBy`, `publicPhotos`, `afterPhotos`.
+
+**Add to home screen**
+- After **Install Park Manor** on Android the page now says "Park Manor is being added… look for the icon on your home screen or in your list of apps" instead of the button simply disappearing; if the browser's prompt is declined it says so and keeps the menu steps.
+- The menu steps (⋮ → Add to Home screen) are always shown under the Install button, with a note to open the page in Chrome first if it opened inside WhatsApp.
+- iPhone: the steps now say plainly that it only works from Safari and has to be done by hand, cover the newer layout where Share is under ⋯, and offer **Copy the link** for pasting into Safari.
+- "Don't show this again" folds the hint to one small line at the bottom instead of removing it, so it can always be brought back.
+- The app settings files are now `manifest.json` and `manifest-admin.json` (the `.webmanifest` files were being served as a generic download type).
+
+**Housekeeping**
+- The old "Import bank statements" help box no longer prints the statement password in the page.
+
 ## v2.32 — The report page can be added to the home screen like an app
 - The site now carries an app name, icon and settings file, so a phone can keep the report page as a **Park Manor** icon that opens full-screen, without the browser bar. Nothing comes from an app store, and **the link works exactly as before** — the icon is an extra way in, not a replacement.
 - At the bottom of the report page, on phones and tablets only, there is a rolled-up **Add Park Manor to your home screen** button. It opens the steps for that phone: on iPhone, Share → Add to Home Screen → Add; on Android, the ⋮ menu → Add to Home screen / Install app, or a single **Install Park Manor** button when the browser offers one. It is not shown when the page was opened from the icon, and "Don't show this again" removes it on that phone.

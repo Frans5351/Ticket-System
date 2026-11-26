@@ -4,14 +4,19 @@
 //
 //   GET  /api/public-tickets?prefix=          → the public tickets, sanitised
 //   POST /api/public-tickets {action, id, …}  → add an update / report it fixed
+//   GET  /api/public-tickets?prefix=&photo=<ticket>&p=<photo>&size=thumb|full
+//                                             → one photo a trustee has approved
 //
 // A ticket is on the list when it is PUBLIC — it was logged through the report
 // form, or a trustee ticked "Visible to everyone" on it — and it is still open,
 // or was closed in the last 14 days (so people can see it was dealt with).
 //
 // What leaves this function: number, title, category, unit, status, dates, the
-// description and the public updates. NEVER the reporter's name, phone or
-// email, the internal log, quotes or photos.
+// description, the public updates, the "expected by" date a trustee set, and
+// the photos a trustee has ticked for the report page (ticket.publicPhotos —
+// nothing is shown until a trustee ticks it; ticket.afterPhotos marks the ones
+// of the finished job). NEVER the reporter's name, phone or email, the internal
+// log, quotes, documents, or any photo that was not ticked.
 //
 // Public updates are kept apart from the ticket itself, in settings rows keyed
 // "tpub:<ticket row id>" = { updates:[{ts,text,by,role}], fixed:{at,by,text}|null },
@@ -39,6 +44,9 @@ const KEEP_CLOSED_DAYS = 14;
 const MAX_UPDATES = 40;          // per ticket
 const MIN_GAP_MS = 15 * 1000;    // between public updates on one ticket
 const MAX_METOO = 60;            // per ticket
+const MAX_PHOTOS = 6;            // per ticket, on the public list
+const PHOTO_ID = /^[\w.-]{3,80}$/;
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];   // never SVG or HTML
 const STATUS_LABEL = { open: "Open", awaiting_quote: "Obtaining quotes", awaiting_trustee_approval: "Awaiting trustee approval", work_in_progress: "Work in progress", closed: "Closed" };
 const HIDDEN_CATEGORIES = ["Water Reading", "Electricity Reading"];
 
@@ -65,6 +73,12 @@ function onList(d, now) {
   if (!isPublic(d)) return false;
   return normStatus(d.status) !== "closed" || now - closedAt(d) <= KEEP_CLOSED_DAYS * 86400000;
 }
+// The photos a trustee ticked, limited to ones still attached to the ticket.
+function publicPhotoIds(d) {
+  const linked = Array.isArray(d.linkedDocIds) ? d.linkedDocIds.map(String) : [];
+  return [...new Set((Array.isArray(d.publicPhotos) ? d.publicPhotos : []).map(String))].filter((x) => PHOTO_ID.test(x) && linked.includes(x)).slice(0, MAX_PHOTOS);
+}
+const validDay = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || "")) && !isNaN(Date.parse(v + "T00:00:00Z")) ? String(v) : "");
 function shape(id, prefix, d, pub, staffView) {
   const status = normStatus(d.status), p = pub || {};
   const metoo = (Array.isArray(p.metoo) ? p.metoo : []).filter((m) => m && m.d);
@@ -79,6 +93,8 @@ function shape(id, prefix, d, pub, staffView) {
     fixed: status !== "closed" && p.fixed ? { at: Number(p.fixed.at) || 0, by: clean(p.fixed.by, 60) } : null,
     updates: (Array.isArray(p.updates) ? p.updates : []).slice(-MAX_UPDATES).map((u) => ({ ts: Number(u.ts) || 0, text: clean(u.text, 600), by: clean(u.by, 60), role: u.role === "trustee" ? "trustee" : "resident", kind: u.kind === "fixed" || u.kind === "notfixed" ? u.kind : "" })),
     metoo: metoo.length,
+    expected: status === "closed" ? "" : validDay(d.expectedBy),
+    photos: (() => { const after = (Array.isArray(d.afterPhotos) ? d.afterPhotos : []).map(String); return publicPhotoIds(d).map((x) => ({ id: x, after: after.includes(x) })); })(),
   };
   if (staffView) out.metooUnits = [...new Set(metoo.map((m) => cleanUnit(m.unit)).filter(Boolean))];
   return out;
@@ -120,11 +136,48 @@ async function list(cfg, prefix, staffView) {
   return jsonResponse(200, { ok: true, keepClosedDays: KEEP_CLOSED_DAYS, tickets: out });
 }
 
+// One approved photo. The ticket must be on the public list and the photo ticked by a trustee;
+// only real image types are served (decoded from the stored copy, or handed over to the
+// project's own public storage bucket).
+function fromDataUrl(v) {
+  const m = /^data:([\w/+.-]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(String(v || ""));
+  if (!m || !IMAGE_TYPES.includes(m[1].toLowerCase())) return null;
+  return { type: m[1].toLowerCase(), bytes: Buffer.from(m[2], "base64") };
+}
+const imageResponse = (img) => new Response(img.bytes, { status: 200, headers: { "Content-Type": img.type, "Cache-Control": "public, max-age=86400", "X-Content-Type-Options": "nosniff", "Content-Disposition": "inline" } });
+const noPhoto = () => new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+async function servePhoto(cfg, prefix, ticketId, photoId, size) {
+  if (!/^[\w.-]{3,80}$/.test(ticketId) || !PHOTO_ID.test(photoId)) return noPhoto();
+  const rowId = prefix + ticketId;
+  const rows = await supa(cfg, "/rest/v1/tickets?id=eq." + encodeURIComponent(rowId) + "&select=id,data&limit=1");
+  const d = rows && rows[0] && rows[0].data;
+  if (!d || !onList(d, Date.now()) || !publicPhotoIds(d).includes(photoId)) return noPhoto();
+  const invRow = encodeURIComponent(prefix + photoId);
+  // the small fields first — the full picture can be megabytes
+  const meta = await supa(cfg, "/rest/v1/invoices?id=eq." + invRow + "&select=id,thumb:data->>thumb,type:data->>type,url:data->>url&limit=1");
+  const m = meta && meta[0];
+  if (!m) return noPhoto();
+  if (size === "thumb") { const t = fromDataUrl(m.thumb); if (t) return imageResponse(t); }
+  const type = String(m.type || "").toLowerCase();
+  if (m.url && IMAGE_TYPES.includes(type) && String(m.url).startsWith(String(cfg.supaUrl).replace(/\/+$/, "") + "/storage/v1/object/public/")) {
+    return new Response(null, { status: 302, headers: { Location: m.url, "Cache-Control": "public, max-age=3600" } });
+  }
+  const full = await supa(cfg, "/rest/v1/invoices?id=eq." + invRow + "&select=d:data->>data&limit=1");
+  let img = fromDataUrl(full && full[0] && full[0].d);
+  if (!img) {                                                     // oldest uploads: the file sits in its own table
+    try { const old = await supa(cfg, "/rest/v1/invoice_files?id=eq." + invRow + "&select=file_data&limit=1"); img = fromDataUrl(old && old[0] && old[0].file_data); } catch (e) { img = null; }
+  }
+  if (!img) { const t = fromDataUrl(m.thumb); if (t) return imageResponse(t); }     // better small than nothing
+  return img ? imageResponse(img) : noPhoto();
+}
+
 export default async function handler(req) {
   const cfg = getConfig();
   if (req.method === "GET") {
-    const prefix = new URL(req.url).searchParams.get("prefix") || "";
+    const q = new URL(req.url).searchParams;
+    const prefix = q.get("prefix") || "";
     if (!validPrefix(prefix)) return errorResponse(400, "bad prefix");
+    if (q.has("photo")) { try { return await servePhoto(cfg, prefix, q.get("photo") || "", q.get("p") || "", q.get("size") === "thumb" ? "thumb" : "full"); } catch (e) { return noPhoto(); } }
     try { return await list(cfg, prefix, isStaffView(cfg, req.headers.get("x-pm-session") || "")); } catch (e) { return errorResponse(502, "Could not load the issues: " + e.message); }
   }
   if (req.method !== "POST") return errorResponse(405, "GET or POST only");

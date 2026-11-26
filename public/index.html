@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" id="pm-app-title" content="Park Manor">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="manifest" id="pm-manifest" href="/manifest.webmanifest">
+<link rel="manifest" id="pm-manifest" href="/manifest.json">
 <link rel="apple-touch-icon" id="pm-touch-icon" href="/app-icon-180.png">
 <link rel="icon" id="pm-icon" type="image/png" sizes="192x192" href="/app-icon-192.png">
 <script>
@@ -17,7 +17,7 @@
   var q = new URLSearchParams(location.search);
   if(q.has('report') || q.has('water') || q.has('electricity') || q.has('contact-public')) return;
   var set = function(id, attr, v){ var e = document.getElementById(id); if(e) e.setAttribute(attr, v); };
-  set('pm-manifest', 'href', '/manifest-admin.webmanifest'); set('pm-touch-icon', 'href', '/admin-icon-180.png'); set('pm-icon', 'href', '/admin-icon-192.png');
+  set('pm-manifest', 'href', '/manifest-admin.json'); set('pm-touch-icon', 'href', '/admin-icon-180.png'); set('pm-icon', 'href', '/admin-icon-192.png');
   set('pm-theme', 'content', '#1b2a44'); set('pm-app-title', 'content', 'PM Admin');
 } catch(e){} })();
 </script>
@@ -1809,7 +1809,7 @@ async function checkStorageSetup(){
           <div style="background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;padding:20px;text-align:center;margin-bottom:16px;">
             <div style="font-size:24px;margin-bottom:8px;">📁</div>
             <div style="font-size:13px;color:var(--text);margin-bottom:4px;">Upload your ZIP to Claude</div>
-            <div style="font-size:11px;color:var(--muted);font-family:var(--mono);">Password: <span style="color:var(--accent2)">302921400</span></div>
+            <div style="font-size:11px;color:var(--muted);font-family:var(--mono);">Password: <span style="color:var(--accent2)">the statement password — it is not shown here</span></div>
           </div>
           <div style="font-size:11px;color:var(--muted);line-height:1.7;">
             <div style="margin-bottom:4px;color:var(--text);font-size:12px;font-weight:500;">Steps:</div>
@@ -11977,10 +11977,71 @@ async function ptMeToo(id){
 function ptChip(t){
   var st = (typeof TKT_STATUS !== 'undefined' && TKT_STATUS[t.status]) || { bg:'var(--surface2)', color:'var(--text2)', border:'var(--border2)' };
   var chip = function(txt, bg, col, bd){ return '<span style="display:inline-block;padding:3px 9px;border-radius:99px;font:600 11px var(--sans);white-space:nowrap;background:' + bg + ';color:' + col + ';border:1px solid ' + bd + '">' + txt + '</span>'; };
-  var h = t.fixed ? chip('✓ Reported fixed', 'var(--green-bg,rgba(74,222,158,.12))', 'var(--green,#1e9e6a)', 'var(--green-bd,rgba(74,222,158,.4))') : chip(ptEsc(t.statusLabel || t.status), st.bg, st.color, st.border);
-  if(t.urgent) h += ' ' + chip('🚨 Urgent', 'var(--red-bg,rgba(240,111,111,.1))', 'var(--red,#d9534f)', 'var(--red-bd,rgba(240,111,111,.35))');
+  var h = t.fixed ? chip('✓ Reported fixed', 'var(--green-bg,rgba(74,222,158,.12))', 'var(--green,#1e9e6a)', 'var(--green-bd,rgba(74,222,158,.4))') : (t.status === 'closed' ? chip(ptEsc(t.statusLabel || t.status), st.bg, st.color, st.border) : '');
+  if(t.urgent) h += (h ? ' ' : '') + chip('🚨 Urgent', 'var(--red-bg,rgba(240,111,111,.1))', 'var(--red,#d9534f)', 'var(--red-bd,rgba(240,111,111,.35))');
   return h;
 }
+// Where an issue stands, as five steps (an issue can skip steps — a small job goes straight to "In progress").
+var PT_STEPS = [['open', 'Reported'], ['awaiting_quote', 'Quotes'], ['awaiting_trustee_approval', 'Approval'], ['work_in_progress', 'In progress'], ['closed', 'Done']];
+function ptStepsHtml(t){
+  var cur = 0; PT_STEPS.forEach(function(x, i){ if(x[0] === t.status) cur = i; });
+  return '<span class="pt-steps" role="img" aria-label="Step ' + (cur + 1) + ' of ' + PT_STEPS.length + ': ' + PT_STEPS[cur][1] + '" style="display:grid;grid-template-columns:repeat(' + PT_STEPS.length + ',minmax(0,1fr));gap:4px;margin-top:9px">'
+    + PT_STEPS.map(function(x, i){
+        return '<span style="min-width:0"><span style="display:block;height:5px;border-radius:99px;background:' + (i <= cur ? 'var(--accent)' : 'var(--border2)') + '"></span>'
+          + '<span style="display:block;margin-top:4px;font:' + (i === cur ? '700' : '400') + ' 10.5px/1.2 var(--sans);letter-spacing:-.1px;text-align:center;color:' + (i === cur ? 'var(--accent2,var(--accent))' : 'var(--muted)') + '">' + x[1] + '</span></span>';
+      }).join('') + '</span>';
+}
+function ptAgo(ts){
+  if(!ts) return '';
+  var a = new Date(ts), b = new Date(), d = Math.round((new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate())) / 86400000);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? d + ' days ago' : ptDay(ts);
+}
+function ptLatestHtml(t){
+  var u = t.updates && t.updates.length ? t.updates[t.updates.length - 1] : null; if(!u || !u.text) return '';
+  return '<span class="pt-latest" style="display:flex;gap:6px;margin-top:8px;font:400 12.5px/1.45 var(--sans);color:var(--text2)"><span aria-hidden="true" style="flex:none">' + (u.role === 'trustee' ? '🛡' : '💬') + '</span><span style="flex:1;min-width:0"><span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere">' + ptEsc(u.text) + '</span>'
+    + '<span style="display:block;font-size:11.5px;color:var(--muted)">' + (u.role === 'trustee' ? 'Trustees' : 'A resident') + ' · ' + ptEsc(ptAgo(u.ts)) + '</span></span></span>';
+}
+function ptExpectedHtml(t){
+  if(!t.expected || t.status === 'closed') return '';
+  var late = t.expected < ptToday(), day = ptNDay(t.expected);
+  return '<span class="pt-expected" style="display:block;margin-top:8px;font:600 12.5px/1.4 var(--sans);color:' + (late ? '#b7791f' : 'var(--text2)') + '"><span aria-hidden="true">📅 </span>' + (late ? 'Was expected by ' + ptEsc(day) + ' — running late' : 'Expected by ' + ptEsc(day)) + '</span>';
+}
+// ── Photos a trustee has put on the report page ──
+function ptPhotoUrl(t, ph, size){ return '/api/public-tickets?prefix=' + encodeURIComponent(ptPrefix()) + '&photo=' + encodeURIComponent(t.id) + '&p=' + encodeURIComponent(ph.id) + (size === 'thumb' ? '&size=thumb' : ''); }
+function ptPhotos(t){ var p = (t.photos || []).slice(); if(t.status === 'closed') p.sort(function(a, b){ return (b.after ? 1 : 0) - (a.after ? 1 : 0); }); return p; }      // on a finished job the "after" photo leads
+function ptLeadPhotoHtml(t){
+  var p = ptPhotos(t)[0]; if(!p) return '';
+  return '<span class="pt-lead" style="flex:none;position:relative;width:58px;height:58px;border-radius:10px;overflow:hidden;background:var(--surface2);border:1px solid var(--border2)"><img src="' + ptEsc(ptPhotoUrl(t, p, 'thumb')) + '" alt="" loading="lazy" onerror="this.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block">'
+    + ((t.photos || []).length > 1 ? '<span style="position:absolute;right:3px;bottom:3px;padding:1px 5px;border-radius:99px;background:rgba(0,0,0,.65);color:#fff;font:700 10px var(--sans)">' + t.photos.length + '</span>' : '') + '</span>';
+}
+function ptPhotoStripHtml(t){
+  var ps = ptPhotos(t); if(!ps.length) return '';
+  return '<div class="pt-photos" style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px">' + ps.map(function(p, i){
+    return '<button type="button" class="pt-photo" aria-label="' + (p.after ? 'After photo' : 'Photo ' + (i + 1)) + ' — tap to enlarge" onclick="ptPhotoOpen(\'' + ptEsc(t.id) + '\',' + i + ')" style="position:relative;flex:none;width:96px;height:96px;padding:0;border-radius:12px;overflow:hidden;border:1px solid var(--border2);background:var(--surface2);cursor:pointer"><img src="' + ptEsc(ptPhotoUrl(t, p, 'thumb')) + '" alt="" loading="lazy" onerror="this.parentNode.style.display=\'none\'" style="width:100%;height:100%;object-fit:cover;display:block">'
+      + (p.after ? '<span style="position:absolute;left:4px;bottom:4px;padding:2px 7px;border-radius:99px;background:var(--green,#1e9e6a);color:#fff;font:700 10.5px var(--sans)">✓ After</span>' : '') + '</button>';
+  }).join('') + '</div>';
+}
+function ptPhotoOpen(id, i){
+  var t = (PT.list || []).filter(function(x){ return x.id === id; })[0], ps = t ? ptPhotos(t) : []; if(!ps.length) return;
+  PT.box = { id:id, i:Math.max(0, Math.min(ps.length - 1, i || 0)), back:document.activeElement };
+  var box = document.getElementById('pt-lightbox');
+  if(!box){ box = document.createElement('div'); box.id = 'pt-lightbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', 'Photo'); document.body.appendChild(box); }
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(8,12,18,.94);display:flex;flex-direction:column;font-family:var(--sans)';
+  box.onclick = function(e){ if(e.target === box || e.target.id === 'pt-lb-stage') ptPhotoClose(); };
+  ptPhotoPaint();
+}
+function ptPhotoPaint(){
+  var box = document.getElementById('pt-lightbox'), st = PT.box; if(!box || !st) return;
+  var t = (PT.list || []).filter(function(x){ return x.id === st.id; })[0], ps = t ? ptPhotos(t) : []; if(!ps.length){ ptPhotoClose(); return; }
+  var p = ps[st.i], many = ps.length > 1, bt = 'flex:none;min-width:48px;height:48px;padding:0 14px;border-radius:99px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font:700 16px var(--sans);cursor:pointer';
+  box.innerHTML = '<div style="flex:none;display:flex;align-items:center;gap:10px;padding:10px 12px;color:#fff"><span style="flex:1;min-width:0;font:600 13.5px/1.35 var(--sans);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (p.after ? '✓ After · ' : '') + ptEsc(t.title || '') + '</span><button type="button" id="pt-lb-close" aria-label="Close photo" onclick="ptPhotoClose()" style="' + bt + '">✕</button></div>'
+    + '<div id="pt-lb-stage" style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 8px"><img id="pt-lb-img" src="' + ptEsc(ptPhotoUrl(t, p, 'full')) + '" alt="' + (p.after ? 'After photo' : 'Photo') + ' of: ' + ptEsc(t.title || '') + '" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:8px"></div>'
+    + '<div style="flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 12px 16px;color:#fff;min-height:48px">' + (many ? '<button type="button" aria-label="Previous photo" onclick="ptPhotoStep(-1)" style="' + bt + '">‹</button><span style="font:600 13px var(--sans)">' + (st.i + 1) + ' of ' + ps.length + '</span><button type="button" aria-label="Next photo" onclick="ptPhotoStep(1)" style="' + bt + '">›</button>' : '') + '</div>';
+  var c = document.getElementById('pt-lb-close'); if(c) try { c.focus(); } catch(e){}
+}
+function ptPhotoStep(d){ var st = PT.box; if(!st) return; var t = (PT.list || []).filter(function(x){ return x.id === st.id; })[0], n = t ? ptPhotos(t).length : 0; if(!n) return; st.i = (st.i + d + n) % n; ptPhotoPaint(); }
+function ptPhotoClose(){ var box = document.getElementById('pt-lightbox'), back = PT.box && PT.box.back; if(box) box.remove(); PT.box = null; if(back && back.focus) try { back.focus(); } catch(e){} }
+document.addEventListener('keydown', function(e){ if(!PT.box) return; if(e.key === 'Escape') ptPhotoClose(); else if(e.key === 'ArrowLeft') ptPhotoStep(-1); else if(e.key === 'ArrowRight') ptPhotoStep(1); });
 function ptUpdatesHtml(t){
   if(!t.updates || !t.updates.length) return '';
   return '<div style="margin-top:12px"><div style="font:600 11px var(--sans);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px">Updates</div>'
@@ -11990,17 +12051,20 @@ function ptUpdatesHtml(t){
       }).join('') + '</div>';
 }
 function ptItemHtml(t){
-  var open = !!PT.open[t.id], closed = t.status === 'closed', id = ptEsc(t.id), msg = PT.msg[t.id];
+  var open = !!PT.open[t.id], closed = t.status === 'closed', id = ptEsc(t.id), msg = PT.msg[t.id], chips = ptChip(t);
   var meta = [t.number != null ? '#' + t.number : '', t.category, t.unit ? 'Unit ' + t.unit : '', closed ? 'closed ' + ptDay(t.closed) : 'logged ' + ptDay(t.logged)].filter(Boolean).map(ptEsc).join(' · ');
   var h = '<div class="pt-item" style="border-top:1px solid var(--border2)">'
-    + '<button type="button" aria-expanded="' + open + '" onclick="ptToggle(\'' + id + '\')" style="display:flex;gap:10px;align-items:flex-start;width:100%;min-height:56px;padding:12px 0;background:none;border:none;text-align:left;cursor:pointer;font-family:var(--sans);color:var(--text2)">'
-    +   '<span style="flex:1;min-width:0"><span style="display:block;font:600 14.5px/1.35 var(--sans);overflow-wrap:anywhere;' + (closed ? 'color:var(--muted)' : '') + '">' + ptEsc(t.title || '(no title)') + '</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere">' + meta + '</span><span style="display:block;margin-top:6px">' + ptChip(t) + '</span></span>'
-    +   '<span aria-hidden="true" style="flex:none;font-size:18px;color:var(--muted);line-height:1.6">' + (open ? '▾' : '▸') + '</span></button>';
+    + '<button type="button" aria-expanded="' + open + '" onclick="ptToggle(\'' + id + '\')" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;width:100%;min-height:56px;padding:12px 0;background:none;border:none;text-align:left;cursor:pointer;font-family:var(--sans);color:var(--text2)">'
+    +   '<span style="flex:1;min-width:0"><span style="display:block;font:600 14.5px/1.35 var(--sans);overflow-wrap:anywhere;' + (closed ? 'color:var(--muted)' : '') + '">' + ptEsc(t.title || '(no title)') + '</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere">' + meta + '</span>' + (chips ? '<span style="display:block;margin-top:6px">' + chips + '</span>' : '') + '</span>'
+    +   ptLeadPhotoHtml(t)
+    +   '<span aria-hidden="true" style="flex:none;font-size:18px;color:var(--muted);line-height:1.6">' + (open ? '▾' : '▸') + '</span>'
+    +   '<span style="flex:1 1 100%;min-width:0;margin-top:-4px">' + (closed ? '' : ptStepsHtml(t)) + ptExpectedHtml(t) + (open ? '' : ptLatestHtml(t)) + '</span></button>';      // steps, date and latest update run the full width, under the photo
   if(!closed) h += ptMeTooHtml(t);
   if(open){
     var inCss = 'width:100%;padding:11px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 16px var(--sans);outline:none;box-sizing:border-box';
     var nm = ''; try { nm = localStorage.getItem('pm_pt_name') || ''; } catch(e){}
     h += '<div style="padding:0 0 14px">'
+      + ptPhotoStripHtml(t)
       + (t.desc ? '<div style="font:400 13.5px/1.55 var(--sans);color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);border-radius:10px;padding:10px 12px">' + ptEsc(t.desc) + '</div>' : '')
       + (t.fixed ? '<div style="margin-top:10px;font:400 13px/1.5 var(--sans);color:var(--green,#1e9e6a)">✓ ' + ptEsc(t.fixed.by || 'A resident') + ' said this is fixed (' + ptEsc(ptDay(t.fixed.at)) + '). The trustees will confirm and close it.</div>' : '')
       + ptUpdatesHtml(t);
@@ -12122,6 +12186,8 @@ function ptInject(){
     ptDRender(); ptDLoad().then(ptDRender);
     ptNLoad().then(ptNRender);
     ptARender(); ptFreshStart();
+    var phIn = document.getElementById('pub-photos');
+    if(phIn && !document.getElementById('pt-photo-hint')) phIn.insertAdjacentHTML('afterend', '<div id="pt-photo-hint" style="margin-top:8px;font:400 12px/1.5 var(--sans);color:var(--muted)">A trustee may show a photo next to this issue on the list other residents see. Please keep faces, number plates and the inside of your home out of the picture.</div>');
   };
   go();
 }
@@ -12223,12 +12289,53 @@ function ptTktRender(id){
   var t = id && typeof TICKETS !== 'undefined' ? TICKETS[id] : null, pub = t ? ptIsPublic(t) : false, can = ptCanManage();
   var p = (id && PT.list) ? PT.list.filter(function(x){ return x.id === id; })[0] : null;
   var h = '<label for="tkt-public" style="display:flex;align-items:center;gap:10px;min-height:40px;cursor:' + (can ? 'pointer' : 'default') + '"><input id="tkt-public" type="checkbox"' + (pub ? ' checked' : '') + (can ? '' : ' disabled') + ' onchange="ptTktPublic(this.checked)" style="width:20px;height:20px;flex:none;accent-color:var(--accent)"><span style="font:600 13px var(--sans);color:var(--text2)">🌐 Visible to everyone on the report page</span></label>'
-    + '<div style="font:400 11.5px/1.5 var(--sans);color:var(--muted)">Residents see the title, unit, status and description without logging in — never the name, phone or email of whoever reported it, the activity log or photos. Closed tickets stay on the list for 14 days.</div>';
+    + '<div style="font:400 11.5px/1.5 var(--sans);color:var(--muted)">Residents see the title, unit, status and description without logging in — never the name, phone or email of whoever reported it or the activity log, and only the photos you choose below. Closed tickets stay on the list for 14 days.</div>';
+  if(t && id && (t.type || 'maintenance') === 'maintenance' && !t.parentId) h += ptTktExtraHtml(t, pub, can);
   if(p && p.fixed) h += '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--green-bd,rgba(74,222,158,.4));background:var(--green-bg,rgba(74,222,158,.12));font:400 13px/1.5 var(--sans);color:var(--text2)"><b style="color:var(--green,#1e9e6a)">✓ ' + ptEsc(p.fixed.by || 'A resident') + ' reported this fixed on ' + ptEsc(ptDay(p.fixed.at)) + '.</b> Close the ticket to confirm.' + (can ? ' <button type="button" onclick="ptTktAct(\'notfixed\')" style="display:block;margin-top:8px;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 12.5px var(--sans);cursor:pointer">Not fixed yet</button>' : '') + '</div>';
   if(p && p.metoo) h += '<div id="pt-tkt-metoo" style="margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid var(--accent-bd,rgba(31,168,152,.45));background:var(--accent-bg,rgba(31,168,152,.1));font:400 13px/1.5 var(--sans);color:var(--text2)"><b>🙋 Me too: ' + p.metoo + ' other resident' + (p.metoo > 1 ? 's have' : ' has') + ' this as well</b>' + (p.metooUnits && p.metooUnits.length ? ' — unit' + (p.metooUnits.length > 1 ? 's ' : ' ') + p.metooUnits.map(ptEsc).join(', ') + (p.metooUnits.length < p.metoo ? ' and others' : '') : '') + '</div>';
   if(p) h += ptUpdatesHtml(p);
   if(id && pub && can && t && t.status !== 'closed') h += '<div style="display:flex;gap:6px;margin-top:10px"><input id="pt-tkt-reply" type="text" maxlength="600" placeholder="Public reply — everyone on the report page sees this" style="flex:1;min-width:0;padding:8px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:400 13px var(--sans);outline:none"><button type="button" onclick="ptTktAct(\'reply\')" style="min-height:40px;padding:6px 12px;border-radius:7px;border:none;background:var(--accent);color:#fff;font:700 12.5px var(--sans);cursor:pointer;white-space:nowrap">Post</button></div><div id="pt-tkt-msg" style="font:400 12px var(--sans);color:var(--red,#d9534f);margin-top:4px"></div>';
+  var typing = document.getElementById('pt-tkt-reply'), keep = typing ? typing.value : '';
   b.innerHTML = h;
+  if(keep){ var again = document.getElementById('pt-tkt-reply'); if(again) again.value = keep; }
+}
+// Expected date and photo choices live on the ticket itself (expectedBy, publicPhotos, afterPhotos).
+function ptTktImages(t){
+  if(typeof INVOICES === 'undefined') return [];
+  return (t.linkedDocIds || []).map(function(d){ return INVOICES[d]; }).filter(function(v){ return v && /^image\/(jpeg|png|webp|gif)$/i.test(v.type || ''); });
+}
+function ptTktExtraHtml(t, pub, can){
+  var inCss = 'padding:8px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:400 14px var(--sans);outline:none;min-height:40px;box-sizing:border-box';
+  var h = '<label for="pt-tkt-exp" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font:600 13px var(--sans);color:var(--text2)"><span style="flex:1 1 150px">📅 Expected by <span style="font-weight:400;color:var(--muted)">(shown to residents)</span></span>'
+    + '<input id="pt-tkt-exp" type="date" value="' + ptEsc(ptNDate(t.expectedBy)) + '"' + (can ? '' : ' disabled') + ' onchange="ptTktExpected(this.value)" style="' + inCss + ';flex:1 1 150px"></label>';
+  var imgs = ptTktImages(t), shown = t.publicPhotos || [], after = t.afterPhotos || [];
+  h += '<div style="margin-top:12px;font:600 13px var(--sans);color:var(--text2)">📷 Photos on the report page</div>';
+  if(!imgs.length) h += '<div style="font:400 11.5px/1.5 var(--sans);color:var(--muted)">No photos on this ticket yet. Add one under Documents, and choose here whether residents see it.</div>';
+  else {
+    h += '<div style="font:400 11.5px/1.5 var(--sans);color:var(--muted)">Nothing is shown until you choose it. Check each photo for faces, number plates and the inside of someone’s home first. Mark the photo of the finished job as “After”.' + (pub ? '' : ' <b>This ticket is hidden from the report page, so its photos are too.</b>') + '</div>'
+      + '<div id="pt-tkt-photos" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">' + imgs.map(function(v){
+          var st = shown.indexOf(v.id) < 0 ? '' : (after.indexOf(v.id) < 0 ? 'show' : 'after'), src = v.thumb || v.url || v.data || '';
+          return '<div style="flex:none;width:112px"><div style="width:112px;height:84px;border-radius:9px;overflow:hidden;background:var(--surface);border:2px solid ' + (st ? 'var(--accent)' : 'var(--border2)') + '">' + (src ? '<img src="' + ptEsc(src) + '" alt="' + ptEsc(v.name || 'photo') + '" style="width:100%;height:100%;object-fit:cover;display:block">' : '') + '</div>'
+            + '<select aria-label="Show ' + ptEsc(v.name || 'this photo') + ' on the report page?" data-photo="' + ptEsc(v.id) + '"' + (can ? '' : ' disabled') + ' onchange="ptTktPhoto(this.getAttribute(\'data-photo\'), this.value)" style="' + inCss + ';width:112px;margin-top:4px;font-size:12.5px;padding:6px"><option value=""' + (st === '' ? ' selected' : '') + '>Hidden</option><option value="show"' + (st === 'show' ? ' selected' : '') + '>Show</option><option value="after"' + (st === 'after' ? ' selected' : '') + '>Show: After</option></select></div>';
+        }).join('') + '</div>';
+  }
+  return h;
+}
+async function ptTktExpected(v){
+  var id = PT.tktId; if(!id || typeof TICKETS === 'undefined' || !TICKETS[id] || !ptCanManage()) return;
+  TICKETS[id].expectedBy = ptNDate(v); TICKETS[id].updated = Date.now();
+  try { await saveTickets([id]); if(typeof blToast === 'function') blToast(TICKETS[id].expectedBy ? 'Residents now see: expected by ' + ptNDay(TICKETS[id].expectedBy) : 'Expected date removed', 'ok'); }
+  catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
+}
+async function ptTktPhoto(photoId, v){
+  var id = PT.tktId; if(!id || !photoId || typeof TICKETS === 'undefined' || !TICKETS[id] || !ptCanManage()) return;
+  var t = TICKETS[id], shown = (t.publicPhotos || []).filter(function(x){ return x !== photoId; }), after = (t.afterPhotos || []).filter(function(x){ return x !== photoId; });
+  if(v === 'show' || v === 'after'){ if(shown.length >= 6){ if(typeof blToast === 'function') blToast('Six photos is the most the report page shows — hide one first.', 'err'); ptTktRender(id); return; } shown.push(photoId); }
+  if(v === 'after') after.push(photoId);
+  t.publicPhotos = shown; t.afterPhotos = after; t.updated = Date.now();
+  try { await saveTickets([id]); if(typeof blToast === 'function') blToast(v ? (ptIsPublic(t) ? 'Photo now shows on the report page' + (v === 'after' ? ' as “After”' : '') : 'Saved — it will show once the ticket is visible to everyone') : 'Photo hidden from the report page', 'ok'); }
+  catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
+  if(PT.tktId === id) ptTktRender(id);
 }
 async function ptTktOpen(id){
   PT.tktId = id || null; ptTktRender(PT.tktId);
@@ -12263,6 +12370,7 @@ function ptBanner(){
 function ptInstall(){
   if(PT.installed) return; PT.installed = true;
   if(typeof renderPublicReportForm === 'function'){ var r0 = renderPublicReportForm; renderPublicReportForm = function(){ var r = r0.apply(this, arguments); try { ptInject(); } catch(e){} return r; }; }
+  if(typeof renderTicketLinkedDocs === 'function'){ var rl = renderTicketLinkedDocs; renderTicketLinkedDocs = function(t){ var r = rl.apply(this, arguments); try { if(t && PT.tktId && t.id === PT.tktId){ clearTimeout(PT.tktT); PT.tktT = setTimeout(function(){ if(PT.tktId === t.id) ptTktRender(t.id); }, 60); } } catch(e){} return r; }; }
   if(typeof openTicketModal === 'function'){ var o = openTicketModal; openTicketModal = function(id){ var r = o.apply(this, arguments); try { ptTktOpen(id); } catch(e){} return r; }; }
   var pub = (typeof _PUBLIC_MODE !== 'undefined') ? _PUBLIC_MODE : null;
   var staffLoad = function(){ try { if(!pub && ptCanManage()) ptLoad().then(ptBanner); } catch(e){} };
@@ -12538,14 +12646,15 @@ async function ptNEdit(){
 }
 
 // ═══ "Add to home screen" — the report page as an app ═══
-// The site ships a web-app manifest and icons (public/manifest.webmanifest, app-icon-*.png), so a
+// The site ships a web-app manifest and icons (public/manifest.json, app-icon-*.png), so a
 // phone can keep the report page as a "Park Manor" icon that opens full-screen. Nothing is installed
 // from a store and there is no service worker: the icon always loads the current build, and the
 // plain link keeps working exactly as before. This is the hint that tells residents how — shown on
-// phones and tablets only, at the bottom of the page, until they add it or tap "Don't show this again".
-PT.a = { open:false, bip:null };
+// phones and tablets only, at the bottom of the page. It always says what is happening (a phone gives
+// little feedback of its own), and "Don't show this again" folds it to one quiet line, never away for good.
+PT.a = { open:false, bip:null, state:'' };      // state: '' · 'adding' (they said yes to the browser) · 'added' (the browser confirmed) · 'declined'
 window.addEventListener('beforeinstallprompt', function(e){ try { e.preventDefault(); } catch(x){} PT.a.bip = e; ptARender(); });      // Android / Chrome: lets the page offer its own Install button
-window.addEventListener('appinstalled', function(){ PT.a.bip = null; PT.a.done = true; ptARender(); });
+window.addEventListener('appinstalled', function(){ PT.a.bip = null; PT.a.state = 'added'; PT.a.open = true; ptARender(); });
 function ptAStandalone(){ try { return !!navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch(e){ return false; } }
 function ptAKind(){
   var ua = navigator.userAgent || '';
@@ -12554,29 +12663,51 @@ function ptAKind(){
   return '';
 }
 function ptAOff(){ try { return localStorage.getItem('pm_a2hs_off') === '1'; } catch(e){ return false; } }
+function ptALink(){ return location.origin + location.pathname + '?report'; }
 function ptARender(){
   var host = document.getElementById('pt-install'); if(!host) return;
   var kind = ptAKind(), a = PT.a;
-  if(ptAStandalone() || a.done || ptAOff() || (!kind && !a.bip)){ host.innerHTML = ''; host.style.display = 'none'; return; }
+  if(ptAStandalone() || (!kind && !a.bip && !a.state)){ host.innerHTML = ''; host.style.display = 'none'; return; }
   host.style.display = '';
+  if(ptAOff() && !a.open && !a.state){      // put away with "Don't show this again": one quiet line that brings it back
+    host.innerHTML = '<button type="button" id="pt-install-back" onclick="ptAShow()" style="display:block;width:100%;min-height:44px;padding:0;background:none;border:none;color:var(--muted);font:600 12.5px var(--sans);text-decoration:underline;cursor:pointer">📲 Add Park Manor to your home screen</button>';
+    return;
+  }
   var h = '<button type="button" id="pt-install-btn" aria-expanded="' + !!a.open + '" aria-controls="pt-install-how" onclick="ptAToggle()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px dashed var(--accent-bd,rgba(31,168,152,.55));background:var(--accent-bg,rgba(31,168,152,.08));color:var(--text2);font:700 15px var(--sans);cursor:pointer"><span aria-hidden="true">📲</span> Add Park Manor to your home screen <span aria-hidden="true" style="font-size:13px">' + (a.open ? '▾' : '▸') + '</span></button>';
   if(a.open){
     var step = function(n, t){ return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;font:400 14px/1.5 var(--sans);color:var(--text2)"><span aria-hidden="true" style="flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:700 12.5px/24px var(--sans);text-align:center">' + n + '</span><span style="flex:1;min-width:0">' + t + '</span></div>'; };
-    var steps = a.bip ? '<button type="button" id="pt-install-go" onclick="ptAInstall()" style="width:100%;min-height:50px;margin:6px 0 4px;padding:12px 16px;border-radius:12px;border:none;background:var(--accent);color:#fff;font:700 15.5px var(--sans);cursor:pointer">Install Park Manor</button>'
-      : kind === 'ios' ? step(1, 'Tap the <b>Share</b> button — the square with an arrow pointing up.') + step(2, 'Scroll down and tap <b>Add to Home Screen</b>.') + step(3, 'Tap <b>Add</b>.')
-      : step(1, 'Tap the <b>⋮</b> menu at the top right of the browser.') + step(2, 'Tap <b>Add to Home screen</b> (or <b>Install app</b>).') + step(3, 'Tap <b>Add</b> or <b>Install</b>.');
+    var note = function(t, good){ return '<div role="status" style="margin:6px 0 8px;padding:10px 12px;border-radius:10px;font:' + (good ? '600' : '400') + ' 13.5px/1.5 var(--sans);color:var(--text2);border:1px solid ' + (good ? 'var(--green-bd,rgba(74,222,158,.5));background:var(--green-bg,rgba(74,222,158,.12))' : 'var(--border2);background:var(--surface2)') + '">' + t + '</div>'; };
+    var copy = '<button type="button" id="pt-install-copy" onclick="ptACopy()" style="min-height:44px;margin:2px 0 6px;padding:8px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 13px var(--sans);cursor:pointer">' + (a.copied ? '✓ Link copied' : 'Copy the link') + '</button>';
+    var menu = step(1, 'Tap the <b>⋮</b> menu at the top right of Chrome.') + step(2, 'Tap <b>Add to Home screen</b> (it may say <b>Install app</b>).') + step(3, 'Tap <b>Install</b> or <b>Add</b>.');
+    var body;
+    if(a.state === 'added') body = note('✓ Park Manor is now on your phone. Look for the <b>Park Manor</b> icon on your home screen or in your list of apps.', true);
+    else if(a.state === 'adding') body = note('✓ Park Manor is being added. This can take up to a minute and happens in the background — look for the <b>Park Manor</b> icon on your home screen or in your list of apps.', true)
+      + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-top:4px">No icon after a minute? Add it from the browser menu instead:</div>' + menu;
+    else if(kind === 'ios') body = note('An iPhone only allows this from <b>Safari</b>, and you do the three steps yourself — the page cannot do it for you. If this page opened inside WhatsApp or another app, open it in Safari first (or copy the link and paste it into Safari).') + copy
+      + step(1, 'Tap the <b>Share</b> button — the square with an arrow pointing up. On newer iPhones it is under <b>⋯</b> next to the address bar.') + step(2, 'Scroll down and tap <b>Add to Home Screen</b>.') + step(3, 'Tap <b>Add</b>.');
+    else body = (a.state === 'declined' ? note('Not added this time. You can still add it from the browser menu:') : '')
+      + (a.bip ? '<button type="button" id="pt-install-go" onclick="ptAInstall()" style="width:100%;min-height:50px;margin:6px 0 4px;padding:12px 16px;border-radius:12px;border:none;background:var(--accent);color:#fff;font:700 15.5px var(--sans);cursor:pointer">Install Park Manor</button><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin:6px 0 0">Or do it from the browser menu:</div>' : '')
+      + menu + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-top:4px">If this page opened inside WhatsApp or another app, tap ⋮ and choose <b>Open in Chrome</b> first.</div>';
     h += '<div id="pt-install-how" class="pub-card" style="margin-top:8px"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">Keep this page as an icon on your phone, like an app — one tap to open it, no WhatsApp link to find. The link itself keeps working as well.</div>'
-      + steps
-      + '<button type="button" onclick="ptAHide()" style="display:block;min-height:44px;margin-top:4px;padding:0;background:none;border:none;color:var(--muted);font:600 13px var(--sans);text-decoration:underline;cursor:pointer">Don’t show this again</button></div>';
+      + body
+      + '<button type="button" onclick="ptAHide()" style="display:block;min-height:44px;margin-top:4px;padding:0;background:none;border:none;color:var(--muted);font:600 13px var(--sans);text-decoration:underline;cursor:pointer">' + (a.state === 'added' || a.state === 'adding' ? 'Close this' : 'Don’t show this again') + '</button></div>';
   }
   host.innerHTML = h;
 }
 function ptAToggle(){ PT.a.open = !PT.a.open; ptARender(); }
-function ptAHide(){ try { localStorage.setItem('pm_a2hs_off', '1'); } catch(e){} PT.a.done = true; ptARender(); }
+function ptAShow(){ try { localStorage.removeItem('pm_a2hs_off'); } catch(e){} PT.a.open = true; ptARender(); try { document.getElementById('pt-install').scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){} }
+function ptAHide(){ try { localStorage.setItem('pm_a2hs_off', '1'); } catch(e){} PT.a.open = false; PT.a.state = ''; PT.a.copied = false; ptARender(); }
+async function ptACopy(){
+  var link = ptALink(), ok = false;
+  try { await navigator.clipboard.writeText(link); ok = true; } catch(e){}
+  if(!ok){ try { var ta = document.createElement('textarea'); ta.value = link; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch(e){} }
+  PT.a.copied = ok; ptARender();
+}
 async function ptAInstall(){
   var e = PT.a.bip; if(!e) return;
-  try { e.prompt(); var c = await e.userChoice; if(c && c.outcome === 'accepted') PT.a.done = true; } catch(x){}
-  PT.a.bip = null; ptARender();      // the browser's prompt can be used once; after a "not now" the written steps show
+  var go = document.getElementById('pt-install-go'); if(go){ go.disabled = true; go.textContent = 'Opening…'; }
+  try { e.prompt(); var c = await e.userChoice; if(PT.a.state !== 'added') PT.a.state = (c && c.outcome === 'accepted') ? 'adding' : 'declined'; } catch(x){ PT.a.state = 'declined'; }
+  PT.a.bip = null; PT.a.open = true; ptARender();      // the browser's own prompt can be used once per visit; the menu steps always work
 }
 // ── Staying current ──
 // A home-screen app is not closed like a tab: it is put away and brought back hours or days later.
@@ -22647,6 +22778,9 @@ function _buildTicketFromForm(id, prev){
     createdViaPublicForm: prev.createdViaPublicForm,
     reporterEditToken: prev.reporterEditToken,
     public: (function(){ var c = document.getElementById('tkt-public'); return c ? !!c.checked : prev.public; })(),
+    expectedBy: prev.expectedBy || '',
+    publicPhotos: prev.publicPhotos || [],
+    afterPhotos: prev.afterPhotos || [],
     reporterUserId: prev.reporterUserId,
     linkedDocIds: prev.linkedDocIds || [],
     log: prev.log || [],
