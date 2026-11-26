@@ -11961,9 +11961,9 @@ function ptItemHtml(t){
 }
 function ptRender(){
   var host = document.getElementById('pt-card'); if(!host) return;
-  // The list rolls up and down like the other sections (tap the title). It starts open, and the title
-  // always shows how many are open, so nothing is hidden by rolling it up.
-  var shut = PT.listOpen === false, nOpen = PT.list ? PT.list.filter(function(t){ return t.status !== 'closed'; }).length : 0;
+  // The list rolls up and down like the other sections (tap the title). It starts rolled up, and the
+  // title always shows how many are open, so the count is visible without opening it.
+  var shut = PT.listOpen !== true, nOpen = PT.list ? PT.list.filter(function(t){ return t.status !== 'closed'; }).length : 0;
   var head = '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:' + (shut ? '0' : '2px') + '"><button type="button" id="pt-list-btn" aria-expanded="' + !shut + '" aria-controls="pt-list-body" onclick="ptListToggle()" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;padding:0;background:none;border:none;text-align:left;cursor:pointer;font:700 16px var(--sans);color:var(--text2)"><span style="flex:1;min-width:0">📋 Current issues logged' + (PT.list ? ' <span style="font-weight:600;color:var(--muted)">· ' + nOpen + ' open</span>' : '') + '</span><span aria-hidden="true" style="flex:none;font-size:14px;color:var(--muted)">' + (shut ? '▸' : '▾') + '</span></button>'
     + (shut ? '' : '<button type="button" onclick="ptRefresh()" style="flex:none;white-space:nowrap;min-height:44px;padding:0 6px;background:none;border:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer">↻ Refresh</button>') + '</div>';
   if(shut){ host.innerHTML = head; return; }
@@ -11975,7 +11975,7 @@ function ptRender(){
   host.innerHTML = h;
 }
 function ptToggle(id){ PT.open[id] = !PT.open[id]; ptRender(); }
-function ptListToggle(){ PT.listOpen = PT.listOpen === false; ptRender(); }
+function ptListToggle(){ PT.listOpen = PT.listOpen !== true; ptRender(); }
 async function ptRefresh(){ PT.list = null; PT.error = ''; ptRender(); await ptLoad(); ptRender(); }
 async function ptAct(id, action){
   if(PT.busy) return;

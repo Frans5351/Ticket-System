@@ -1,5 +1,8 @@
 # Billing changelog
 
+## v2.29 — Current issues logged starts rolled up
+- When the report page opens, **Current issues logged** is now rolled up like the other sections. The title still shows how many are open (for example "Current issues logged · 2 open"); tap it to see the list, tap again to close it.
+
 ## v2.28 — Current issues logged rolls up too
 - The **Current issues logged** card on the report page now rolls up and down from its title, like the other sections. It starts open; the title always shows how many are open, so the count is visible even when it is rolled up.
 
