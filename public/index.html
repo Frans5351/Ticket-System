@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Park Manor</title>
+<meta name="theme-color" id="pm-theme" content="#1fa898">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" id="pm-app-title" content="Park Manor">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" id="pm-manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" id="pm-touch-icon" href="/app-icon-180.png">
+<link rel="icon" id="pm-icon" type="image/png" sizes="192x192" href="/app-icon-192.png">
+<script>
+(function(){ try {
+  var q = new URLSearchParams(location.search);
+  if(q.has('report') || q.has('water') || q.has('electricity') || q.has('contact-public')) return;
+  var set = function(id, attr, v){ var e = document.getElementById(id); if(e) e.setAttribute(attr, v); };
+  set('pm-manifest', 'href', '/manifest-admin.webmanifest'); set('pm-touch-icon', 'href', '/admin-icon-180.png'); set('pm-icon', 'href', '/admin-icon-192.png');
+  set('pm-theme', 'content', '#1b2a44'); set('pm-app-title', 'content', 'PM Admin');
+} catch(e){} })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- WeconnectU/Davies statement + invoice importer (parser + unit mapper) -->
 <script src="pm-weconnectu.js"></script>
@@ -12080,18 +12097,18 @@ function ptInject(){
     var hero = document.querySelector('#public-view-content .pub-hero'), err = document.getElementById('pub-err'), btn = document.getElementById('pub-submit-btn');
     if(!hero || !err || !btn || !/submitPublicReport/.test(btn.getAttribute('onclick') || '')){ if(++tries < 40) setTimeout(go, 150); return; }
     if(!document.getElementById('pt-card')){
-      // The landing screen is a short menu: emergency numbers · managing agent contacts · documents · Report an issue
+      // The landing screen is a short menu: notices (always in view) · emergency numbers · managing agent contacts · documents · Report an issue
       // (the form — steps 1–5 and the Send button — opens underneath it) · water / electricity readings ·
       // and the list of current issues, which is always visible.
       var rest = [], n = hero.nextSibling; while(n){ rest.push(n); n = n.nextSibling; }
-      hero.insertAdjacentHTML('afterend', '<div id="pt-c-em" style="margin-bottom:10px"></div><div id="pt-c-ag" style="margin-bottom:10px"></div><div id="pt-c-doc" style="margin-bottom:10px"></div>'
+      hero.insertAdjacentHTML('afterend', '<div id="pt-notices" style="display:none;margin-bottom:12px"></div><div id="pt-c-em" style="margin-bottom:10px"></div><div id="pt-c-ag" style="margin-bottom:10px"></div><div id="pt-c-doc" style="margin-bottom:10px"></div>'
         + '<button type="button" id="pt-report-btn" aria-expanded="false" aria-controls="pt-form" onclick="ptFormToggle()" style="display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:14px 18px;margin-bottom:10px;border-radius:14px;border:none;background:var(--accent);color:#fff;text-align:left;cursor:pointer;font-family:var(--sans);box-shadow:0 4px 14px rgba(31,168,152,.28)"><span aria-hidden="true" style="font-size:24px;flex:none">📝</span><span style="flex:1;min-width:0"><span style="display:block;font:700 17px/1.25 var(--sans)">Report an issue</span><span style="display:block;font:400 12.5px/1.4 var(--sans);opacity:.92">A problem, a request or a question for the trustees</span></span><span id="pt-report-caret" aria-hidden="true" style="flex:none;font-size:15px">▸</span></button>'
         + '<div id="pt-form" style="display:none;margin-bottom:14px"></div>'
         + '<div id="pt-meters" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">'
         +   '<button type="button" id="pt-water-btn" aria-expanded="false" aria-controls="pt-meter-panel" onclick="ptMeterToggle(\'water\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 8px;border-radius:14px;border:1.5px solid var(--info-bd,rgba(90,160,230,.45));background:var(--info-bg,rgba(90,160,230,.1));color:var(--text2);font:700 14px/1.25 var(--sans);cursor:pointer;text-align:center"><span aria-hidden="true" style="font-size:22px">💧</span>Water meter reading</button>'
         +   '<button type="button" id="pt-elec-btn" aria-expanded="false" aria-controls="pt-meter-panel" onclick="ptMeterToggle(\'elec\')" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:76px;padding:12px 8px;border-radius:14px;border:1.5px solid rgba(217,164,65,.5);background:rgba(217,164,65,.12);color:var(--text2);font:700 14px/1.25 var(--sans);cursor:pointer;text-align:center"><span aria-hidden="true" style="font-size:22px">⚡</span>Electricity meter reading</button>'
         + '</div><div id="pt-meter-panel" style="display:none;margin-bottom:14px"></div>'
-        + '<div id="pt-card" class="pub-card" style="margin-bottom:14px;border:1.5px solid var(--accent-bd,rgba(31,168,152,.45));box-shadow:0 2px 10px rgba(0,0,0,.05)"></div>');
+        + '<div id="pt-card" class="pub-card" style="margin-bottom:14px;border:1.5px solid var(--accent-bd,rgba(31,168,152,.45));box-shadow:0 2px 10px rgba(0,0,0,.05)"></div><div id="pt-install" style="display:none;margin-bottom:14px"></div>');
       var form = document.getElementById('pt-form'); rest.forEach(function(x){ form.appendChild(x); });
       // the two meter readings now have their own buttons, so they leave the category tiles
       Array.prototype.forEach.call(form.querySelectorAll('#pub-cat-tiles button[data-cat="Water Reading"], #pub-cat-tiles button[data-cat="Electricity Reading"]'), function(b){ b.remove(); });
@@ -12103,6 +12120,8 @@ function ptInject(){
     ptRender(); ptLoad().then(ptRender);
     ['em', 'ag'].forEach(function(k){ ptCRender(k); ptCLoad(k).then(function(){ ptCRender(k); }); });
     ptDRender(); ptDLoad().then(ptDRender);
+    ptNLoad().then(ptNRender);
+    ptARender(); ptFreshStart();
   };
   go();
 }
@@ -12357,6 +12376,7 @@ async function ptCEdit(kind){
 // Settings page summaries (names kept from the first version: the page calls ptEmSettings / ptEmEdit).
 function ptEmEdit(){ return ptCEdit('em'); }
 function ptEmSettings(){
+  var nEl = document.getElementById('pt-c-sum-not'); if(nEl) ptNLoad().then(function(list){ var live = ptNLive(); nEl.textContent = (live.length ? live.map(function(e){ return e.title; }).join(' · ') : 'None showing') + (list.length > live.length ? ' (' + (list.length - live.length) + ' expired)' : ''); });
   var dEl = document.getElementById('pt-c-sum-doc'); if(dEl) ptDLoad().then(function(list){ dEl.textContent = list.length ? list.map(function(e){ return e.title; }).join(' · ') : 'None'; });
   ['em', 'ag'].forEach(function(k){
     var el = document.getElementById('pt-c-sum-' + k); if(!el) return;
@@ -12440,6 +12460,149 @@ async function ptDEdit(){
   try { await sbSetSetting(PT_D.key, { list:list }); await ptDLoad(); if(typeof blToast === 'function') blToast(list.length ? list.length + ' document' + (list.length > 1 ? 's' : '') + ' saved' : 'Back to the standard list', 'ok'); }
   catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
   ptEmSettings();
+}
+
+// ═══ Notices at the top of the report page ═══
+// Short messages from the trustees — "Water off Thursday 9–12", "Plumber on site Friday" — shown
+// above everything else, always in view (they do not roll up). Settings key "report_notices" =
+// { list:[{ title, text, until }] }: "until" is the last day it shows (YYYY-MM-DD, South African
+// date); empty means it stays up. Until a list is saved, the standing meter-reading notice shows.
+// Once a list has been saved it is used as it is — an empty one means no notices.
+var PT_N = { key:'report_notices', max:10,
+  def:[ { title:'Meter readings: 15th to 18th of each month', text:'Please send your water and electricity meter readings between the 15th and the 18th of every month, using the two meter-reading buttons below.', until:'' } ] };
+PT.n = { list:null, custom:false };
+function ptToday(){
+  try { var s = new Date().toLocaleDateString('en-CA', { timeZone:'Africa/Johannesburg' }); if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; } catch(e){}
+  var d = new Date(), p = function(n){ return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function ptNDate(v){ v = String(v || '').trim(); return (/^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v + 'T00:00:00Z'))) ? v : ''; }
+function ptNDay(v){ try { return new Date(v + 'T12:00:00').toLocaleDateString('en-ZA', { weekday:'short', day:'numeric', month:'short' }); } catch(e){ return v; } }
+function ptNClean(list){
+  return (Array.isArray(list) ? list : []).map(function(e){ e = e || {}; return { title:String(e.title || '').trim().slice(0, 80), text:String(e.text || '').trim().slice(0, 400), until:ptNDate(e.until) }; })
+    .filter(function(e){ return e.title; }).slice(0, PT_N.max);
+}
+function ptNDefault(){ return ptPrefix() ? [] : PT_N.def.map(function(e){ return Object.assign({}, e); }); }      // the standing notice is Park Manor's own
+async function ptNLoad(){
+  var v = null; try { v = await sbGetSetting(PT_N.key); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
+  var saved = !!v && typeof v === 'object' && Array.isArray(v.list);
+  PT.n.custom = saved; PT.n.list = saved ? ptNClean(v.list) : ptNDefault();
+  return PT.n.list;
+}
+function ptNLive(){ var t = ptToday(); return (PT.n.list || []).filter(function(e){ return !e.until || e.until >= t; }); }
+function ptNRender(){
+  var host = document.getElementById('pt-notices'); if(!host) return;
+  var live = ptNLive();
+  if(!live.length){ host.innerHTML = ''; host.style.display = 'none'; return; }
+  var C = '#6d5dd3';
+  host.style.display = '';
+  host.innerHTML = '<div role="region" aria-label="Notices" style="padding:12px 14px 12px 16px;border-radius:14px;border:1.5px solid rgba(109,93,211,.4);border-left:5px solid ' + C + ';background:rgba(109,93,211,.08);font-family:var(--sans);color:var(--text2)">'
+    + '<div style="font:700 11px var(--sans);letter-spacing:.6px;text-transform:uppercase;color:' + C + ';margin-bottom:2px"><span aria-hidden="true">📢 </span>Notice' + (live.length > 1 ? 's' : '') + '</div>'
+    + live.map(function(e, i){
+        return '<div class="pt-n-row" style="padding:8px 0 ' + (i === live.length - 1 ? '0' : '8px') + ';' + (i ? 'border-top:1px solid rgba(109,93,211,.22);' : '') + '"><div style="font:700 15px/1.35 var(--sans);overflow-wrap:anywhere">' + ptEsc(e.title) + '</div>'
+          + (e.text ? '<div style="font:400 13.5px/1.5 var(--sans);margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere">' + ptEsc(e.text) + '</div>' : '')
+          + (e.until ? '<div style="font:400 11.5px var(--sans);color:var(--muted);margin-top:3px">Until ' + ptEsc(ptNDay(e.until)) + '</div>' : '') + '</div>';
+      }).join('') + '</div>';
+}
+// ── Settings (admin or trustee): write the notices ──
+PT.nEdit = null;
+function ptNEditRows(){
+  var inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box', today = ptToday();
+  return PT.nEdit.rows.map(function(e, i){
+    var gone = !!e.until && ptNDate(e.until) && e.until < today;
+    return '<div style="padding:10px 0;' + (i ? 'border-top:1px solid var(--border2)' : '') + '"><div style="display:flex;gap:8px;align-items:center"><input id="pt-nt-' + i + '" type="text" maxlength="80" placeholder="The notice — e.g. Water off Thursday 9–12" aria-label="Notice ' + (i + 1) + '" value="' + ptEsc(e.title) + '" style="' + inCss + ';flex:1;min-width:0;font-weight:600">'
+      + '<button type="button" aria-label="Remove ' + ptEsc(e.title || 'this notice') + '" onclick="ptNEditDel(' + i + ')" style="flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--red,#d9534f);font-size:16px;cursor:pointer">✕</button></div>'
+      + '<textarea id="pt-nx-' + i + '" rows="2" maxlength="400" placeholder="More detail (optional)" aria-label="Notice ' + (i + 1) + ' detail" style="' + inCss + ';margin-top:6px;resize:vertical">' + ptEsc(e.text) + '</textarea>'
+      + '<label for="pt-nu-' + i + '" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font:400 12.5px var(--sans);color:var(--muted)"><span style="flex:1 1 150px">Show until (leave empty to keep it up)</span><input id="pt-nu-' + i + '" type="date" value="' + ptEsc(ptNDate(e.until)) + '" style="' + inCss + ';flex:1 1 150px;width:auto;min-height:44px"></label>'
+      + (gone ? '<div style="font:600 12px var(--sans);color:var(--red,#d9534f);margin-top:4px">This date has passed — it is no longer shown. Change the date or remove it.</div>' : '') + '</div>';
+  }).join('') || '<div class="bl-hint">No notices. Nothing is shown at the top of the report page.</div>';
+}
+function ptNEditCollect(){ var ed = PT.nEdit; if(!ed) return; ed.rows = ed.rows.map(function(e, i){ var g = function(p){ var el = document.getElementById(p + i); return el ? el.value : ''; }; return { title:g('pt-nt-'), text:g('pt-nx-'), until:g('pt-nu-') }; }); }
+function ptNEditPaint(){ var el = document.getElementById('pt-n-rows'); if(el) el.innerHTML = ptNEditRows(); }
+function ptNEditAdd(){ ptNEditCollect(); if(PT.nEdit.rows.length >= PT_N.max){ if(typeof blToast === 'function') blToast('That is the most notices that fit — remove an old one first.', 'err'); return; } PT.nEdit.rows.unshift({ title:'', text:'', until:'' }); ptNEditPaint(); var el = document.getElementById('pt-nt-0'); if(el) el.focus(); }
+function ptNEditDel(i){ ptNEditCollect(); PT.nEdit.rows.splice(i, 1); ptNEditPaint(); }
+async function ptNEdit(){
+  if(typeof _currentRole === 'undefined' || (_currentRole !== 'admin' && _currentRole !== 'trustee') || typeof blDialog !== 'function') return;
+  await ptNLoad();
+  PT.nEdit = { rows:PT.n.list.map(function(e){ return Object.assign({}, e); }) };
+  var body = '<div class="bl-hint" style="margin-bottom:6px">Shown at the very top of the report page, above the buttons, for everyone who opens it. Keep each one short. Give it a last day and it disappears by itself after that day; leave the date empty for a standing notice.</div>'
+    + '<button type="button" class="bl-btn" style="width:100%;margin-bottom:4px" onclick="ptNEditAdd()">＋ Add a notice</button>'
+    + '<div id="pt-n-rows">' + ptNEditRows() + '</div>';
+  var res = await blDialog({ title:'Notices', body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:ptNEditCollect }, { label:'Cancel', value:false }] });
+  var ed = PT.nEdit; PT.nEdit = null;
+  if(res !== 'save' || !ed) return;
+  var typed = ed.rows.filter(function(e){ return String(e.title).trim() || String(e.text).trim(); }), list = ptNClean(typed);
+  if(list.length < typed.length && typeof blToast === 'function') blToast((typed.length - list.length) + ' left out — a notice needs its first line filled in', 'err');
+  try { await sbSetSetting(PT_N.key, { list:list }); await ptNLoad(); var live = ptNLive().length; if(typeof blToast === 'function') blToast(live ? live + ' notice' + (live > 1 ? 's' : '') + ' showing on the report page' : 'No notices showing', 'ok'); }
+  catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
+  ptEmSettings();
+}
+
+// ═══ "Add to home screen" — the report page as an app ═══
+// The site ships a web-app manifest and icons (public/manifest.webmanifest, app-icon-*.png), so a
+// phone can keep the report page as a "Park Manor" icon that opens full-screen. Nothing is installed
+// from a store and there is no service worker: the icon always loads the current build, and the
+// plain link keeps working exactly as before. This is the hint that tells residents how — shown on
+// phones and tablets only, at the bottom of the page, until they add it or tap "Don't show this again".
+PT.a = { open:false, bip:null };
+window.addEventListener('beforeinstallprompt', function(e){ try { e.preventDefault(); } catch(x){} PT.a.bip = e; ptARender(); });      // Android / Chrome: lets the page offer its own Install button
+window.addEventListener('appinstalled', function(){ PT.a.bip = null; PT.a.done = true; ptARender(); });
+function ptAStandalone(){ try { return !!navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch(e){ return false; } }
+function ptAKind(){
+  var ua = navigator.userAgent || '';
+  if(/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+  if(/Android/i.test(ua)) return 'android';
+  return '';
+}
+function ptAOff(){ try { return localStorage.getItem('pm_a2hs_off') === '1'; } catch(e){ return false; } }
+function ptARender(){
+  var host = document.getElementById('pt-install'); if(!host) return;
+  var kind = ptAKind(), a = PT.a;
+  if(ptAStandalone() || a.done || ptAOff() || (!kind && !a.bip)){ host.innerHTML = ''; host.style.display = 'none'; return; }
+  host.style.display = '';
+  var h = '<button type="button" id="pt-install-btn" aria-expanded="' + !!a.open + '" aria-controls="pt-install-how" onclick="ptAToggle()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px dashed var(--accent-bd,rgba(31,168,152,.55));background:var(--accent-bg,rgba(31,168,152,.08));color:var(--text2);font:700 15px var(--sans);cursor:pointer"><span aria-hidden="true">📲</span> Add Park Manor to your home screen <span aria-hidden="true" style="font-size:13px">' + (a.open ? '▾' : '▸') + '</span></button>';
+  if(a.open){
+    var step = function(n, t){ return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;font:400 14px/1.5 var(--sans);color:var(--text2)"><span aria-hidden="true" style="flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:700 12.5px/24px var(--sans);text-align:center">' + n + '</span><span style="flex:1;min-width:0">' + t + '</span></div>'; };
+    var steps = a.bip ? '<button type="button" id="pt-install-go" onclick="ptAInstall()" style="width:100%;min-height:50px;margin:6px 0 4px;padding:12px 16px;border-radius:12px;border:none;background:var(--accent);color:#fff;font:700 15.5px var(--sans);cursor:pointer">Install Park Manor</button>'
+      : kind === 'ios' ? step(1, 'Tap the <b>Share</b> button — the square with an arrow pointing up.') + step(2, 'Scroll down and tap <b>Add to Home Screen</b>.') + step(3, 'Tap <b>Add</b>.')
+      : step(1, 'Tap the <b>⋮</b> menu at the top right of the browser.') + step(2, 'Tap <b>Add to Home screen</b> (or <b>Install app</b>).') + step(3, 'Tap <b>Add</b> or <b>Install</b>.');
+    h += '<div id="pt-install-how" class="pub-card" style="margin-top:8px"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">Keep this page as an icon on your phone, like an app — one tap to open it, no WhatsApp link to find. The link itself keeps working as well.</div>'
+      + steps
+      + '<button type="button" onclick="ptAHide()" style="display:block;min-height:44px;margin-top:4px;padding:0;background:none;border:none;color:var(--muted);font:600 13px var(--sans);text-decoration:underline;cursor:pointer">Don’t show this again</button></div>';
+  }
+  host.innerHTML = h;
+}
+function ptAToggle(){ PT.a.open = !PT.a.open; ptARender(); }
+function ptAHide(){ try { localStorage.setItem('pm_a2hs_off', '1'); } catch(e){} PT.a.done = true; ptARender(); }
+async function ptAInstall(){
+  var e = PT.a.bip; if(!e) return;
+  try { e.prompt(); var c = await e.userChoice; if(c && c.outcome === 'accepted') PT.a.done = true; } catch(x){}
+  PT.a.bip = null; ptARender();      // the browser's prompt can be used once; after a "not now" the written steps show
+}
+// ── Staying current ──
+// A home-screen app is not closed like a tab: it is put away and brought back hours or days later.
+// When the page comes back after more than a minute it re-reads the notices and the issues list, and
+// if a newer build has been published (deploy.txt changed) it reloads itself — but only when nothing
+// is being filled in.
+function ptIdle(){
+  var f = document.getElementById('pt-form'); if(PT.meter || (f && f.style.display !== 'none')) return false;
+  return !Array.prototype.some.call(document.querySelectorAll('#pt-card textarea'), function(t){ return !!t.value.trim(); });
+}
+async function ptFresh(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  try {
+    var r = await fetch('/deploy.txt', { cache:'no-store' }); if(!r.ok) return;
+    var t = (await r.text()).trim(); if(!t || t.length > 200) return;
+    if(!PT.build){ PT.build = t; return; }
+    if(t !== PT.build && ptIdle()) location.reload();
+  } catch(e){}
+}
+function ptFreshStart(){
+  if(PT.freshOn) return; PT.freshOn = true; ptFresh();
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState !== 'visible'){ PT.awayAt = Date.now(); return; }
+    if(!PT.awayAt || Date.now() - PT.awayAt < 60000 || !document.getElementById('pt-card')) return;
+    PT.awayAt = 0; ptFresh(); ptNLoad().then(ptNRender); ptLoad().then(ptRender);
+  });
 }
 
 </script>
@@ -15145,6 +15308,11 @@ function deleteDuplicates(){
             <button onclick="copyElectricityReadingUrl(this)" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Copy</button>
             <button onclick="window.open(document.getElementById('electricity-reading-url').value,'_blank','noopener')" style="padding:8px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text2);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Open</button>
           </div>
+        </div>
+        <div id="notices-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">📢 Notices at the top of the report page</div>
+          <div id="pt-c-sum-not" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
+          <button onclick="ptNEdit()" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit notices</button>
         </div>
         <div id="emergency-numbers-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
           <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">🚨 Emergency numbers on the report page</div>

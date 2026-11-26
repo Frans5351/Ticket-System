@@ -1,5 +1,18 @@
 # Billing changelog
 
+## v2.32 — The report page can be added to the home screen like an app
+- The site now carries an app name, icon and settings file, so a phone can keep the report page as a **Park Manor** icon that opens full-screen, without the browser bar. Nothing comes from an app store, and **the link works exactly as before** — the icon is an extra way in, not a replacement.
+- At the bottom of the report page, on phones and tablets only, there is a rolled-up **Add Park Manor to your home screen** button. It opens the steps for that phone: on iPhone, Share → Add to Home Screen → Add; on Android, the ⋮ menu → Add to Home screen / Install app, or a single **Install Park Manor** button when the browser offers one. It is not shown when the page was opened from the icon, and "Don't show this again" removes it on that phone.
+- The resident links (`?report`, `?water`, `?electricity`) install as **Park Manor** (teal icon) and open the report page. Any other page — the trustees' app — installs as **Park Manor Admin** (navy icon) and opens the tracker.
+- Staying current: there is no offline copy, so the icon always loads the build that is live. When the page is brought back after being put away for more than a minute it re-reads the notices and the issues list, and if a newer build has been published it reloads itself, but only when no form is open.
+- New files in `public/`: `manifest.webmanifest`, `manifest-admin.webmanifest`, `app-icon-180/192/512.png`, `admin-icon-180/192/512.png`. Nothing to set up in Supabase, Netlify or the Drive script.
+
+## v2.31 — Notices at the top of the report page
+- A **Notices** card now sits at the very top of the report page, above Emergency numbers. It is always in view (it does not roll up) and disappears when there is nothing to show.
+- **Settings → Notices at the top of the report page → Edit notices** (admin or trustee): each notice has a first line, optional detail, and an optional **Show until** date. With a date it shows up to and including that day (South African date) and then drops off by itself; without one it is a standing notice. New notices go on top; up to 10.
+- Until a list is saved, one standing notice shows: **Meter readings: 15th to 18th of each month**. Once a list has been saved it is used exactly as saved, so removing every notice leaves the top of the page empty.
+- Stored in `settings` under `report_notices` — nothing to set up in Supabase, Netlify or the Drive script.
+
 ## v2.30 — "Me too" on current issues, and a Documents button
 - **Me too.** Every open issue on the report page has a **Me too** button. One tap adds the resident to that issue instead of logging it again; a second tap takes it back. The line next to it shows how many have it ("3 other residents have this too").
   - No login. The phone keeps a random id so it counts once, and remembers which issues it ticked.
