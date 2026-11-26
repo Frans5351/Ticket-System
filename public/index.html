@@ -11981,13 +11981,13 @@ function ptInject(){
     var hero = document.querySelector('#public-view-content .pub-hero'), err = document.getElementById('pub-err'), btn = document.getElementById('pub-submit-btn');
     if(!hero || !err || !btn || !/submitPublicReport/.test(btn.getAttribute('onclick') || '')){ if(++tries < 40) setTimeout(go, 150); return; }
     if(!document.getElementById('pt-card')){
-      hero.insertAdjacentHTML('afterend', '<div id="pt-em" style="margin-bottom:14px"></div><div id="pt-card" class="pub-card" style="margin-bottom:14px"></div><div style="font:700 16px var(--sans);color:var(--text2);margin:18px 2px 10px">Report something new</div>');
+      hero.insertAdjacentHTML('afterend', '<div id="pt-c-em" style="margin-bottom:8px"></div><div id="pt-c-ag" style="margin-bottom:14px"></div><div id="pt-card" class="pub-card" style="margin-bottom:14px"></div><div style="font:700 16px var(--sans);color:var(--text2);margin:18px 2px 10px">Report something new</div>');
       err.insertAdjacentHTML('beforebegin', '<div id="pf-flow" class="pub-card" style="margin-bottom:12px"></div>');
       PT.flow = { notify:null, urgent:false, pub:null, anon:null };
       ptAnonMount(); ptFlowRender();
     }
     ptRender(); ptLoad().then(ptRender);
-    ptEmRender(); ptEmLoad().then(ptEmRender);
+    ['em', 'ag'].forEach(function(k){ ptCRender(k); ptCLoad(k).then(function(){ ptCRender(k); }); });
   };
   go();
 }
@@ -12137,76 +12137,112 @@ function ptInstall(){
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ptInstall); else ptInstall();
 
-// ═══ Emergency numbers — a button on the report page; tap a number to call it ═══
-// The list is kept in settings ("emergency_contacts") and edited by an admin on the
-// Settings page. Until one is saved, these standard numbers are shown. They were
-// checked against the Western Cape Government and City of Cape Town pages (Nov 2026).
-var PT_EM_DEFAULT = [
-  { name:'Police', number:'10111', note:'SAPS flying squad — crime in progress, danger to life' },
-  { name:'Ambulance', number:'10177', note:'Medical emergency' },
-  { name:'Any emergency, from a cellphone', number:'112', note:'Free from any cell network; they put you through' },
-  { name:'City of Cape Town emergency', number:'021 480 7700', note:'Fire, rescue and other emergencies' }
-];
-PT.em = null; PT.emOpen = false;
-function ptEmClean(list){
-  return (Array.isArray(list) ? list : []).map(function(e){ return { name:String((e && e.name) || '').trim().slice(0, 60), number:String((e && e.number) || '').trim().slice(0, 30), note:String((e && e.note) || '').trim().slice(0, 120) }; })
-    .filter(function(e){ return e.name && e.number.replace(/\D/g, '').length >= 3; }).slice(0, 20);
+// ═══ Contact lists on the report page — tap a number to call, an address to email ═══
+//   em  Emergency numbers        (red button)   settings key "emergency_contacts"
+//   ag  Managing agent contacts  (plain button) settings key "agent_contacts" — title and intro editable,
+//       so it still fits if the managing agent changes
+// Both are edited by an admin on the Settings page. Until a list is saved the defaults below show.
+// Emergency numbers were checked against the Western Cape Government and City of Cape Town pages
+// (Nov 2026). The Davies list is as Tara Kellerman set it out by email on 20 Nov 2026; everyone there
+// is reached through the office line, which Davies gives as its official channel along with email.
+var PT_C = {
+  em:{ key:'emergency_contacts', title:'Emergency numbers', icon:'🚨', red:true, email:false, editTitle:false,
+       intro:'Tap a number to call it. In an emergency, call first — you can log a report here afterwards.',
+       def:[ { name:'Police', number:'10111', note:'SAPS flying squad — crime in progress, danger to life' },
+             { name:'Ambulance', number:'10177', note:'Medical emergency' },
+             { name:'Any emergency, from a cellphone', number:'112', note:'Free from any cell network; they put you through' },
+             { name:'City of Cape Town emergency', number:'021 480 7700', note:'Fire, rescue and other emergencies' } ] },
+  ag:{ key:'agent_contacts', title:'Davies contact numbers', icon:'📞', red:false, email:true, editTitle:true,
+       intro:'The Davies Group is the managing agent. Office hours: Monday to Thursday 08:30–17:00, Friday until 16:00. Ask for the person by name, or email them.',
+       def:[ { name:'Ruaan Rossouw', number:'021 419 5392', email:'ruaan@daviesgroup.co.za', note:'Accounts — levies, water and electricity charges, payments, statements and general account queries' },
+             { name:'Myolisi', number:'021 419 5392', email:'', note:'Accounts — levies, water and electricity charges, payments, statements and general account queries' },
+             { name:'Cheryl', number:'021 419 5392', email:'cheryl@daviesgroup.co.za', note:'Maintenance, repairs, insurance and related operational issues' } ] }
+};
+PT.c = { em:{ list:null, open:false }, ag:{ list:null, open:false } };
+function ptIsEmail(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s || '').trim()); }
+function ptCClean(kind, list){
+  var c = PT_C[kind];
+  return (Array.isArray(list) ? list : []).map(function(e){ e = e || {}; return { name:String(e.name || '').trim().slice(0, 60), number:String(e.number || '').trim().slice(0, 30), email:c.email ? String(e.email || '').trim().slice(0, 120) : '', note:String(e.note || '').trim().slice(0, 200) }; })
+    .filter(function(e){ return e.name && (e.number.replace(/\D/g, '').length >= 3 || (c.email && ptIsEmail(e.email))); })
+    .map(function(e){ if(e.email && !ptIsEmail(e.email)) e.email = ''; if(e.number.replace(/\D/g, '').length < 3) e.number = ''; return e; }).slice(0, 20);
 }
-async function ptEmLoad(){
-  var v = null;
-  try { v = await sbGetSetting('emergency_contacts'); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
-  var list = ptEmClean(v);
-  PT.em = list.length ? list : PT_EM_DEFAULT.slice(); PT.emCustom = !!list.length;
-  return PT.em;
+async function ptCLoad(kind){
+  var c = PT_C[kind], st = PT.c[kind], v = null;
+  try { v = await sbGetSetting(c.key); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
+  var obj = Array.isArray(v) ? { list:v } : (v && typeof v === 'object' ? v : {});
+  var list = ptCClean(kind, obj.list);
+  st.custom = !!list.length; st.list = list.length ? list : c.def.map(function(e){ return Object.assign({ email:'' }, e); });
+  st.title = (c.editTitle && String(obj.title || '').trim().slice(0, 50)) || c.title;
+  st.intro = (c.editTitle && typeof obj.intro === 'string' && obj.intro.trim().slice(0, 300)) || c.intro;
+  return st.list;
 }
 function ptTel(n){ var s = String(n || '').trim(), plus = s.charAt(0) === '+'; return 'tel:' + (plus ? '+' : '') + s.replace(/\D/g, ''); }
-function ptEmRender(){
-  var host = document.getElementById('pt-em'); if(!host) return;
-  var list = PT.em || PT_EM_DEFAULT;
-  var h = '<button type="button" aria-expanded="' + !!PT.emOpen + '" aria-controls="pt-em-list" onclick="PT.emOpen=!PT.emOpen;ptEmRender()" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px solid var(--red-bd,rgba(240,111,111,.5));background:var(--red-bg,rgba(240,111,111,.08));color:var(--red,#d9534f);font:700 15.5px var(--sans);cursor:pointer">🚨 Emergency numbers <span aria-hidden="true" style="font-size:13px">' + (PT.emOpen ? '▾' : '▸') + '</span></button>';
-  if(PT.emOpen){
-    h += '<div id="pt-em-list" class="pub-card" style="margin-top:8px;border-color:var(--red-bd,rgba(240,111,111,.4))"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">Tap a number to call it. In an emergency, call first — you can log a report here afterwards.</div>'
+function ptCRender(kind){
+  var host = document.getElementById('pt-c-' + kind); if(!host) return;
+  var c = PT_C[kind], st = PT.c[kind], list = st.list || c.def, title = st.title || c.title, intro = st.intro || c.intro;
+  var col = c.red ? 'var(--red,#d9534f)' : 'var(--accent2)', bd = c.red ? 'var(--red-bd,rgba(240,111,111,.5))' : 'var(--border2)', bg = c.red ? 'var(--red-bg,rgba(240,111,111,.08))' : 'var(--surface)', pill = c.red ? 'var(--red,#d9534f)' : 'var(--accent)';
+  var h = '<button type="button" aria-expanded="' + !!st.open + '" aria-controls="pt-c-list-' + kind + '" onclick="ptCToggle(\'' + kind + '\')" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;padding:12px 16px;border-radius:12px;border:1.5px solid ' + bd + ';background:' + bg + ';color:' + col + ';font:700 15.5px var(--sans);cursor:pointer">' + c.icon + ' ' + ptEsc(title) + ' <span aria-hidden="true" style="font-size:13px">' + (st.open ? '▾' : '▸') + '</span></button>';
+  if(st.open){
+    h += '<div id="pt-c-list-' + kind + '" class="pub-card" style="margin-top:8px;' + (c.red ? 'border-color:var(--red-bd,rgba(240,111,111,.4))' : '') + '"><div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin-bottom:4px">' + ptEsc(intro) + '</div>'
       + list.map(function(e, i){
-          return '<a href="' + ptEsc(ptTel(e.number)) + '" style="display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;' + (i ? 'border-top:1px solid var(--border2);' : '') + 'text-decoration:none;color:var(--text2);font-family:var(--sans)">'
+          return '<div class="pt-c-row" style="padding:10px 0;' + (i ? 'border-top:1px solid var(--border2);' : '') + 'font-family:var(--sans);color:var(--text2)"><div style="display:flex;align-items:center;gap:12px;min-height:44px">'
             + '<span style="flex:1;min-width:0"><span style="display:block;font:700 15px/1.3 var(--sans);overflow-wrap:anywhere">' + ptEsc(e.name) + '</span>' + (e.note ? '<span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);overflow-wrap:anywhere">' + ptEsc(e.note) + '</span>' : '') + '</span>'
-            + '<span style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:99px;background:var(--red,#d9534f);color:#fff;font:700 15px var(--sans);white-space:nowrap"><span aria-hidden="true">📞</span>' + ptEsc(e.number) + '</span></a>';
+            + (e.number ? '<a href="' + ptEsc(ptTel(e.number)) + '" aria-label="Call ' + ptEsc(e.name) + ' on ' + ptEsc(e.number) + '" style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:99px;background:' + pill + ';color:#fff;font:700 15px var(--sans);white-space:nowrap;text-decoration:none"><span aria-hidden="true">📞</span>' + ptEsc(e.number) + '</a>' : '') + '</div>'
+            + (e.email ? '<a href="mailto:' + ptEsc(e.email) + '" style="display:flex;align-items:center;gap:6px;min-height:44px;color:var(--accent2);font:600 13.5px var(--sans);text-decoration:none;overflow-wrap:anywhere"><span aria-hidden="true">✉️</span>' + ptEsc(e.email) + '</a>' : '') + '</div>';
         }).join('') + '</div>';
   }
   host.innerHTML = h;
 }
-// ── Settings (admin): edit the list ──
-PT.emEdit = null;
-function ptEmEditRows(){
+function ptCToggle(kind){ PT.c[kind].open = !PT.c[kind].open; ptCRender(kind); }
+// ── Settings (admin): edit a list ──
+PT.cEdit = null;
+function ptCEditRows(){
+  var ed = PT.cEdit, c = PT_C[ed.kind];
   var inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box';
-  return (PT.emEdit || []).map(function(e, i){
-    return '<div style="padding:10px 0;' + (i ? 'border-top:1px solid var(--border2)' : '') + '"><div style="display:flex;gap:8px;align-items:center"><input id="pt-emn-' + i + '" type="text" maxlength="60" placeholder="Who (e.g. Police, Security company)" aria-label="Name ' + (i + 1) + '" value="' + ptEsc(e.name) + '" style="' + inCss + ';flex:1;min-width:0;font-weight:600">'
-      + '<button type="button" aria-label="Remove ' + ptEsc(e.name || 'this number') + '" onclick="ptEmEditDel(' + i + ')" style="flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--red,#d9534f);font-size:16px;cursor:pointer">✕</button></div>'
-      + '<input id="pt-emp-' + i + '" type="tel" inputmode="tel" maxlength="30" placeholder="Number" aria-label="Number ' + (i + 1) + '" value="' + ptEsc(e.number) + '" style="' + inCss + ';margin-top:6px">'
-      + '<input id="pt-emx-' + i + '" type="text" maxlength="120" placeholder="Note (optional) — when to call" aria-label="Note ' + (i + 1) + '" value="' + ptEsc(e.note) + '" style="' + inCss + ';margin-top:6px"></div>';
-  }).join('') || '<div class="bl-hint">No numbers yet.</div>';
+  return ed.rows.map(function(e, i){
+    return '<div style="padding:10px 0;' + (i ? 'border-top:1px solid var(--border2)' : '') + '"><div style="display:flex;gap:8px;align-items:center"><input id="pt-cn-' + i + '" type="text" maxlength="60" placeholder="Who" aria-label="Name ' + (i + 1) + '" value="' + ptEsc(e.name) + '" style="' + inCss + ';flex:1;min-width:0;font-weight:600">'
+      + '<button type="button" aria-label="Remove ' + ptEsc(e.name || 'this entry') + '" onclick="ptCEditDel(' + i + ')" style="flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--red,#d9534f);font-size:16px;cursor:pointer">✕</button></div>'
+      + '<input id="pt-cp-' + i + '" type="tel" inputmode="tel" maxlength="30" placeholder="Phone number" aria-label="Number ' + (i + 1) + '" value="' + ptEsc(e.number) + '" style="' + inCss + ';margin-top:6px">'
+      + (c.email ? '<input id="pt-ce-' + i + '" type="email" inputmode="email" autocapitalize="off" maxlength="120" placeholder="Email address (optional)" aria-label="Email ' + (i + 1) + '" value="' + ptEsc(e.email || '') + '" style="' + inCss + ';margin-top:6px">' : '')
+      + '<input id="pt-cx-' + i + '" type="text" maxlength="200" placeholder="' + (c.email ? 'What they deal with' : 'Note (optional) — when to call') + '" aria-label="Note ' + (i + 1) + '" value="' + ptEsc(e.note) + '" style="' + inCss + ';margin-top:6px"></div>';
+  }).join('') || '<div class="bl-hint">Nothing here yet.</div>';
 }
-function ptEmEditCollect(){ PT.emEdit = (PT.emEdit || []).map(function(e, i){ var g = function(p){ var el = document.getElementById(p + i); return el ? el.value : ''; }; return { name:g('pt-emn-'), number:g('pt-emp-'), note:g('pt-emx-') }; }); }
-function ptEmEditPaint(){ var el = document.getElementById('pt-em-rows'); if(el) el.innerHTML = ptEmEditRows(); }
-function ptEmEditAdd(){ ptEmEditCollect(); if(PT.emEdit.length >= 20) return; PT.emEdit.push({ name:'', number:'', note:'' }); ptEmEditPaint(); var el = document.getElementById('pt-emn-' + (PT.emEdit.length - 1)); if(el) el.focus(); }
-function ptEmEditDel(i){ ptEmEditCollect(); PT.emEdit.splice(i, 1); ptEmEditPaint(); }
-function ptEmEditReset(){ PT.emEdit = PT_EM_DEFAULT.map(function(e){ return Object.assign({}, e); }); ptEmEditPaint(); }
-async function ptEmEdit(){
+function ptCEditCollect(){
+  var ed = PT.cEdit; if(!ed) return;
+  ed.rows = ed.rows.map(function(e, i){ var g = function(p){ var el = document.getElementById(p + i); return el ? el.value : ''; }; return { name:g('pt-cn-'), number:g('pt-cp-'), email:g('pt-ce-'), note:g('pt-cx-') }; });
+  var t = document.getElementById('pt-c-title'), n = document.getElementById('pt-c-intro'); if(t) ed.title = t.value; if(n) ed.intro = n.value;
+}
+function ptCEditPaint(){ var el = document.getElementById('pt-c-rows'); if(el) el.innerHTML = ptCEditRows(); }
+function ptCEditAdd(){ ptCEditCollect(); if(PT.cEdit.rows.length >= 20) return; PT.cEdit.rows.push({ name:'', number:'', email:'', note:'' }); ptCEditPaint(); var el = document.getElementById('pt-cn-' + (PT.cEdit.rows.length - 1)); if(el) el.focus(); }
+function ptCEditDel(i){ ptCEditCollect(); PT.cEdit.rows.splice(i, 1); ptCEditPaint(); }
+function ptCEditReset(){ var c = PT_C[PT.cEdit.kind]; PT.cEdit.rows = c.def.map(function(e){ return Object.assign({ email:'' }, e); }); ptCEditPaint(); var t = document.getElementById('pt-c-title'), n = document.getElementById('pt-c-intro'); if(t) t.value = c.title; if(n) n.value = c.intro; }
+async function ptCEdit(kind){
   if(typeof _currentRole === 'undefined' || _currentRole !== 'admin' || typeof blDialog !== 'function') return;
-  await ptEmLoad();
-  PT.emEdit = PT.em.map(function(e){ return Object.assign({}, e); });
-  var body = '<div class="bl-hint" style="margin-bottom:6px">These show under the red <b>Emergency numbers</b> button on the report page. Residents tap a number to call it.</div><div id="pt-em-rows">' + ptEmEditRows() + '</div>'
-    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button type="button" class="bl-btn" style="flex:1 1 140px" onclick="ptEmEditAdd()">＋ Add a number</button><button type="button" class="bl-btn" style="flex:1 1 140px" onclick="ptEmEditReset()">Reset to the standard four</button></div>';
-  var res = await blDialog({ title:'Emergency numbers', body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:ptEmEditCollect }, { label:'Cancel', value:false }] });
-  if(res !== 'save') return;
-  var typed = (PT.emEdit || []).filter(function(e){ return String(e.name).trim() || String(e.number).trim(); }), list = ptEmClean(typed);
-  if(list.length < typed.length){ if(typeof blToast === 'function') blToast((typed.length - list.length) + ' row(s) left out — each needs a name and a number', 'err'); }
-  try { await sbSetSetting('emergency_contacts', list); PT.em = list.length ? list : PT_EM_DEFAULT.slice(); if(typeof blToast === 'function') blToast(list.length ? list.length + ' emergency number' + (list.length > 1 ? 's' : '') + ' saved' : 'Back to the standard numbers', 'ok'); }
+  var c = PT_C[kind], st = PT.c[kind];
+  await ptCLoad(kind);
+  PT.cEdit = { kind:kind, rows:st.list.map(function(e){ return Object.assign({}, e); }), title:st.title, intro:st.intro };
+  var inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box';
+  var body = '<div class="bl-hint" style="margin-bottom:6px">Shown under the <b>' + ptEsc(st.title) + '</b> button on the report page. Residents tap a number to call it' + (c.email ? ', or an address to email' : '') + '.</div>'
+    + (c.editTitle ? '<label class="bl-lbl" for="pt-c-title">Button title</label><input id="pt-c-title" type="text" maxlength="50" value="' + ptEsc(st.title) + '" style="' + inCss + ';font-weight:600"><label class="bl-lbl" for="pt-c-intro" style="margin-top:8px;display:block">Line under the title (e.g. office hours)</label><textarea id="pt-c-intro" rows="3" maxlength="300" style="' + inCss + ';resize:vertical">' + ptEsc(st.intro) + '</textarea>' : '')
+    + '<div id="pt-c-rows">' + ptCEditRows() + '</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button type="button" class="bl-btn" style="flex:1 1 140px" onclick="ptCEditAdd()">＋ Add a contact</button><button type="button" class="bl-btn" style="flex:1 1 140px" onclick="ptCEditReset()">Reset to the standard list</button></div>';
+  var res = await blDialog({ title:st.title, body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:ptCEditCollect }, { label:'Cancel', value:false }] });
+  var ed = PT.cEdit; PT.cEdit = null;
+  if(res !== 'save' || !ed) return;
+  var typed = ed.rows.filter(function(e){ return String(e.name).trim() || String(e.number).trim() || String(e.email || '').trim(); }), list = ptCClean(kind, typed);
+  if(list.length < typed.length && typeof blToast === 'function') blToast((typed.length - list.length) + ' row(s) left out — each needs a name and a number' + (c.email ? ' or email' : ''), 'err');
+  var value = c.editTitle ? { title:String(ed.title || '').trim().slice(0, 50), intro:String(ed.intro || '').trim().slice(0, 300), list:list } : list;
+  try { await sbSetSetting(c.key, value); await ptCLoad(kind); if(typeof blToast === 'function') blToast(list.length ? list.length + ' contact' + (list.length > 1 ? 's' : '') + ' saved' : 'Back to the standard list', 'ok'); }
   catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
   ptEmSettings();
 }
+// Settings page summaries (names kept from the first version: the page calls ptEmSettings / ptEmEdit).
+function ptEmEdit(){ return ptCEdit('em'); }
 function ptEmSettings(){
-  var el = document.getElementById('pt-em-summary'); if(!el) return;
-  ptEmLoad().then(function(list){ el.textContent = list.map(function(e){ return e.name + ' ' + e.number; }).join(' · '); });
+  ['em', 'ag'].forEach(function(k){
+    var el = document.getElementById('pt-c-sum-' + k); if(!el) return;
+    ptCLoad(k).then(function(list){ el.textContent = (k === 'ag' ? PT.c.ag.title + ': ' : '') + list.map(function(e){ return e.name + (e.number ? ' ' + e.number : ''); }).join(' · '); });
+  });
 }
 
 </script>
@@ -14915,8 +14951,13 @@ function deleteDuplicates(){
         </div>
         <div id="emergency-numbers-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
           <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">🚨 Emergency numbers on the report page</div>
-          <div id="pt-em-summary" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
-          <button onclick="ptEmEdit()" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit numbers</button>
+          <div id="pt-c-sum-em" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
+          <button onclick="ptCEdit('em')" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit numbers</button>
+        </div>
+        <div id="agent-contacts-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">📞 Managing agent contacts on the report page</div>
+          <div id="pt-c-sum-ag" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
+          <button onclick="ptCEdit('ag')" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit contacts</button>
         </div>
       </div>
       <!-- Permissions (admin only) -->

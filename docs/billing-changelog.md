@@ -1,5 +1,11 @@
 # Billing changelog
 
+## v2.26 — Davies contact numbers on the report page
+- A second button under Emergency numbers: **Davies contact numbers** — who at the managing agent deals with what, with tap-to-call and tap-to-email.
+- Starting list, as set out by the portfolio manager by email on 20 November 2026: **Ruaan Rossouw** and **Myolisi** — accounts (levies, water and electricity charges, payments, statements, general account queries); **Cheryl** — maintenance, repairs, insurance and related operational issues. All on the office line 021 419 5392; office hours Monday–Thursday 08:30–17:00, Friday until 16:00.
+- **Settings → Managing agent contacts on the report page → Edit contacts** (admin): change the button title, the line under it (office hours), and each contact's name, phone, email and what they deal with. Up to 20; an entry needs a name plus a phone number or an email.
+- Emergency numbers are unchanged and edited the same way. Stored in the `agent_contacts` and `emergency_contacts` settings.
+
 ## v2.25 — emergency numbers on the report page
 - A red **Emergency numbers** button at the top of the report page (`?report`). It opens a list; tapping a number dials it on a phone (`tel:` link).
 - Standard numbers until a list is saved: Police 10111 · Ambulance 10177 · Any emergency from a cellphone 112 · City of Cape Town emergency 021 480 7700 (checked against the Western Cape Government and City of Cape Town pages, November 2026).
