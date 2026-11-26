@@ -1,5 +1,14 @@
 # Billing changelog
 
+## v2.22 — report page: current issues for everyone, and an "urgent" tick box
+- **Current issues list on the report page (`?report`), no login.** Every public ticket that is still open is listed with its status; closed ones stay for 14 days under "Sorted in the last 14 days". Tap one to read the description and updates.
+- **Residents can add an update and say "This has been fixed".** That flags the ticket ("Reported fixed") and emails the Park Manor inbox; a trustee confirms by closing it, or chooses **Not fixed yet**. Residents cannot close a ticket themselves.
+- **What is shown:** number, title, category, unit, status, dates, description and public updates. Never the reporter's name, phone or email, the activity log, quotes or photos (the server strips them — `functions/public-tickets.js`).
+- **Which tickets are public:** everything logged through the report page; a ticket made in the tracker only when **Visible to everyone on the report page** is ticked in the ticket editor. The same box hides a public ticket. Meter readings, action items and sub-tickets are never listed.
+- **🚨 This is urgent** tick box on the report form. Ticked: all trustees and the managing agent are emailed at once (subject starts "URGENT") and the ticket's priority is Urgent. Not ticked: only the Park Manor inbox is emailed and the report shows on the list. (If no inbox is set up, everyone is emailed as before.)
+- **Tracker:** a bar at the top lists tickets residents say are fixed; the ticket editor shows the public updates, the "reported fixed" note, and a box to post a public reply.
+- Public updates are stored separately from the ticket (settings rows `tpub:<ticket id>`), so saving a ticket in the tracker can't overwrite a resident's update. No new table, no SQL to run, no new Netlify settings.
+
 ## v2.21 — electricity link on the Settings page
 - Settings → public links: the **Electricity meter reading link** (`…/?electricity`) is listed under the water link, with **Copy** and **Open**. It is shown and hidden together with the other public links.
 

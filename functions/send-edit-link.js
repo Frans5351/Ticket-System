@@ -104,6 +104,12 @@ export default async function handler(req) {
   // Water readings only: skip the managing-agent email (used when testing the
   // form), leaving just the resident's own copy if they gave an address.
   const skipAgent = !!body.skipAgent && isMeterReading;
+  // Ordinary reports: a resident ticks "urgent" to email every trustee and the managing agent.
+  // Without it the report is only logged — the Park Manor inbox gets the email and everyone can
+  // follow it on the public list. (If no inbox is set up we fall back to emailing everyone,
+  // so a report is never left without a single notification.)
+  const urgent = !!body.urgent && !isMeterReading;
+  const quietReport = !isMeterReading && !urgent && looksLikeEmail(bareAddress((body.bcInbox || "").toString().trim()));
   // Meter readings are not tickets: they live under Water / Electricity readings in the app.
   const listName = isElecReading ? "Electricity readings" : "Water readings";
   const whereElse = isMeterReading ? `see ${listName} in the Park Manor app, or the Google Drive folder` : "view in the tracker";
@@ -290,15 +296,16 @@ export default async function handler(req) {
   // to this inbox + the managing agent, but NOT the individual trustees — see
   // the role filter above.)
   if (looksLikeEmail(bareAddress(bcInbox))) agentSet.add(bareAddress(bcInbox).toLowerCase());
+  if (quietReport) { agentSet.clear(); agentSet.add(bareAddress(bcInbox).toLowerCase()); }
   const agentList = Array.from(agentSet);
   if (agentList.length) {
     const aSubject = isElecReading
       ? `⚡ Electricity meter reading — ${/^Main/.test(unit) ? unit : "Unit " + unit}`
       : isWaterReading
       ? `💧 Water meter reading ${ref}${unit ? ` — Unit ${unit}` : ""}`.trim()
-      : `New Park Manor report ${ref}${title ? ` — ${title}` : ""}`.trim();
+      : `${urgent ? "🚨 URGENT: " : ""}New Park Manor report ${ref}${title ? ` — ${title}` : ""}`.trim();
     const aLines = [
-      isMeterReading ? `${isElecReading ? "An electricity" : "A water"} meter reading was submitted through the Park Manor app.` : "A new report was submitted via the Park Manor public report form.",
+      isMeterReading ? `${isElecReading ? "An electricity" : "A water"} meter reading was submitted through the Park Manor app.` : urgent ? "URGENT — the resident marked this report as urgent, so it has gone to all trustees and the managing agent." : "A new report was submitted via the Park Manor public report form.",
       "",
       `Reference:  ${ref || "(no number)"}`,
       `Subject:    ${title || "(none)"}`,
@@ -329,7 +336,7 @@ export default async function handler(req) {
       ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#9a6200;margin-top:6px">\u26a0 Not attached because of size (${escH(whereElse)}): ${skippedFiles.map((x) => escH(x.name) + " (" + escH(x.sizeMB) + " MB)").join(", ")}</div>`
       : "";
     const agentHtml = emailShell(`
-      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${isMeterReading ? "#177a4c" : "#8b96a5"};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${isElecReading ? "⚡ Electricity meter reading" : isWaterReading ? "💧 Water meter reading" : "New public report"}${ref ? " \u00b7 " + escH(ref) : ""}</div>
+      <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${isMeterReading ? "#177a4c" : "#8b96a5"};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${isElecReading ? "⚡ Electricity meter reading" : isWaterReading ? "💧 Water meter reading" : urgent ? "🚨 URGENT — new public report" : "New public report"}${ref ? " \u00b7 " + escH(ref) : ""}</div>
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:#3a4354;margin-bottom:16px">${escH(title || "(no subject)")}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:14px">
         ${detailRow("Reference", ref)}
@@ -377,6 +384,7 @@ export default async function handler(req) {
     ok: true,
     id: residentResult && residentResult.id,
     agentNotified: !!(agentResult && agentResult.ok),
+    urgent, notified: agentList.length,
     residentCopy: !!(copyResult && copyResult.ok),
     residentCopyError: copyResult && !copyResult.ok ? String(copyResult.msg || "failed").slice(0, 200) : "",
   });
