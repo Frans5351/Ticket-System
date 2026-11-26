@@ -1,5 +1,11 @@
 # Billing changelog
 
+## v2.35 — Fire department in the emergency numbers, and a City services row
+- **Emergency numbers** now lists **Fire department** by name: 021 480 7700 (City of Cape Town Fire and Rescue, 24 hours; 107 from a landline). The standard list is Police · Ambulance · Fire department · 112 from a cellphone · City of Cape Town emergency. A list that was already saved in Settings is shown exactly as saved — add the fire entry there if so.
+- New row **City services**, under Davies contact numbers: who to contact when the fault is the City's, not the body corporate's — water and sewerage, electricity, roads and stormwater, Metro Police and Traffic Services, and any other City service. Tap to call or email; the WhatsApp and SMS numbers for water and electricity are shown too. It says plainly that anything inside the complex goes to the trustees with Report an issue.
+- The numbers are the ones on the City of Cape Town's own pages (Contact us; Submit a service request; Fire and Rescue Service), checked 26 November 2026.
+- **Settings → City services on the report page → Edit numbers** changes the title, the line underneath and the entries (`settings` key `city_contacts`).
+
 ## v2.34 — A "Done" status, one look for the whole report page, and each issue as its own card
 **Done**
 - New ticket status **Done**, between Work In Progress and Closed: the work is finished, but the ticket has not been closed yet. It is in the status list in the ticket editor, the progress strip, the filter chips, the summary cards and the board, and it counts as active (shown by default).
