@@ -12465,20 +12465,25 @@ var PT_C = {
              { name:'Cheryl', number:'021 419 5392', email:'cheryl@daviesgroup.co.za', note:'Maintenance, repairs, insurance and related operational issues' } ] },
   // cs  City services — who to call when the fault is the City's, not the body corporate's. Numbers as
   //     published on capetown.gov.za (Contact us; Submit a service request), checked 26 Nov 2026.
-  cs:{ key:'city_contacts', title:'City services', icon:'🏙️', red:false, email:true, editTitle:true, row:'cs', sub:'Street water, power and road faults', pill:'#35557f', bd:'rgba(53,85,127,.4)', link:'#35557f',
+  cs:{ key:'city_contacts', title:'City services', icon:'🏙️', red:false, email:true, urls:true, editTitle:true, row:'cs', sub:'Street water, power and road faults', pill:'#35557f', bd:'rgba(53,85,127,.4)', link:'#35557f',
        intro:'For faults outside the complex — in the street, or with the City’s own supply — contact the City of Cape Town directly. Anything inside the complex goes to the trustees with “Report an issue”.',
        def:[ { name:'Water and sewerage', number:'0860 103 089', email:'water@capetown.gov.za', note:'Burst pipe, leak or no water in the street — choose option 2, 24 hours. Also WhatsApp 060 018 1505 or SMS 31373' },
              { name:'Electricity', number:'0860 103 089', email:'power@capetown.gov.za', note:'Power cut in the area or an electricity fault — choose option 3, 24 hours. Also SMS 31220' },
              { name:'Roads and stormwater', number:'0800 656 463', email:'Transport.Info@capetown.gov.za', note:'Potholes and blocked stormwater drains' },
              { name:'Metro Police and Traffic Services', number:'0860 765 423', email:'', note:'' },
-             { name:'Any other City service', number:'0860 103 089', email:'contact.us@capetown.gov.za', note:'All other service requests and account queries. Online: capetown.gov.za/ServiceRequests' } ] }
+             { name:'Any other City service', number:'0860 103 089', email:'contact.us@capetown.gov.za', note:'All other service requests and account queries. Online: capetown.gov.za/ServiceRequests' },
+             // My Smart City: an independent app (Acumen Software) for reporting City faults; links checked 26 Nov 2026
+             { name:'My Smart City — website', number:'', email:'', url:'https://mysmart.city', note:'Report a City fault from your phone or computer and follow its progress. An independent service, not run by the City.' },
+             { name:'My Smart City — iPhone app', number:'', email:'', url:'https://apps.apple.com/za/app/mysmart-city/id1555236570', note:'On the App Store' },
+             { name:'My Smart City — Android app', number:'', email:'', url:'https://play.google.com/store/apps/details?id=net.acumensoft.mysmartcityapp', note:'On Google Play' } ] }
 };
 PT.c = { em:{ list:null, open:false }, ag:{ list:null, open:false }, cs:{ list:null, open:false } };
+function ptCUrl(u){ u = String(u || '').trim(); return /^https:\/\/[^\s"'<>\\]{4,500}$/i.test(u) ? u : ''; }      // links leave the site, so https only
 function ptIsEmail(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s || '').trim()); }
 function ptCClean(kind, list){
   var c = PT_C[kind];
-  return (Array.isArray(list) ? list : []).map(function(e){ e = e || {}; return { name:String(e.name || '').trim().slice(0, 60), number:String(e.number || '').trim().slice(0, 30), email:c.email ? String(e.email || '').trim().slice(0, 120) : '', note:String(e.note || '').trim().slice(0, 200) }; })
-    .filter(function(e){ return e.name && (e.number.replace(/\D/g, '').length >= 3 || (c.email && ptIsEmail(e.email))); })
+  return (Array.isArray(list) ? list : []).map(function(e){ e = e || {}; return { name:String(e.name || '').trim().slice(0, 60), number:String(e.number || '').trim().slice(0, 30), email:c.email ? String(e.email || '').trim().slice(0, 120) : '', url:c.urls ? ptCUrl(e.url) : '', note:String(e.note || '').trim().slice(0, 200) }; })
+    .filter(function(e){ return e.name && (e.number.replace(/\D/g, '').length >= 3 || (c.email && ptIsEmail(e.email)) || e.url); })
     .map(function(e){ if(e.email && !ptIsEmail(e.email)) e.email = ''; if(e.number.replace(/\D/g, '').length < 3) e.number = ''; return e; }).slice(0, 20);
 }
 async function ptCLoad(kind){
@@ -12486,12 +12491,16 @@ async function ptCLoad(kind){
   try { v = await sbGetSetting(c.key); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
   var obj = Array.isArray(v) ? { list:v } : (v && typeof v === 'object' ? v : {});
   var list = ptCClean(kind, obj.list);
-  st.custom = !!list.length; st.list = list.length ? list : c.def.map(function(e){ return Object.assign({ email:'' }, e); });
+  st.custom = !!list.length; st.list = list.length ? list : c.def.map(function(e){ return Object.assign({ email:'', url:'' }, e); });
   st.title = (c.editTitle && String(obj.title || '').trim().slice(0, 50)) || c.title;
   st.intro = (c.editTitle && typeof obj.intro === 'string' && obj.intro.trim().slice(0, 300)) || c.intro;
   return st.list;
 }
 function ptTel(n){ var s = String(n || '').trim(), plus = s.charAt(0) === '+'; return 'tel:' + (plus ? '+' : '') + s.replace(/\D/g, ''); }
+// An entry with a link and no phone number gets an "Open" button where the call button would be.
+function ptCOpenPill(e, c){
+  return e.url ? '<a class="pt-c-link" href="' + ptEsc(e.url) + '" target="_blank" rel="noopener" aria-label="Open ' + ptEsc(e.name) + '" style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 16px;border-radius:99px;background:' + c.pill + ';color:#fff;font:700 15px var(--sans);white-space:nowrap;text-decoration:none">Open <span aria-hidden="true">↗</span></a>' : '';
+}
 function ptCRender(kind){
   var host = document.getElementById('pt-c-' + kind); if(!host) return;
   var c = PT_C[kind], st = PT.c[kind], list = st.list || c.def, title = st.title || c.title, intro = st.intro || c.intro;
@@ -12503,7 +12512,8 @@ function ptCRender(kind){
       + list.map(function(e, i){
           return '<div class="pt-c-row" style="padding:10px 0;' + (i ? 'border-top:1px solid var(--border2);' : '') + 'font-family:var(--sans);color:var(--text2)"><div style="display:flex;align-items:center;gap:12px;min-height:44px">'
             + '<span style="flex:1;min-width:0"><span style="display:block;font:700 15px/1.3 var(--sans);overflow-wrap:anywhere">' + ptEsc(e.name) + '</span>' + (e.note ? '<span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);overflow-wrap:anywhere">' + ptEsc(e.note) + '</span>' : '') + '</span>'
-            + (e.number ? '<a href="' + ptEsc(ptTel(e.number)) + '" aria-label="Call ' + ptEsc(e.name) + ' on ' + ptEsc(e.number) + '" style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:99px;background:' + pill + ';color:#fff;font:700 15px var(--sans);white-space:nowrap;text-decoration:none"><span aria-hidden="true">📞</span>' + ptEsc(e.number) + '</a>' : '') + '</div>'
+            + (e.number ? '<a href="' + ptEsc(ptTel(e.number)) + '" aria-label="Call ' + ptEsc(e.name) + ' on ' + ptEsc(e.number) + '" style="flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:8px 14px;border-radius:99px;background:' + pill + ';color:#fff;font:700 15px var(--sans);white-space:nowrap;text-decoration:none"><span aria-hidden="true">📞</span>' + ptEsc(e.number) + '</a>' : ptCOpenPill(e, c)) + '</div>'
+            + (e.url && e.number ? '<a class="pt-c-link" href="' + ptEsc(e.url) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:6px;min-height:44px;color:' + c.link + ';font:600 13.5px var(--sans);text-decoration:none;overflow-wrap:anywhere"><span aria-hidden="true">🔗</span>Open the link</a>' : '')
             + (e.email ? '<a href="mailto:' + ptEsc(e.email) + '" style="display:flex;align-items:center;gap:6px;min-height:44px;color:' + c.link + ';font:600 13.5px var(--sans);text-decoration:none;overflow-wrap:anywhere"><span aria-hidden="true">✉️</span>' + ptEsc(e.email) + '</a>' : '') + '</div>';
         }).join('') + '</div>';
   }
@@ -12520,18 +12530,19 @@ function ptCEditRows(){
       + '<button type="button" aria-label="Remove ' + ptEsc(e.name || 'this entry') + '" onclick="ptCEditDel(' + i + ')" style="flex:none;width:44px;height:44px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--red,#d9534f);font-size:16px;cursor:pointer">✕</button></div>'
       + '<input id="pt-cp-' + i + '" type="tel" inputmode="tel" maxlength="30" placeholder="Phone number" aria-label="Number ' + (i + 1) + '" value="' + ptEsc(e.number) + '" style="' + inCss + ';margin-top:6px">'
       + (c.email ? '<input id="pt-ce-' + i + '" type="email" inputmode="email" autocapitalize="off" maxlength="120" placeholder="Email address (optional)" aria-label="Email ' + (i + 1) + '" value="' + ptEsc(e.email || '') + '" style="' + inCss + ';margin-top:6px">' : '')
+      + (c.urls ? '<input id="pt-cl-' + i + '" type="url" inputmode="url" autocapitalize="off" spellcheck="false" maxlength="500" placeholder="Link (optional) — https://…" aria-label="Link ' + (i + 1) + '" value="' + ptEsc(e.url || '') + '" style="' + inCss + ';margin-top:6px">' : '')
       + '<input id="pt-cx-' + i + '" type="text" maxlength="200" placeholder="' + (c.email ? 'What they deal with' : 'Note (optional) — when to call') + '" aria-label="Note ' + (i + 1) + '" value="' + ptEsc(e.note) + '" style="' + inCss + ';margin-top:6px"></div>';
   }).join('') || '<div class="bl-hint">Nothing here yet.</div>';
 }
 function ptCEditCollect(){
   var ed = PT.cEdit; if(!ed) return;
-  ed.rows = ed.rows.map(function(e, i){ var g = function(p){ var el = document.getElementById(p + i); return el ? el.value : ''; }; return { name:g('pt-cn-'), number:g('pt-cp-'), email:g('pt-ce-'), note:g('pt-cx-') }; });
+  ed.rows = ed.rows.map(function(e, i){ var g = function(p){ var el = document.getElementById(p + i); return el ? el.value : ''; }; return { name:g('pt-cn-'), number:g('pt-cp-'), email:g('pt-ce-'), url:g('pt-cl-'), note:g('pt-cx-') }; });
   var t = document.getElementById('pt-c-title'), n = document.getElementById('pt-c-intro'); if(t) ed.title = t.value; if(n) ed.intro = n.value;
 }
 function ptCEditPaint(){ var el = document.getElementById('pt-c-rows'); if(el) el.innerHTML = ptCEditRows(); }
-function ptCEditAdd(){ ptCEditCollect(); if(PT.cEdit.rows.length >= 20) return; PT.cEdit.rows.push({ name:'', number:'', email:'', note:'' }); ptCEditPaint(); var el = document.getElementById('pt-cn-' + (PT.cEdit.rows.length - 1)); if(el) el.focus(); }
+function ptCEditAdd(){ ptCEditCollect(); if(PT.cEdit.rows.length >= 20) return; PT.cEdit.rows.push({ name:'', number:'', email:'', url:'', note:'' }); ptCEditPaint(); var el = document.getElementById('pt-cn-' + (PT.cEdit.rows.length - 1)); if(el) el.focus(); }
 function ptCEditDel(i){ ptCEditCollect(); PT.cEdit.rows.splice(i, 1); ptCEditPaint(); }
-function ptCEditReset(){ var c = PT_C[PT.cEdit.kind]; PT.cEdit.rows = c.def.map(function(e){ return Object.assign({ email:'' }, e); }); ptCEditPaint(); var t = document.getElementById('pt-c-title'), n = document.getElementById('pt-c-intro'); if(t) t.value = c.title; if(n) n.value = c.intro; }
+function ptCEditReset(){ var c = PT_C[PT.cEdit.kind]; PT.cEdit.rows = c.def.map(function(e){ return Object.assign({ email:'', url:'' }, e); }); ptCEditPaint(); var t = document.getElementById('pt-c-title'), n = document.getElementById('pt-c-intro'); if(t) t.value = c.title; if(n) n.value = c.intro; }
 async function ptCEdit(kind){
   if(typeof _currentRole === 'undefined' || _currentRole !== 'admin' || typeof blDialog !== 'function') return;
   var c = PT_C[kind], st = PT.c[kind];
@@ -12545,8 +12556,8 @@ async function ptCEdit(kind){
   var res = await blDialog({ title:st.title, body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:ptCEditCollect }, { label:'Cancel', value:false }] });
   var ed = PT.cEdit; PT.cEdit = null;
   if(res !== 'save' || !ed) return;
-  var typed = ed.rows.filter(function(e){ return String(e.name).trim() || String(e.number).trim() || String(e.email || '').trim(); }), list = ptCClean(kind, typed);
-  if(list.length < typed.length && typeof blToast === 'function') blToast((typed.length - list.length) + ' row(s) left out — each needs a name and a number' + (c.email ? ' or email' : ''), 'err');
+  var typed = ed.rows.filter(function(e){ return String(e.name).trim() || String(e.number).trim() || String(e.email || '').trim() || String(e.url || '').trim(); }), list = ptCClean(kind, typed);
+  if(list.length < typed.length && typeof blToast === 'function') blToast((typed.length - list.length) + ' row(s) left out — each needs a name and a number' + (c.email ? ' or email' : '') + (c.urls ? ' or an https:// link' : ''), 'err');
   var value = c.editTitle ? { title:String(ed.title || '').trim().slice(0, 50), intro:String(ed.intro || '').trim().slice(0, 300), list:list } : list;
   try { await sbSetSetting(c.key, value); await ptCLoad(kind); if(typeof blToast === 'function') blToast(list.length ? list.length + ' contact' + (list.length > 1 ? 's' : '') + ' saved' : 'Back to the standard list', 'ok'); }
   catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
