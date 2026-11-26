@@ -11955,6 +11955,7 @@ function ptStyle(){
     '.pt-row-em{background:var(--red-bg,rgba(240,111,111,.08));border-color:var(--red-bd,rgba(240,111,111,.45))}.pt-row-em .pt-tt{color:var(--red,#d9534f)}.pt-row-em .pt-ic{background:rgba(217,83,79,.14)}',
     '.pt-row-ag{background:#1b6b45;border-color:#1b6b45;color:#fff;box-shadow:0 3px 10px rgba(27,107,69,.25)}.pt-row-ag .pt-st,.pt-row-ag .pt-cv{color:rgba(255,255,255,.88)}.pt-row-ag .pt-ic{background:rgba(255,255,255,.16)}',
     '.pt-row-report{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(31,168,152,.28)}.pt-row-report .pt-st,.pt-row-report .pt-cv{color:rgba(255,255,255,.92)}.pt-row-report .pt-ic{background:rgba(255,255,255,.18)}',
+    '.pt-row-wcu{background:#d0202e;border-color:#d0202e;color:#fff;box-shadow:0 3px 10px rgba(208,32,46,.25)}.pt-row-wcu .pt-st,.pt-row-wcu .pt-cv{color:rgba(255,255,255,.92)}.pt-row-wcu .pt-ic{background:#1f3f8f}',
     '.pt-row-cs .pt-ic{background:rgba(53,85,127,.12)}',
     '.pt-row-water{background:var(--info-bg,rgba(90,160,230,.1));border-color:var(--info-bd,rgba(90,160,230,.45))}.pt-row-water .pt-ic{background:rgba(59,130,196,.16)}',
     '.pt-row-elec{background:rgba(217,164,65,.12);border-color:rgba(217,164,65,.5)}.pt-row-elec .pt-ic{background:rgba(217,164,65,.24)}',
@@ -12214,7 +12215,7 @@ function ptInject(){
       // (the form — steps 1–5 and the Send button — opens underneath it) · water / electricity readings ·
       // and the list of current issues, which is always visible.
       var rest = [], n = hero.nextSibling; while(n){ rest.push(n); n = n.nextSibling; }
-      hero.insertAdjacentHTML('afterend', '<div id="pt-notices" style="display:none;margin-bottom:12px"></div><div id="pt-c-em" style="margin-bottom:10px"></div><div id="pt-c-ag" style="margin-bottom:10px"></div><div id="pt-c-cs" style="margin-bottom:10px"></div><div id="pt-c-doc" style="margin-bottom:10px"></div>'
+      hero.insertAdjacentHTML('afterend', '<div id="pt-notices" style="display:none;margin-bottom:12px"></div><div id="pt-c-em" style="margin-bottom:10px"></div><div id="pt-c-ag" style="margin-bottom:10px"></div><div id="pt-c-wcu" style="display:none;margin-bottom:10px"></div><div id="pt-c-cs" style="margin-bottom:10px"></div><div id="pt-c-doc" style="margin-bottom:10px"></div>'
         + ptRowHtml({ id:'pt-report-btn', kind:'report', icon:'📝', title:'Report an issue', sub:'A problem, request or question', controls:'pt-form', onclick:'ptFormToggle()', style:'margin-bottom:10px' })
         + '<div id="pt-form" style="display:none;margin-bottom:14px"></div>'
         + '<div id="pt-meters">'
@@ -12233,6 +12234,7 @@ function ptInject(){
     ptRender(); ptLoad().then(ptRender);
     ['em', 'ag', 'cs'].forEach(function(k){ ptCRender(k); ptCLoad(k).then(function(){ ptCRender(k); }); });
     ptDRender(); ptDLoad().then(ptDRender);
+    ptWLoad().then(ptWRender);
     ptNLoad().then(ptNRender);
     ptARender(); ptFreshStart();
     var phIn = document.getElementById('pub-photos');
@@ -12567,6 +12569,7 @@ async function ptCEdit(kind){
 function ptEmEdit(){ return ptCEdit('em'); }
 function ptEmSettings(){
   var nEl = document.getElementById('pt-c-sum-not'); if(nEl) ptNLoad().then(function(list){ var live = ptNLive(); nEl.textContent = (live.length ? live.map(function(e){ return e.title; }).join(' · ') : 'None showing') + (list.length > live.length ? ' (' + (list.length - live.length) + ' expired)' : ''); });
+  var wEl = document.getElementById('pt-c-sum-wcu'); if(wEl) ptWLoad().then(function(w){ wEl.textContent = w.url ? w.title + ' → ' + w.url : 'Hidden — no link set'; });
   var dEl = document.getElementById('pt-c-sum-doc'); if(dEl) ptDLoad().then(function(list){ dEl.textContent = list.length ? list.map(function(e){ return e.title; }).join(' · ') : 'None'; });
   ['em', 'ag', 'cs'].forEach(function(k){
     var el = document.getElementById('pt-c-sum-' + k); if(!el) return;
@@ -12816,6 +12819,58 @@ function ptFreshStart(){
     if(!PT.awayAt || Date.now() - PT.awayAt < 60000 || !document.getElementById('pt-card')) return;
     PT.awayAt = 0; ptFresh(); ptNLoad().then(ptNRender); ptLoad().then(ptRender);
   });
+}
+
+// ═══ Invoices and billing — the managing agent's own portal ═══
+// One row under the managing agent's contact numbers, in the portal's red, blue and white, that sends
+// an owner to where their Davies invoices and statements are (WeconnectU). It opens in place like the
+// other rows: one line of explanation and a log-in button that opens the portal in a new tab. Nothing
+// is sent to or read from the portal — it is only a link. Settings key "billing_portal" =
+// { title, sub, text, button, url }; an empty url hides the row.
+var PT_W = { key:'billing_portal', red:'#d0202e', blue:'#1f3f8f',
+  def:{ title:'Davies invoices and billing', sub:'Log in to WeconnectU', text:'For your Davies invoices, statements and billing, please log in to WeconnectU.', button:'Log in to WeconnectU', url:'https://app.weconnectu.co.za/signin' } };
+PT.w = { v:null, open:false };
+function ptWClean(v){
+  v = v && typeof v === 'object' ? v : {};
+  var g = function(k, n){ return String(v[k] == null ? '' : v[k]).trim().slice(0, n); };
+  return { title:g('title', 50), sub:g('sub', 60), text:g('text', 300), button:g('button', 40), url:ptCUrl(v.url) };
+}
+async function ptWLoad(){
+  var v = null; try { v = await sbGetSetting(PT_W.key); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
+  var saved = !!v && typeof v === 'object' && !Array.isArray(v);
+  var w = saved ? ptWClean(v) : (ptPrefix() ? ptWClean({}) : Object.assign({}, PT_W.def));      // the standard link is Park Manor's managing agent
+  if(saved){ ['title', 'button'].forEach(function(k){ if(!w[k]) w[k] = PT_W.def[k]; }); }
+  PT.w.v = w; PT.w.custom = saved;
+  return w;
+}
+function ptWRender(){
+  var host = document.getElementById('pt-c-wcu'); if(!host) return;
+  var w = PT.w.v;
+  if(!w || !w.url){ host.innerHTML = ''; host.style.display = 'none'; return; }
+  host.style.display = '';
+  var h = ptRowHtml({ id:'pt-wcu-btn', kind:'wcu', icon:'🧾', title:ptEsc(w.title), sub:ptEsc(w.sub), open:PT.w.open, controls:'pt-wcu-card', onclick:'ptWToggle()' });
+  if(PT.w.open) h += '<div id="pt-wcu-card" class="pub-card" style="margin-top:8px;border-color:rgba(31,63,143,.45)">'
+    + (w.text ? '<div style="font:400 14px/1.55 var(--sans);color:var(--text2);margin-bottom:12px;overflow-wrap:anywhere">' + ptEsc(w.text) + '</div>' : '')
+    + '<a id="pt-wcu-go" href="' + ptEsc(w.url) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:12px 16px;border-radius:12px;background:' + PT_W.blue + ';color:#fff;font:700 15.5px var(--sans);text-decoration:none;text-align:center">' + ptEsc(w.button) + ' <span aria-hidden="true">↗</span></a>'
+    + '<div style="font:400 12px/1.5 var(--sans);color:var(--muted);margin-top:8px;overflow-wrap:anywhere">Opens ' + ptEsc(w.url.replace(/^https:\/\//, '').replace(/\/.*$/, '')) + ' in a new tab. Your login there is separate from this page.</div></div>';
+  host.innerHTML = h;
+}
+function ptWToggle(){ PT.w.open = !PT.w.open; ptWRender(); }
+async function ptWEdit(){
+  if(typeof _currentRole === 'undefined' || _currentRole !== 'admin' || typeof blDialog !== 'function') return;
+  var w = await ptWLoad();
+  var inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box';
+  var f = function(id, label, val, max, type){ return '<label class="bl-lbl" for="' + id + '" style="display:block;margin-top:8px">' + label + '</label>' + (type === 'area' ? '<textarea id="' + id + '" rows="3" maxlength="' + max + '" style="' + inCss + ';resize:vertical">' + ptEsc(val) + '</textarea>' : '<input id="' + id + '" type="' + (type || 'text') + '" maxlength="' + max + '" value="' + ptEsc(val) + '" style="' + inCss + '"' + (type === 'url' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…"' : '') + '>'); };
+  var body = '<div class="bl-hint">The red row under the managing agent’s numbers on the report page. It only links to the portal — nothing is shared with it. Clear the link to hide the row.</div>'
+    + f('pt-w-title', 'Title on the row', w.title, 50) + f('pt-w-sub', 'Line under the title', w.sub, 60) + f('pt-w-text', 'What it says when opened', w.text, 300, 'area') + f('pt-w-button', 'Wording on the button', w.button, 40) + f('pt-w-url', 'Link', w.url, 500, 'url');
+  var got = null, grab = function(){ var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; }; got = { title:g('pt-w-title'), sub:g('pt-w-sub'), text:g('pt-w-text'), button:g('pt-w-button'), url:g('pt-w-url') }; };
+  var res = await blDialog({ title:'Invoices and billing link', body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:grab }, { label:'Reset to WeconnectU', value:'reset' }, { label:'Cancel', value:false }] });
+  if(res !== 'save' && res !== 'reset') return;
+  var typedUrl = got ? String(got.url || '').trim() : '', val = res === 'reset' ? Object.assign({}, PT_W.def) : ptWClean(got);
+  if(res === 'save' && typedUrl && !val.url){ if(typeof blToast === 'function') blToast('Not saved — the link must start with https://', 'err'); return; }
+  try { await sbSetSetting(PT_W.key, val); await ptWLoad(); if(typeof blToast === 'function') blToast(val.url ? 'Saved' : 'Saved — the row is hidden until a link is set', 'ok'); }
+  catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
+  ptEmSettings();
 }
 
 </script>
@@ -15537,6 +15592,11 @@ function deleteDuplicates(){
           <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">📞 Managing agent contacts on the report page</div>
           <div id="pt-c-sum-ag" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
           <button onclick="ptCEdit('ag')" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit contacts</button>
+        </div>
+        <div id="billing-portal-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">🧾 Invoices and billing link on the report page</div>
+          <div id="pt-c-sum-wcu" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
+          <button onclick="ptWEdit()" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit link</button>
         </div>
         <div id="city-contacts-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
           <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">🏙️ City services on the report page</div>

@@ -1,5 +1,10 @@
 # Billing changelog
 
+## v2.37 — Davies invoices and billing: a link to WeconnectU
+- New row on the report page, directly under Davies contact numbers: **Davies invoices and billing — Log in to WeconnectU**. It is in WeconnectU's red, blue and white (red row, blue icon tile and button, white text).
+- It opens in place like the other rows: "For your Davies invoices, statements and billing, please log in to WeconnectU", and a **Log in to WeconnectU** button that opens https://app.weconnectu.co.za/signin in a new tab. It is only a link; nothing is sent to or read from WeconnectU.
+- **Settings → Invoices and billing link on the report page → Edit link** changes the title, the wording, the button and the link (https only). Clearing the link hides the row; "Reset to WeconnectU" puts the standard one back. `settings` key `billing_portal`.
+
 ## v2.36 — My Smart City links under City services
 - **City services** now ends with three links to **My Smart City**, the app for reporting City faults and following them: the website (mysmart.city), the iPhone app on the App Store and the Android app on Google Play. Each has an **Open** button where the other entries have a call button, and opens in a new tab. The note says it is an independent service, not run by the City.
 - An entry in the City services list can now have a **link** as well as, or instead of, a phone number or email address (Settings → City services on the report page → Edit numbers). Only https:// links are accepted. The emergency and managing-agent lists stay numbers and email only.
