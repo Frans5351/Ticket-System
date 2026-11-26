@@ -1,5 +1,10 @@
 # Billing changelog
 
+## v2.25 — emergency numbers on the report page
+- A red **Emergency numbers** button at the top of the report page (`?report`). It opens a list; tapping a number dials it on a phone (`tel:` link).
+- Standard numbers until a list is saved: Police 10111 · Ambulance 10177 · Any emergency from a cellphone 112 · City of Cape Town emergency 021 480 7700 (checked against the Western Cape Government and City of Cape Town pages, November 2026).
+- **Settings → Emergency numbers on the report page → Edit numbers** (admin): add, change or remove entries — name, number, optional note — up to 20, or reset to the standard four. Stored in the `emergency_contacts` setting; no deploy needed to change them.
+
 ## v2.24 — Electricity Reading on the report page; last photo from Google Drive
 - **Electricity Reading** tile on the report page (`?report`), next to Water Reading. It opens the same electricity form as the `?electricity` link (with a way back to the report form). It can never become a ticket.
 - **"Last reading" panel, with Google Drive as the fallback.** When a meter has no reading in the app for this month, the form looks in `Park Manor Electricity Meter Readings` for the newest photo of that meter (`Unit N…` / `Main Meter…`, newest dated folder first) and shows its date, with **Show the photo**. If that photo is from this month the panel says the reading is on file; if it is older it says none has come in this month and shows the last one.
