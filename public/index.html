@@ -6844,6 +6844,196 @@ body.bl-ro #unit-modal [data-ro-hide]{display:none!important}
 
 /* Water readings in the main navigation (desktop sidebar + burger menu) */
 @media(min-width:900px){.tab[data-tab="water"]::before{content:'💧'}}
+
+/* ═══ Tracker look (tk.js) — same cards, spacing and type as the report page ═══ */
+/* shared field look */
+.tk-in{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font:400 15px/1.4 var(--sans);outline:none;transition:border-color .12s,box-shadow .12s}
+.tk-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg,rgba(31,168,152,.14))}
+.tk-in:disabled{opacity:.55}
+textarea.tk-in{min-height:92px;line-height:1.5;resize:vertical}
+select.tk-in{cursor:pointer}
+
+/* ── toolbar ── */
+#panel-tickets > div.tk-bar{position:sticky;top:0;z-index:10;display:flex;flex-direction:column;flex-wrap:nowrap;gap:10px;padding:14px 20px 12px;background:var(--bg);border-bottom:1px solid var(--border)}
+#panel-tickets > div.tk-bar > *{order:0 !important;flex-basis:auto !important;min-width:0;max-width:100%;margin-left:0 !important}
+#panel-tickets .tk-bar-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#panel-tickets .tk-bar-title{font:700 20px/1.2 var(--sans);color:var(--text);white-space:nowrap}
+#panel-tickets .tk-new{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 20px;border:none;border-radius:12px;background:var(--accent);color:#fff;font:700 15px var(--sans);cursor:pointer;white-space:nowrap;box-shadow:0 3px 10px rgba(31,168,152,.25)}
+#panel-tickets .tk-search{background:var(--surface);border-radius:12px;padding-left:14px}
+#panel-tickets .tk-bar-chips{display:flex;gap:8px;flex-wrap:wrap}
+#panel-tickets .tk-bar-chips .tkt-filter-btn{min-height:36px;padding:6px 14px;font:600 13px var(--sans)}
+#panel-tickets .tk-bar-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#panel-tickets .tk-tool-select{width:auto;min-height:40px;padding:8px 10px;background:var(--surface);font-size:13.5px;max-width:100%}
+#panel-tickets .tk-bar-tools > button{min-height:40px !important;padding:8px 14px !important;border-radius:10px !important;font:600 13.5px var(--sans) !important}
+#panel-tickets #tkt-view-toggle{border-radius:10px !important}
+#panel-tickets .tkt-vt{min-height:40px;padding:8px 13px;font-size:15px}
+/* summary cards */
+#panel-tickets .tk-stats{padding:14px 20px !important;gap:10px !important;border-bottom:none !important}
+#panel-tickets .tk-stats .tkt-stat-card{border-radius:12px;border-left-width:4px;padding:10px 14px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+#panel-tickets .tk-stats .tkt-stat-num{font:700 22px/1.1 var(--sans)}
+#panel-tickets .tk-stats .tkt-stat-lbl{font:500 12px/1.3 var(--sans);margin-top:3px}
+
+/* ── a ticket in the list ── */
+.tkt-card.tk-card [style*="var(--mono)"]{font:600 11.5px var(--sans) !important;padding:3px 10px !important;border-radius:99px !important}
+.tkt-card.tk-card .tkt-att-pill{font:700 11.5px var(--sans);padding:4px 10px}
+#panel-tickets .tk-list{padding:4px 20px 24px !important;gap:12px !important}
+.tkt-card.tk-card{position:relative;display:flex;align-items:flex-start;gap:10px;padding:14px 14px 14px 19px;border:1px solid var(--border2) !important;border-radius:14px;background:var(--surface);box-shadow:0 1px 3px rgba(16,24,40,.08);overflow:hidden;cursor:pointer;transition:box-shadow .12s,border-color .12s}
+.tkt-card.tk-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--accent)}
+.tkt-card.tk-card.priority-urgent::before{background:var(--red,#d9534f)}
+.tkt-card.tk-card.priority-high::before{background:#e0a03a}
+.tkt-card.tk-card.priority-low::before{background:var(--border2)}
+.tkt-card.tk-card.type-action::before{background:var(--info,#3b82c4)}
+.tkt-card.tk-card.tk-done::before,.tkt-card.tk-card.tk-closed::before{background:var(--green,#1e9e6a)}
+.tkt-card.tk-card:hover{border-color:var(--accent) !important;box-shadow:0 3px 10px rgba(16,24,40,.1)}
+.tkt-card.tk-card:focus-visible{outline:3px solid rgba(31,168,152,.5);outline-offset:2px}
+.tkt-card.tk-card.tk-closed .tk-card-title{color:var(--muted)}
+.tk-card-main{flex:1;min-width:0}
+.tk-card-meta{font:600 11.5px/1.4 var(--sans);letter-spacing:.2px;color:var(--muted);overflow-wrap:anywhere}
+.tk-card-title{margin-top:3px;font:700 16px/1.3 var(--sans);color:var(--text);overflow-wrap:anywhere}
+.tk-card-desc{margin-top:3px;font:400 13px/1.45 var(--sans);color:var(--muted);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.tk-card-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px}
+.tk-card-chips .tkt-status-badge{font:600 11.5px var(--sans);padding:3px 10px}
+.tk-chip{display:inline-block;padding:3px 10px;border-radius:99px;font:600 11.5px var(--sans);white-space:nowrap;border:1px solid var(--border2);background:var(--surface2);color:var(--text2)}
+.tk-chip-urgent{background:var(--red-bg,rgba(240,111,111,.1));border-color:var(--red-bd,rgba(240,111,111,.35));color:var(--red,#d9534f)}
+.tk-chip-high{background:rgba(224,160,58,.13);border-color:rgba(224,160,58,.45);color:#a86f12}
+.tk-chip-low{color:var(--muted)}
+.tk-chip-pub{background:var(--info-bg,rgba(90,160,230,.1));border-color:var(--info-bd,rgba(90,160,230,.4));color:var(--info,#3b82c4)}
+.tk-steps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;margin-top:11px;max-width:420px}
+.tk-steps i{display:block;height:5px;border-radius:99px;background:var(--border2)}
+.tk-steps i.on{background:var(--accent)}
+.tk-steps i.on.fin{background:var(--green,#1e9e6a)}
+.tk-card-foot{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font:400 12.5px/1.4 var(--sans);color:var(--muted)}
+.tk-card-foot .tk-foot-docs{color:var(--accent2)}
+.tk-card-att{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.tk-card-go{flex:none;display:flex;margin-top:2px;color:var(--muted)}
+
+/* ── the ticket editor ── */
+#ticket-modal-card.tk{width:min(880px,96vw) !important;background:var(--bg) !important;border-radius:18px !important;overflow:hidden;font-family:var(--sans)}
+#ticket-modal-card.tk > .tk-head,#ticket-modal-card.tk > #tkt-status-flow,#ticket-modal-card.tk > #tkt-journey,#ticket-modal-card.tk > #tkt-parent-banner{background:var(--surface) !important}
+#ticket-modal-card.tk > .tk-head{padding:18px 20px 14px !important;align-items:flex-start !important;gap:12px !important}
+#ticket-modal-card.tk #tkt-number-display{font:700 11.5px var(--sans) !important;letter-spacing:.6px !important;color:var(--muted) !important;margin-bottom:2px !important}
+#ticket-modal-card.tk #tkt-title{font:700 20px/1.3 var(--sans) !important;color:var(--text) !important;padding:4px 8px !important;margin-left:-8px;border-radius:8px !important;width:calc(100% + 8px) !important;box-sizing:border-box}
+#ticket-modal-card.tk #tkt-title:focus{background:var(--surface2) !important}
+#ticket-modal-card.tk .tkt-header-actions{gap:8px !important}
+#ticket-modal-card.tk .tkt-header-actions button{min-height:38px;padding:8px 12px !important;border-radius:10px !important;font:600 12.5px var(--sans) !important}
+#ticket-modal-card.tk > #tkt-status-flow{padding:12px 20px !important}
+#ticket-modal-card.tk > #tkt-journey{padding:12px 20px 10px !important}
+/* anything still set in the old typewriter face reads as the page's own type */
+#ticket-modal-card.tk [style*="var(--mono)"]{font-family:var(--sans) !important}
+#ticket-modal-card.tk :is(div,span)[style*="text-transform:uppercase"]{font:700 14px/1.3 var(--sans) !important;text-transform:none !important;letter-spacing:0 !important;color:var(--text2) !important}
+/* sections: white cards on the page colour, like the report page */
+#ticket-modal-card.tk .tk-sec,#ticket-modal-card.tk > #tkt-subtickets-section,#ticket-modal-card.tk > #tkt-approval-panel,#ticket-modal-card.tk #tkt-suppliers-section,#ticket-modal-card.tk #tkt-rating-section{margin:12px 14px 0 !important;padding:14px 16px !important;border:1px solid var(--border2) !important;border-radius:14px !important;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+#ticket-modal-card.tk .tk-sec,#ticket-modal-card.tk > #tkt-subtickets-section,#ticket-modal-card.tk #tkt-suppliers-section,#ticket-modal-card.tk #tkt-rating-section{background:var(--surface)}
+#ticket-modal-card.tk > .tk-body{display:block !important;padding-bottom:16px;background:transparent !important}
+/* the one-button shortcut panels bring their own box: let that box be the card */
+#ticket-modal-card.tk > #tkt-approval-panel:has(> div:only-child){padding:0 !important;border:none !important;background:none !important;box-shadow:none}
+#ticket-modal-card.tk > #tkt-approval-panel > div:only-child{padding:14px 16px !important;border:1px solid var(--border2) !important;border-radius:14px !important;background:var(--surface) !important;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+#ticket-modal-card.tk > #tkt-approval-panel > div:only-child > div:first-child > div:first-child{font:400 13.5px/1.5 var(--sans) !important;color:var(--text2) !important}
+#ticket-modal-card.tk > #tkt-approval-panel button{min-height:44px;border-radius:10px !important;font-family:var(--sans) !important}
+#ticket-modal-card.tk #tkt-subtickets-section button{min-height:36px;border-radius:10px !important;font:600 12.5px var(--sans) !important}
+.tk-sec-h{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.tk-sec-ic{flex:none;width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;background:var(--surface2)}
+.tk-sec-t{flex:1;min-width:0;font:700 15px/1.3 var(--sans);color:var(--text)}
+.tk-sec-x{flex:none;display:flex;align-items:center}
+.tk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}
+.tk-f{min-width:0}
+.tk-grid > .tk-wide{grid-column:1 / -1;margin-top:-2px}
+.tk-l{display:block;margin:0 0 5px;font:600 12.5px/1.3 var(--sans);color:var(--muted)}
+.tk-anon{display:inline-flex;align-items:center;gap:8px;min-height:36px;font:500 13px var(--sans);color:var(--text2);cursor:pointer}
+.tk-anon input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+#ticket-modal-card.tk #tkt-reqappr-wrap label{font-size:12.5px !important;gap:8px !important;min-height:32px;color:var(--text2) !important}
+#ticket-modal-card.tk #tkt-reqappr-wrap input{width:18px;height:18px}
+#ticket-modal-card.tk #tkt-link-user-row,#ticket-modal-card.tk #tkt-linked-user-row{margin-top:12px !important}
+/* report-page block, now a section body instead of a box in a side column */
+#ticket-modal-card.tk #pt-tkt-block{padding:0 !important;border:none !important;background:none !important;border-radius:0 !important}
+/* photos and documents */
+#ticket-modal-card.tk .tkt-attach-area{display:flex}
+#ticket-modal-card.tk .tkt-attach-area label{flex:1 1 0 !important;min-width:0}
+#ticket-modal-card.tk .tkt-attach-area{gap:10px !important;margin-bottom:12px !important}
+#ticket-modal-card.tk .tkt-attach-area label{min-height:48px;padding:10px !important;border-radius:12px !important;font:600 13px var(--sans) !important;color:var(--text2) !important}
+/* activity log */
+#ticket-modal-card.tk #tkt-log-toggle{min-height:36px;margin-bottom:0 !important;font:700 15px/1.3 var(--sans) !important;text-transform:none !important;letter-spacing:0 !important;color:var(--text) !important;gap:10px !important}
+#ticket-modal-card.tk #tkt-log-caret{font-size:11px !important;color:var(--muted)}
+#ticket-modal-card.tk #tkt-log-count{font:400 12.5px var(--sans) !important}
+#ticket-modal-card.tk #tkt-log-body{margin-top:12px}
+#ticket-modal-card.tk .tkt-log-entry{border-radius:10px;padding:10px 12px;font:400 13px/1.5 var(--sans)}
+#ticket-modal-card.tk #tkt-log-body > div:last-child{gap:10px !important;align-items:stretch}
+#ticket-modal-card.tk #tkt-log-body > div:last-child > button{min-height:44px;padding:0 18px !important;border-radius:10px !important;font:700 14px var(--sans) !important;align-self:flex-end}
+#ticket-modal-card.tk #tkt-note-input{min-height:44px}
+/* suppliers row */
+#ticket-modal-card.tk #tkt-suppliers-section button{min-height:40px;border-radius:10px !important;font-family:var(--sans) !important}
+
+/* ── action item (the short form) and the "what are you adding" chooser ── */
+#action-modal.tk-act .tk-act-card{width:min(680px,96vw) !important;background:var(--bg) !important;border-radius:18px !important;overflow:hidden;font-family:var(--sans)}
+#action-modal.tk-act .tk-act-head{background:var(--surface);padding:16px 20px 14px !important;gap:12px !important;align-items:flex-start !important}
+#action-modal.tk-act .tk-act-head span{font-family:var(--sans) !important;font-size:11.5px !important;font-weight:700;letter-spacing:.2px !important}
+#action-modal.tk-act .tk-act-head span:first-child{padding:3px 10px !important;border-radius:99px !important}
+#action-modal.tk-act #act-title{font:700 20px/1.3 var(--sans) !important;color:var(--text) !important;padding:4px 8px !important;margin-left:-8px;border-radius:8px;width:calc(100% + 8px) !important;box-sizing:border-box}
+#action-modal.tk-act #act-title:focus{background:var(--surface2) !important}
+#action-modal.tk-act .tk-act-head button{min-height:38px;padding:8px 12px !important;border-radius:10px !important;font:600 12.5px var(--sans) !important;white-space:nowrap}
+#action-modal.tk-act .tk-act-head .tk-act-x{font-size:18px !important;min-width:38px}
+#action-modal.tk-act .tk-act-body{padding:12px 14px 16px !important}
+#action-modal.tk-act .tk-act-sec{margin:0 0 12px !important;padding:14px 16px;background:var(--surface);border:1px solid var(--border2);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+#action-modal.tk-act .tk-act-sec:last-child{margin-bottom:0 !important}
+#action-modal.tk-act .tk-act-body [style*="text-transform:uppercase"]{font:600 12.5px/1.3 var(--sans) !important;text-transform:none !important;letter-spacing:0 !important;color:var(--muted) !important;margin-bottom:5px !important}
+#action-modal.tk-act .tk-act-grid{gap:12px 14px !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+#action-modal.tk-act #act-status-badge{min-height:44px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:10px !important;font:700 13.5px var(--sans) !important}
+#action-modal.tk-act .tk-act-note{gap:10px !important;margin-bottom:10px !important}
+#action-modal.tk-act .tk-act-note .tk-in{flex:1;min-width:0}
+#action-modal.tk-act .tk-act-note button{min-height:44px;padding:0 18px !important;border-radius:10px !important;font:700 14px var(--sans) !important}
+#action-modal.tk-act #act-log{gap:8px !important}
+#action-modal.tk-act #act-log [style*="var(--mono)"]{font-family:var(--sans) !important}
+#action-modal.tk-act #act-log > div{border-radius:10px !important}
+#tracker-type-chooser.tk-choose > div{border-radius:18px !important;font-family:var(--sans)}
+#tracker-type-chooser.tk-choose [style*="var(--mono)"]{font:400 13.5px/1.5 var(--sans) !important}
+#tracker-type-chooser.tk-choose > div > button{border-radius:14px !important;padding:14px 16px !important;background:var(--surface) !important;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+#tracker-type-chooser.tk-choose > div > button > div:last-child > div:first-child{font:700 15px/1.3 var(--sans) !important;color:var(--text) !important}
+#tracker-type-chooser.tk-choose > div > button > div:last-child > div:last-child{font:400 12.5px/1.5 var(--sans) !important}
+#tracker-type-chooser.tk-choose > div > div:first-child button{min-width:40px;min-height:40px}
+
+/* ── the "new ticket" and "new action item" sheets ── */
+.new-tkt-sheet .new-tkt-inner{font-family:var(--sans);max-width:560px}
+.new-tkt-sheet .new-tkt-inner > div:nth-child(2) > div:first-child{font:700 18px/1.3 var(--sans) !important;color:var(--text) !important}
+.new-tkt-sheet .new-tkt-inner > div:nth-child(2) > button{min-width:40px;min-height:40px}
+.new-tkt-sheet .tkt-field-label{font:600 12.5px/1.3 var(--sans);text-transform:none;letter-spacing:0;color:var(--muted);margin-bottom:6px}
+.new-tkt-sheet .tkt-input{min-height:44px;border-width:1px}
+.new-tkt-sheet .tkt-input:focus{box-shadow:0 0 0 3px var(--accent-bg,rgba(31,168,152,.14))}
+.new-tkt-sheet .tkt-cat-btn,.new-tkt-sheet .tkt-prio-btn{font:600 12px/1.25 var(--sans);border-width:1px;min-height:44px}
+.new-tkt-sheet .tkt-cat-btn.sel,.new-tkt-sheet .tkt-prio-btn.sel{border-width:1.5px}
+.new-tkt-sheet [style*="var(--mono)"]{font-family:var(--sans) !important}
+.new-tkt-sheet .new-tkt-section{margin-bottom:18px}
+
+@media (max-width:760px){
+  .new-tkt-sheet .tkt-input{font-size:16px}
+  #action-modal.tk-act .tk-act-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
+  #action-modal.tk-act .tk-act-grid > div:last-child{grid-column:1 / -1}
+  #action-modal.tk-act .tk-act-head{flex-wrap:wrap;padding:14px 16px 12px !important}
+  #action-modal.tk-act .tk-act-head > div:first-child{flex:1 1 100% !important}
+  #action-modal.tk-act .tk-act-head > div:last-child{width:100%}
+  #action-modal.tk-act .tk-act-head > div:last-child button:first-child{flex:1}
+  #action-modal.tk-act #act-title{font-size:18px !important}
+  #panel-tickets > div.tk-bar{padding:12px 14px 10px !important;gap:10px !important}
+  #panel-tickets .tk-bar-title{font-size:18px}
+  #panel-tickets .tk-bar-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 0 2px}
+  #panel-tickets .tk-bar-chips::-webkit-scrollbar{display:none}
+  #panel-tickets .tk-bar-chips .tkt-filter-btn{flex:none}
+  #panel-tickets .tk-bar-tools{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 0 2px}
+  #panel-tickets .tk-bar-tools::-webkit-scrollbar{display:none}
+  #panel-tickets .tk-bar-tools > *{flex:none}
+  #panel-tickets .tk-tool-select{font-size:16px}
+  #panel-tickets .tk-stats{padding:10px 14px !important}
+  #panel-tickets .tk-list{padding:4px 14px 24px !important}
+  #ticket-modal-card.tk{width:100% !important;border-radius:0 !important;background:var(--bg) !important;overflow:visible !important;align-self:flex-start;min-height:100dvh}
+  #ticket-modal-card.tk > .tk-head{padding:14px 16px 12px !important}
+  #ticket-modal-card.tk #tkt-title{font-size:18px !important}
+  #ticket-modal-card.tk .tkt-header-actions{flex-wrap:nowrap !important;gap:6px !important}
+  #ticket-modal-card.tk .tkt-header-actions button{flex:1 1 auto;min-width:0;padding:8px 4px !important;font-size:12px !important}
+  #ticket-modal-card.tk .tk-sec,#ticket-modal-card.tk > #tkt-subtickets-section,#ticket-modal-card.tk > #tkt-approval-panel,#ticket-modal-card.tk #tkt-suppliers-section,#ticket-modal-card.tk #tkt-rating-section{margin:10px 10px 0 !important;padding:14px !important}
+  #ticket-modal-card.tk > .tk-body{padding-bottom:calc(24px + env(safe-area-inset-bottom,0))}
+  .tk-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  #tk-sec-reporter .tk-grid{grid-template-columns:1fr}
+  .tk-in{font-size:16px}
+}
 </style>
 
 
@@ -12328,6 +12518,8 @@ function ptIsPublic(t){ return !!t && (t.public === true || (t.public !== false 
 function ptCanManage(){ return typeof _currentRole !== 'undefined' && (_currentRole === 'admin' || _currentRole === 'trustee' || _currentRole === 'management'); }
 function ptTktBlock(){
   var b = document.getElementById('pt-tkt-block'); if(b) return b;
+  var sec = document.getElementById('tk-public-body');          // the editor's "On the report page" section (tk.js)
+  if(sec){ b = document.createElement('div'); b.id = 'pt-tkt-block'; sec.appendChild(b); return b; }
   var anchor = document.getElementById('tkt-priority'); if(!anchor) return null;
   var col = anchor.parentNode && anchor.parentNode.parentNode; if(!col) return null;      // the editor's column of fields (status, priority, dates…)
   b = document.createElement('div'); b.id = 'pt-tkt-block';
@@ -12569,7 +12761,7 @@ async function ptCEdit(kind){
 function ptEmEdit(){ return ptCEdit('em'); }
 function ptEmSettings(){
   var nEl = document.getElementById('pt-c-sum-not'); if(nEl) ptNLoad().then(function(list){ var live = ptNLive(); nEl.textContent = (live.length ? live.map(function(e){ return e.title; }).join(' · ') : 'None showing') + (list.length > live.length ? ' (' + (list.length - live.length) + ' expired)' : ''); });
-  var wEl = document.getElementById('pt-c-sum-wcu'); if(wEl) ptWLoad().then(function(w){ wEl.textContent = w.url ? w.title + ' → ' + w.url : 'Hidden — no link set'; });
+  var wEl = document.getElementById('pt-c-sum-wcu'); if(wEl) ptWLoad().then(function(w){ wEl.textContent = w.url ? w.title + ' → ' + w.url + (w.embed ? ' (shown inside the page when the portal allows it)' : ' (opens in a new tab only)') : 'Hidden — no link set'; });
   var dEl = document.getElementById('pt-c-sum-doc'); if(dEl) ptDLoad().then(function(list){ dEl.textContent = list.length ? list.map(function(e){ return e.title; }).join(' · ') : 'None'; });
   ['em', 'ag', 'cs'].forEach(function(k){
     var el = document.getElementById('pt-c-sum-' + k); if(!el) return;
@@ -12824,23 +13016,24 @@ function ptFreshStart(){
 // ═══ Invoices and billing — the managing agent's own portal ═══
 // One row under the managing agent's contact numbers, in the portal's red, blue and white, that sends
 // an owner to where their Davies invoices and statements are (WeconnectU). It opens in place like the
-// other rows: one line of explanation and a log-in button that opens the portal in a new tab. Nothing
-// is sent to or read from the portal — it is only a link. Settings key "billing_portal" =
+// other rows: one line of explanation, then the portal itself shown in place when it allows that
+// (see ptWCheck), with a button that opens it in a new tab as the fallback. Nothing is sent to or read
+// from the portal by this page. Settings key "billing_portal" =
 // { title, sub, text, button, url }; an empty url hides the row.
 var PT_W = { key:'billing_portal', red:'#d0202e', blue:'#1f3f8f',
-  def:{ title:'Davies invoices and billing', sub:'Log in to WeconnectU', text:'For your Davies invoices, statements and billing, please log in to WeconnectU.', button:'Log in to WeconnectU', url:'https://app.weconnectu.co.za/signin' } };
+  def:{ title:'Davies invoices and billing', sub:'Log in to WeconnectU', text:'For your Davies invoices, statements and billing, please log in to WeconnectU.', button:'Log in to WeconnectU', url:'https://app.weconnectu.co.za/signin', embed:true } };
 PT.w = { v:null, open:false };
 function ptWClean(v){
   v = v && typeof v === 'object' ? v : {};
   var g = function(k, n){ return String(v[k] == null ? '' : v[k]).trim().slice(0, n); };
-  return { title:g('title', 50), sub:g('sub', 60), text:g('text', 300), button:g('button', 40), url:ptCUrl(v.url) };
+  return { title:g('title', 50), sub:g('sub', 60), text:g('text', 300), button:g('button', 40), url:ptCUrl(v.url), embed:v.embed !== false };
 }
 async function ptWLoad(){
   var v = null; try { v = await sbGetSetting(PT_W.key); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
   var saved = !!v && typeof v === 'object' && !Array.isArray(v);
   var w = saved ? ptWClean(v) : (ptPrefix() ? ptWClean({}) : Object.assign({}, PT_W.def));      // the standard link is Park Manor's managing agent
   if(saved){ ['title', 'button'].forEach(function(k){ if(!w[k]) w[k] = PT_W.def[k]; }); }
-  PT.w.v = w; PT.w.custom = saved;
+  PT.w.v = w; PT.w.custom = saved; PT.w.frame = undefined;      // ask again whether it may be shown in place
   return w;
 }
 function ptWRender(){
@@ -12849,21 +13042,39 @@ function ptWRender(){
   if(!w || !w.url){ host.innerHTML = ''; host.style.display = 'none'; return; }
   host.style.display = '';
   var h = ptRowHtml({ id:'pt-wcu-btn', kind:'wcu', icon:'🧾', title:ptEsc(w.title), sub:ptEsc(w.sub), open:PT.w.open, controls:'pt-wcu-card', onclick:'ptWToggle()' });
-  if(PT.w.open) h += '<div id="pt-wcu-card" class="pub-card" style="margin-top:8px;border-color:rgba(31,63,143,.45)">'
-    + (w.text ? '<div style="font:400 14px/1.55 var(--sans);color:var(--text2);margin-bottom:12px;overflow-wrap:anywhere">' + ptEsc(w.text) + '</div>' : '')
-    + '<a id="pt-wcu-go" href="' + ptEsc(w.url) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:12px 16px;border-radius:12px;background:' + PT_W.blue + ';color:#fff;font:700 15.5px var(--sans);text-decoration:none;text-align:center">' + ptEsc(w.button) + ' <span aria-hidden="true">↗</span></a>'
-    + '<div style="font:400 12px/1.5 var(--sans);color:var(--muted);margin-top:8px;overflow-wrap:anywhere">Opens ' + ptEsc(w.url.replace(/^https:\/\//, '').replace(/\/.*$/, '')) + ' in a new tab. Your login there is separate from this page.</div></div>';
+  if(PT.w.open){
+    var inPage = w.embed && PT.w.frame === true, host2 = w.url.replace(/^https:\/\//, '').replace(/\/.*$/, '');
+    h += '<div id="pt-wcu-card" class="pub-card" style="margin-top:8px;border-color:rgba(31,63,143,.45)">'
+      + (w.text ? '<div style="font:400 14px/1.55 var(--sans);color:var(--text2);margin-bottom:12px;overflow-wrap:anywhere">' + ptEsc(w.text) + '</div>' : '');
+    if(inPage) h += '<div style="font:400 12px/1.5 var(--sans);color:var(--muted);margin-bottom:6px;overflow-wrap:anywhere">Below is <b>' + ptEsc(host2) + '</b> itself, shown inside this page. What you type goes straight to it, not to Park Manor.</div>'
+      + '<iframe id="pt-wcu-frame" title="' + ptEsc(w.title) + '" src="' + ptEsc(w.url) + '" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-top-navigation-by-user-activation" style="display:block;width:100%;height:min(620px,78vh);border:1px solid var(--border2);border-radius:10px;background:#fff"></iframe>'
+      + '<div style="font:400 12.5px/1.5 var(--sans);color:var(--muted);margin:10px 0 8px">If the box stays empty, or it keeps asking you to log in again, open it in its own tab instead:</div>';
+    h += '<a id="pt-wcu-go" href="' + ptEsc(w.url) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:12px 16px;border-radius:12px;' + (inPage ? 'border:1.5px solid ' + PT_W.blue + ';background:var(--surface);color:' + PT_W.blue : 'background:' + PT_W.blue + ';color:#fff') + ';font:700 15.5px var(--sans);text-decoration:none;text-align:center">' + (inPage ? 'Open in a new tab' : ptEsc(w.button)) + ' <span aria-hidden="true">↗</span></a>'
+      + (inPage ? '' : '<div style="font:400 12px/1.5 var(--sans);color:var(--muted);margin-top:8px;overflow-wrap:anywhere">Opens ' + ptEsc(host2) + ' in a new tab. Your login there is separate from this page.</div>') + '</div>';
+  }
   host.innerHTML = h;
 }
-function ptWToggle(){ PT.w.open = !PT.w.open; ptWRender(); }
+// The portal is shown inside the page only when it says it allows that. A browser cannot tell — a site
+// that refuses just leaves an empty box — so the server asks the portal (functions/frame-check.js).
+// Until the answer is yes, and whenever it is no or cannot be had, the plain button is what shows.
+async function ptWCheck(){
+  var w = PT.w.v; if(!w || !w.url || !w.embed || PT.w.frame !== undefined || PT.w.checking) return;
+  PT.w.checking = true;
+  var ok = false;
+  try { var r = await fetch('/api/frame-check?prefix=' + encodeURIComponent(ptPrefix())); var j = await r.json(); ok = !!(r.ok && j && j.ok && j.embed === true); PT.w.why = (j && j.reason) || ''; } catch(e){ ok = false; }
+  PT.w.checking = false; PT.w.frame = ok;
+  if(ok && PT.w.open) ptWRender();
+}
+function ptWToggle(){ PT.w.open = !PT.w.open; ptWRender(); if(PT.w.open) ptWCheck(); }
 async function ptWEdit(){
   if(typeof _currentRole === 'undefined' || _currentRole !== 'admin' || typeof blDialog !== 'function') return;
   var w = await ptWLoad();
   var inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box';
   var f = function(id, label, val, max, type){ return '<label class="bl-lbl" for="' + id + '" style="display:block;margin-top:8px">' + label + '</label>' + (type === 'area' ? '<textarea id="' + id + '" rows="3" maxlength="' + max + '" style="' + inCss + ';resize:vertical">' + ptEsc(val) + '</textarea>' : '<input id="' + id + '" type="' + (type || 'text') + '" maxlength="' + max + '" value="' + ptEsc(val) + '" style="' + inCss + '"' + (type === 'url' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://…"' : '') + '>'); };
   var body = '<div class="bl-hint">The red row under the managing agent’s numbers on the report page. It only links to the portal — nothing is shared with it. Clear the link to hide the row.</div>'
-    + f('pt-w-title', 'Title on the row', w.title, 50) + f('pt-w-sub', 'Line under the title', w.sub, 60) + f('pt-w-text', 'What it says when opened', w.text, 300, 'area') + f('pt-w-button', 'Wording on the button', w.button, 40) + f('pt-w-url', 'Link', w.url, 500, 'url');
-  var got = null, grab = function(){ var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; }; got = { title:g('pt-w-title'), sub:g('pt-w-sub'), text:g('pt-w-text'), button:g('pt-w-button'), url:g('pt-w-url') }; };
+    + f('pt-w-title', 'Title on the row', w.title, 50) + f('pt-w-sub', 'Line under the title', w.sub, 60) + f('pt-w-text', 'What it says when opened', w.text, 300, 'area') + f('pt-w-button', 'Wording on the button', w.button, 40) + f('pt-w-url', 'Link', w.url, 500, 'url')
+    + '<label for="pt-w-embed" style="display:flex;align-items:flex-start;gap:10px;margin-top:12px;min-height:44px;cursor:pointer"><input id="pt-w-embed" type="checkbox"' + (w.embed ? ' checked' : '') + ' style="width:20px;height:20px;flex:none;margin-top:2px;accent-color:var(--accent)"><span style="font:400 13px/1.5 var(--sans);color:var(--text2)"><b>Show the portal inside this page</b> when it allows that. Untick this if residents cannot stay logged in there — the row then only opens the portal in a new tab.</span></label>';
+  var got = null, grab = function(){ var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; }; got = { title:g('pt-w-title'), sub:g('pt-w-sub'), text:g('pt-w-text'), button:g('pt-w-button'), url:g('pt-w-url'), embed:!!(document.getElementById('pt-w-embed') || {}).checked }; };
   var res = await blDialog({ title:'Invoices and billing link', body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:grab }, { label:'Reset to WeconnectU', value:'reset' }, { label:'Cancel', value:false }] });
   if(res !== 'save' && res !== 'reset') return;
   var typedUrl = got ? String(got.url || '').trim() : '', val = res === 'reset' ? Object.assign({}, PT_W.def) : ptWClean(got);
@@ -12872,6 +13083,151 @@ async function ptWEdit(){
   catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
   ptEmSettings();
 }
+
+// ═══ Tracker look — the report page's design carried into the trustees' tracker ═══
+// Nothing about how the tracker works changes here: every field, button and id is the one the rest
+// of the app already uses. This file only (1) draws each ticket in the list as a card like the
+// issue cards on the report page, (2) lays the toolbar out in tidy rows, and (3) regroups the
+// ticket editor's fields into titled sections — Details · Reported by · On the report page ·
+// Photos and documents · Activity log — instead of a narrow side column. Styles are in tk.css.
+function tkEl(id){ return document.getElementById(id); }
+function tkEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+
+// ── A ticket in the list ────────────────────────────────────────────────────
+var TK_STEPS = ['open', 'awaiting_quote', 'awaiting_trustee_approval', 'work_in_progress', 'done', 'closed'];
+function tkStepsHtml(status){
+  var st = (typeof normalizeStatus === 'function') ? normalizeStatus(status) : status, cur = Math.max(0, TK_STEPS.indexOf(st));
+  var fin = cur >= TK_STEPS.indexOf('done');
+  return '<div class="tk-steps" aria-hidden="true">' + TK_STEPS.map(function(x, i){ return '<i class="' + (i <= cur ? (fin ? 'on fin' : 'on') : '') + '"></i>'; }).join('') + '</div>';
+}
+// x: what renderTickets has already worked out for this ticket (date, counts, pills).
+function tkCardHtml(t, x){
+  x = x || {};
+  var ttype = x.ttype || t.type || 'maintenance', action = ttype === 'action';
+  var st = (typeof normalizeStatus === 'function') ? normalizeStatus(t.status || 'open') : (t.status || 'open');
+  var pri = action ? '' : (t.priority || 'medium');
+  var pub = !action && typeof ptIsPublic === 'function' && ptIsPublic(t) && st !== 'closed';
+  var meta = [t.ticketNumber ? '#' + t.ticketNumber : '', action ? 'Action item' : (t.category || ''), t.unit ? 'Unit ' + t.unit : '', x.d || ''].filter(Boolean).map(tkEsc).join(' · ');
+  var chip = function(txt, cls, title){ return '<span class="tk-chip ' + cls + '"' + (title ? ' title="' + tkEsc(title) + '"' : '') + '>' + txt + '</span>'; };
+  var chips = (typeof tktStatusBadge === 'function' ? tktStatusBadge(t.status) : '')
+    + (pri === 'urgent' ? chip('🚨 Urgent', 'tk-chip-urgent') : pri === 'high' ? chip('High priority', 'tk-chip-high') : pri === 'low' ? chip('Low priority', 'tk-chip-low') : '')
+    + (pub ? chip('🌐 On the report page', 'tk-chip-pub', 'Residents can see this issue on the report page') : '')
+    + (x.awaitApprovalPill || '') + (x.subPill || '') + (x.duePill || '');
+  var foot = [];
+  if(!action && t.reporter) foot.push('<span>👤 ' + tkEsc(t.reporter) + '</span>');
+  if(action && t.reporter) foot.push('<span>👤 ' + tkEsc(t.reporter) + '</span>');
+  if(x.docCount) foot.push('<span class="tk-foot-docs">📎 ' + x.docCount + ' file' + (x.docCount !== 1 ? 's' : '') + '</span>');
+  if(x.logCount) foot.push('<span>💬 ' + x.logCount + ' note' + (x.logCount !== 1 ? 's' : '') + '</span>');
+  if(t.expectedBy && st !== 'closed' && st !== 'done') foot.push('<span>📅 expected ' + tkEsc(tkDay(t.expectedBy)) + '</span>');
+  return '<div class="tkt-card tk-card priority-' + (t.priority || 'medium') + ' status-' + (t.status || 'open') + ' type-' + ttype + (st === 'done' ? ' tk-done' : '') + (st === 'closed' ? ' tk-closed' : '') + '" role="button" tabindex="0" onclick="openTicketModal(\'' + t.id + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openTicketModal(\'' + t.id + '\')}">'
+    + '<div class="tk-card-main">'
+    +   '<div class="tk-card-meta">' + meta + '</div>'
+    +   '<div class="tk-card-title">' + tkEsc(t.title) + '</div>'
+    +   (t.desc ? '<div class="tk-card-desc">' + tkEsc(String(t.desc).slice(0, 160)) + '</div>' : '')
+    +   '<div class="tk-card-chips">' + chips + '</div>'
+    +   (action ? '' : tkStepsHtml(t.status))
+    +   (foot.length ? '<div class="tk-card-foot">' + foot.join('') + '</div>' : '')
+    +   (x.attHtml ? '<div class="tk-card-att">' + x.attHtml + '</div>' : '')
+    + '</div>'
+    + '<span class="tk-card-go" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>'
+    + '</div>';
+}
+function tkDay(v){ try { return new Date(String(v) + 'T12:00:00').toLocaleDateString('en-ZA', { day:'numeric', month:'short' }); } catch(e){ return v; } }
+
+// ── The toolbar: title and New on the first line, search, filters, then the tools ──
+function tkBuildBar(){
+  var panel = tkEl('panel-tickets'), search = tkEl('ticket-search'), chips = tkEl('tkt-filter-chips'), nb = tkEl('new-tkt-btn');
+  if(!panel || !search || !chips || !nb) return;
+  var bar = search.parentNode; if(!bar || bar.classList.contains('tk-bar')) return;
+  var title = bar.firstElementChild, tools = nb.parentNode;
+  if(!title || !tools || title === chips) return;
+  bar.classList.add('tk-bar'); bar.removeAttribute('style');
+  title.className = 'tk-bar-title'; title.removeAttribute('style'); title.innerHTML = '<span aria-hidden="true">🛠️</span> Tracker';
+  var top = document.createElement('div'); top.className = 'tk-bar-top';
+  top.appendChild(title); nb.removeAttribute('style'); nb.classList.add('tk-new'); top.appendChild(nb);
+  search.removeAttribute('style'); search.classList.add('tk-in', 'tk-search'); search.setAttribute('aria-label', 'Search the tracker');
+  chips.removeAttribute('style'); chips.classList.add('tk-bar-chips');
+  tools.removeAttribute('style'); tools.classList.add('tk-bar-tools');
+  ['ticket-sort', 'ticket-unit-filter'].forEach(function(id){ var s = tkEl(id); if(s){ s.removeAttribute('style'); s.classList.add('tk-in', 'tk-tool-select'); } });
+  var sort = tkEl('ticket-sort'), unit = tkEl('ticket-unit-filter'); if(sort) sort.setAttribute('aria-label', 'Sort tickets'); if(unit) unit.setAttribute('aria-label', 'Filter by unit');
+  bar.appendChild(top); bar.appendChild(search); bar.appendChild(chips); bar.appendChild(tools);
+  var stats = tkEl('ticket-stats'); if(stats){ stats.classList.add('tk-stats'); }
+  var list = tkEl('ticket-list'); if(list) list.classList.add('tk-list');
+}
+
+// ── The ticket editor: fields regrouped into titled sections ────────────────
+function tkSection(id, icon, title){
+  var s = document.createElement('section'); s.className = 'tk-sec'; s.id = id;
+  s.innerHTML = '<div class="tk-sec-h"><span class="tk-sec-ic" aria-hidden="true">' + icon + '</span><span class="tk-sec-t">' + title + '</span><span class="tk-sec-x"></span></div><div class="tk-sec-b"></div>';
+  return s;
+}
+function tkField(el, label){        // the field's own wrapper: its first line becomes the label
+  var w = el.parentNode; w.removeAttribute('style'); w.classList.add('tk-f');
+  var l = w.firstElementChild;
+  if(l && l !== el && l.tagName === 'DIV'){ var lab = document.createElement('label'); lab.className = 'tk-l'; lab.setAttribute('for', el.id); lab.textContent = label || l.textContent.trim(); w.replaceChild(lab, l); }
+  tkInput(el);
+  return w;
+}
+function tkInput(el){ if(!el) return; el.removeAttribute('style'); el.classList.add('tk-in'); }
+function tkBuildEditor(){
+  var card = tkEl('ticket-modal-card'), two = tkEl('tkt-two-col');
+  if(!card || !two || card.classList.contains('tk')) return;
+  var need = ['tkt-title', 'tkt-desc', 'tkt-status', 'tkt-priority', 'tkt-category', 'tkt-unit', 'tkt-reporter', 'tkt-reporter-phone', 'tkt-reporter-email', 'tkt-date-open', 'tkt-date-close', 'tkt-doc-carousel', 'tkt-log-toggle', 'tkt-note-input'];
+  if(need.some(function(id){ return !tkEl(id); })) return;          // an unexpected page: leave the old layout alone
+  card.classList.add('tk');
+  var head = card.firstElementChild; if(head) head.classList.add('tk-head');
+  // description
+  var desc = tkEl('tkt-desc'), dw = desc.parentNode; dw.removeAttribute('style'); dw.classList.add('tk-sec', 'tk-desc');
+  if(dw.firstElementChild && dw.firstElementChild !== desc){ var dh = dw.firstElementChild; dh.removeAttribute('style'); dh.className = 'tk-sec-h'; dh.innerHTML = '<span class="tk-sec-ic" aria-hidden="true">📝</span><label class="tk-sec-t" for="tkt-desc">Description</label>'; }
+  tkInput(desc);
+  // details
+  var details = tkSection('tk-sec-details', '🗂️', 'Details'), grid = document.createElement('div'); grid.className = 'tk-grid';
+  [['tkt-status', 'Status'], ['tkt-priority', 'Priority'], ['tkt-category', 'Category'], ['tkt-unit', 'Unit number'], ['tkt-date-open', 'Date opened'], ['tkt-date-close', 'Date closed']].forEach(function(f){ grid.appendChild(tkField(tkEl(f[0]), f[1])); });
+  var ra = grid.querySelector('#tkt-reqappr-wrap');     // (the grid is not in the page yet, so look inside it)
+  if(ra){ ra.style.marginTop = ''; ra.classList.add('tk-wide'); grid.appendChild(ra); }
+  details.lastElementChild.appendChild(grid);
+  // reported by
+  var rep = tkSection('tk-sec-reporter', '👤', 'Reported by'), rgrid = document.createElement('div'); rgrid.className = 'tk-grid';
+  var anon = tkEl('tkt-anonymous-label'); if(anon){ anon.removeAttribute('style'); anon.className = 'tk-anon'; rep.firstElementChild.lastElementChild.appendChild(anon); }
+  [['tkt-reporter', 'Name'], ['tkt-reporter-phone', 'Phone'], ['tkt-reporter-email', 'Email']].forEach(function(f){
+    var el = tkEl(f[0]), w = document.createElement('div'); w.className = 'tk-f';
+    var lab = document.createElement('label'); lab.className = 'tk-l'; lab.setAttribute('for', f[0]); lab.textContent = f[1];
+    w.appendChild(lab); w.appendChild(el); tkInput(el); rgrid.appendChild(w);
+  });
+  rep.lastElementChild.appendChild(rgrid);
+  ['tkt-link-user-row', 'tkt-linked-user-row'].forEach(function(id){ var r = tkEl(id); if(r) rep.lastElementChild.appendChild(r); });
+  // on the report page (filled by pt.js)
+  var pub = tkSection('tk-sec-public', '🌐', 'On the report page'); pub.lastElementChild.id = 'tk-public-body';
+  var old = tkEl('pt-tkt-block'); if(old){ old.removeAttribute('style'); pub.lastElementChild.appendChild(old); }
+  // photos and documents
+  var docs = tkSection('tk-sec-docs', '📎', 'Photos and documents'), db = tkEl('tkt-doc-carousel').parentNode;
+  db.removeAttribute('style'); if(db.firstElementChild && db.firstElementChild.id !== 'tkt-doc-carousel') db.removeChild(db.firstElementChild);
+  var ds = tkEl('tkt-doc-search'); if(ds){ tkInput(ds); ds.setAttribute('aria-label', 'Search documents to link'); }
+  docs.lastElementChild.appendChild(db);
+  // activity log
+  var log = document.createElement('section'); log.className = 'tk-sec'; log.id = 'tk-sec-log';
+  var lb = tkEl('tkt-log-toggle').parentNode; lb.removeAttribute('style'); log.appendChild(lb); tkInput(tkEl('tkt-note-input'));
+  var sup = tkEl('tkt-suppliers-section'), rat = tkEl('tkt-rating-section'), sa = tkEl('tkt-supplier-add'); if(sa) tkInput(sa);
+  var order = [details, rep, pub, docs, sup, rat, log].filter(Boolean);
+  while(two.firstChild) two.removeChild(two.firstChild);
+  order.forEach(function(n){ two.appendChild(n); });
+  two.classList.add('tk-body');
+}
+// ── The action-item screen and the "what are you adding" chooser: same look, by class only ──
+function tkBuildAction(){
+  var m = tkEl('action-modal'); if(m && m.firstElementChild && tkEl('act-title') && tkEl('act-desc')){
+    m.classList.add('tk-act'); var card = m.firstElementChild; card.classList.add('tk-act-card');
+    if(card.children[0]) card.children[0].classList.add('tk-act-head');
+    if(card.children[1]){ card.children[1].classList.add('tk-act-body'); Array.prototype.forEach.call(card.children[1].children, function(c){ c.classList.add('tk-act-sec'); }); }
+    ['act-desc', 'act-owner', 'act-due', 'act-meeting', 'act-note-input'].forEach(function(id){ var e = tkEl(id); if(e){ e.removeAttribute('style'); e.classList.add('tk-in'); } });
+    var note = tkEl('act-note-input'); if(note && note.parentNode) note.parentNode.classList.add('tk-act-note');
+    var grid = tkEl('act-owner'); grid = grid && grid.parentNode && grid.parentNode.parentNode; if(grid) grid.classList.add('tk-act-grid');
+    var x = card.querySelector('button[onclick^="closeActionItemModal"]'); if(x){ x.setAttribute('aria-label', 'Close'); x.classList.add('tk-act-x'); }
+  }
+  var c = tkEl('tracker-type-chooser'); if(c) c.classList.add('tk-choose');
+}
+function tkInstall(){ try { tkBuildBar(); } catch(e){ console.warn('tkBuildBar', e); } try { tkBuildEditor(); } catch(e){ console.warn('tkBuildEditor', e); } try { tkBuildAction(); } catch(e){ console.warn('tkBuildAction', e); } }
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tkInstall); else tkInstall();
 
 </script>
 
@@ -13432,8 +13788,8 @@ async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
         <option value="">All units</option>
       </select>
       <span id="tkt-view-toggle" style="display:none;gap:0;border:1px solid var(--border2);border-radius:9px;overflow:hidden">
-        <button id="tkt-view-list" class="tkt-vt active" onclick="setTktView('list')" title="List view">\u2630</button>
-        <button id="tkt-view-board" class="tkt-vt" onclick="setTktView('board')" title="Board view (drag cards between statuses)">\u25a5</button>
+        <button id="tkt-view-list" class="tkt-vt active" onclick="setTktView('list')" title="List view" aria-label="List view">☰</button>
+        <button id="tkt-view-board" class="tkt-vt" onclick="setTktView('board')" title="Board view (drag cards between statuses)" aria-label="Board view">▥</button>
       </span>
       <button id="tkt-overview-btn" onclick="shareOverview()" title="Share a read-only overview of all open tickets" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">🔗 Share overview</button>
       <button id="tkt-export-btn" onclick="exportTicketsExcel()" title="Export open tickets, sub-tickets &amp; quotes to Excel" style="display:none;padding:8px 14px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;color:var(--text2);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;white-space:nowrap">⬇ Export</button>
@@ -21926,33 +22282,7 @@ function renderTickets(){
         subPill = '<span title="' + _kids.length + ' sub-ticket' + (_kids.length!==1?'s':'') + ', ' + _kd + ' done" style="font-size:9px;font-family:var(--mono);font-weight:600;color:' + (_allDone?'#4ade9e':'#8aa0bd') + ';background:' + (_allDone?'var(--green-bg)':'rgba(138,160,189,.1)') + ';border:1px solid ' + (_allDone?'var(--green-bd)':'rgba(138,160,189,.25)') + ';padding:1px 7px;border-radius:9px;white-space:nowrap">🧩 ' + _kd + '/' + _kids.length + ' sub</span>';
       }
     }
-    return '<div class="tkt-card priority-'+(t.priority||'medium')+' status-'+(t.status||'open')+' type-'+ttype+'" onclick="openTicketModal(\''+t.id+'\''+')">'
-      +'<div style="flex:1;min-width:0">'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px">'
-          +typeBadge
-          +(t.ticketNumber?'<span style="font-size:10px;color:var(--accent2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;font-weight:600">#'+t.ticketNumber+'</span>':'')
-          +tktStatusBadge(t.status)
-          +awaitApprovalPill
-          +subPill
-          +duePill
-          +(t.createdViaPublicForm?'<span class="tkt-type-badge tkt-type-a" title="Submitted via the public report form">🌐 Public</span>':'')
-          +(t.category?'<span style="font-size:10px;color:var(--muted);font-family:var(--sans);background:var(--surface2);border:1px solid var(--border);padding:2px 9px;border-radius:99px;white-space:nowrap">'+escHtml(t.category)+'</span>':'')
-          +(t.unit?'<span style="font-size:10px;color:#5a7fa8;font-family:var(--sans);background:rgba(90,127,168,.1);border:1px solid rgba(90,127,168,.25);padding:2px 9px;border-radius:99px;white-space:nowrap">Unit '+escHtml(t.unit)+'</span>':'')
-        +'</div>'
-        +'<div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(t.title)+'</div>'
-        +(t.desc?'<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(t.desc.slice(0,80))+'</div>':'')
-        +'<div style="display:flex;gap:14px;margin-top:8px;font-size:11px;font-family:var(--sans);color:var(--muted);flex-wrap:wrap">'
-          +'<span>📅 '+d+'</span>'
-          +(ttype !== 'action' && t.reporter?'<span>👤 '+escHtml(t.reporter)+'</span>':'')
-          +(docCount?'<span style="color:var(--accent2)">📎 '+docCount+' doc'+(docCount!==1?'s':'')+'</span>':'')
-          +(logCount?'<span>💬 '+logCount+' note'+(logCount!==1?'s':'')+'</span>':'')
-        +'</div>'
-        +(attHtml?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">'+attHtml+'</div>':'')
-      +'</div>'
-      +'<div style="text-align:right;flex-shrink:0">'
-        +rightPill
-      +'</div>'
-    +'</div>';
+    return tkCardHtml(t, { ttype:ttype, d:d, docCount:docCount, logCount:logCount, awaitApprovalPill:awaitApprovalPill, subPill:subPill, duePill:duePill, attHtml:attHtml });
   }).join('')
   + (_archHidden ? '<div style="text-align:center;padding:10px;font-size:11px;color:var(--muted);font-family:var(--sans);cursor:pointer;text-decoration:underline" onclick="_showArchivedClosed=true;renderTickets()">Show ' + _archHidden + ' archived (closed over 90 days ago)</div>' : '');
 }

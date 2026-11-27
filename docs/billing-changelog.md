@@ -1,5 +1,22 @@
 # Billing changelog
 
+## v2.38 — The tracker in the report page's look, and WeconnectU inside the app
+**The tracker tab**
+- The top of the tab is laid out in four tidy rows: the title with the **New** button, the search box, the status chips, then sort / unit filter / list-or-board / Share overview / Export / Readings. On a phone the chips and tools scroll sideways instead of wrapping into a pile.
+- The summary cards and the ticket list use the report page's cards: rounded, bordered, a soft shadow, and a coloured edge (teal, amber for high, red for urgent, green for done and closed, blue for an action item).
+- Each ticket card reads top to bottom: number · category · unit · date, the title, one line of the description, the status with Urgent / High / Low and **On the report page** chips, a six-step progress strip (Reported › Quotes › Approval › In progress › Done › Closed), then who reported it, files, notes and the expected date. "Your approval needed" and the other prompts are unchanged.
+
+**The ticket screen**
+- Same fields, same behaviour, regrouped into titled cards on the page colour: **Description**, Sub-tickets, the approval / next-step panel, **Details** (status, priority, category, unit, date opened, date closed, and the "requires quotes & trustee approval" tick on its own line), **Reported by** (name, phone, email, Anonymous), **On the report page** (visible to everyone, expected by, photos, me-too, public updates and reply), **Photos and documents**, suppliers, rating and the **Activity log**.
+- Every field has the same height, corners and type as the report page; the small typewriter-style labels are gone. Camera / Gallery / Audio sit side by side. On a phone the screen is full width, scrolls as one page and the header buttons share one row.
+- The **action item** screen, the "What are you adding?" chooser and the New ticket / New action item sheets have the same fields, labels and cards.
+- Nothing about saving, statuses, approvals, sub-tickets, suppliers or emails was changed — this is layout and styling only (`tk.js`, `tk.css`).
+
+**Davies invoices and billing: WeconnectU inside the page**
+- Opening the row now tries to show the WeconnectU login inside the report page, so the resident stays in the Park Manor app. A new function, `/api/frame-check`, first asks WeconnectU's server whether it allows being shown inside another site (`X-Frame-Options` / `frame-ancestors`). If it does not, or the check fails, the row shows the **Log in to WeconnectU** button exactly as in v2.37 — no blank box.
+- **Settings → Invoices and billing link on the report page → Edit link → "Show it inside the app when the site allows it"** switches the embedding off altogether; the button is always there as well.
+- Nothing typed into WeconnectU passes through or is stored by this app; the frame is WeconnectU's own page.
+
 ## v2.37 — Davies invoices and billing: a link to WeconnectU
 - New row on the report page, directly under Davies contact numbers: **Davies invoices and billing — Log in to WeconnectU**. It is in WeconnectU's red, blue and white (red row, blue icon tile and button, white text).
 - It opens in place like the other rows: "For your Davies invoices, statements and billing, please log in to WeconnectU", and a **Log in to WeconnectU** button that opens https://app.weconnectu.co.za/signin in a new tab. It is only a link; nothing is sent to or read from WeconnectU.
