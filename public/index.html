@@ -13490,8 +13490,8 @@ function taRender(){
   }
   sign.innerHTML = '';
   var n = TA.list ? TA.list.length : 0, mine = taMineCount(), isTrustee = s.role === 'trustee';
-  var sub = TA.list == null ? 'Quotes and proposals waiting for the trustees' : !n ? (TA.done.length ? 'Nothing is waiting · ' + TA.done.length + ' approved' : 'Nothing is waiting') : (isTrustee && mine ? mine + ' waiting for your approval' : n + ' awaiting approval');
-  var h = ptRowHtml({ id:'ta-row', kind:'ta', icon:'🗳', title:'Approvals', sub:sub, open:TA.open, controls:'ta-body', onclick:'taToggle()' });
+  var sub = TA.list == null ? 'Quotes and proposals for the trustees' : !n ? (TA.done.length ? 'Nothing is waiting · ' + TA.done.length + ' approved' : 'Nothing is waiting') : (isTrustee && mine ? mine + ' waiting for your approval' : n + ' awaiting approval');
+  var h = ptRowHtml({ id:'ta-row', kind:'ta', icon:'🗳', title:'Awaiting approval', sub:sub, open:TA.open, controls:'ta-body', onclick:'taToggle()' });
   if(TA.open){
     h += '<div id="ta-body" style="margin-top:10px"><div class="ta-bar"><span>Signed in as <b>' + taEsc(s.name) + '</b>' + ' · ' + TA_ROLES[s.role] + '</span><span><button type="button" class="ta-link" onclick="taLoad()">↻ Refresh</button> <button type="button" class="ta-link" onclick="taSignOut()">Sign out</button></span></div>';
     if(TA.msg) h += '<div id="ta-msg" role="status" aria-live="polite" class="ta-msg ' + (TA.msg.kind === 'err' ? 'err' : 'ok') + '">' + taEsc(TA.msg.text) + '</div>';

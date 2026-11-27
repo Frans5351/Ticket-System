@@ -1,5 +1,8 @@
 # Billing changelog
 
+## v2.45 — "Approvals" on the report page is now "Awaiting approval"
+- The purple row a signed-in trustee sees on the report page is titled **Awaiting approval** instead of "Approvals", so it reads as things still waiting for a decision. Nothing else about it changed.
+
 ## v2.44 — A new status: On hold
 - **On Hold** is a new ticket status for something that is parked for now — not closed, not being worked on. Choose it in the ticket's Status list from any other status.
 - **While a ticket is on hold it is off the report page** ("Current issues logged") **and off the trustees' Approvals list** there. Residents cannot add updates or "Me too" to it in the meantime. Nothing is lost: its quotes, proposals, approvals, photos and log are kept.
