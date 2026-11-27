@@ -1,5 +1,24 @@
 # Billing changelog
 
+## v2.42 — One log per ticket: activity log and report-page updates together
+**In the ticket editor**
+- The **Activity log** now lists everything in one place, newest first: the trustees' own entries *and* whatever came in through the report page (a resident's update, "this has been fixed", a public reply). The separate "Updates" list and "Public reply" box under *On the report page* are gone; a short note there says how many updates residents see and jumps to the log.
+- Every entry has a tick **Show on the report page**, the same idea as the photos:
+  - an activity-log entry is **not** shown to residents unless a trustee ticks it;
+  - anything sent in through the report page arrives **already ticked**; unticking hides it from residents but keeps it in the log (greyed).
+- Under the note box: **Also show this note on the report page** — one step to add a note and publish it.
+- Entries that are on the report page have a teal edge and an "on the report page" / "from the report page" tag. The line at the top says how many of the entries residents can see, and whether the ticket itself is on the report page at all.
+- Editing or deleting a ticked entry (admin) updates or removes what residents see as well.
+
+**Timeline**
+- The Timeline button works as before, and **everything that is on the report page is on the timeline automatically** — residents' updates, "reported fixed", and ticked log entries — in date order with the ticket's other events. A hidden update drops off the timeline too.
+- "Show on timeline" on an internal entry still works on its own (on the timeline, not on the report page). An entry that is on the report page shows that tick as on and locked; nothing appears twice.
+- A closed or private ticket keeps its report-page history in its log and on its timeline.
+
+**Underneath (nothing to migrate)**
+- Storage is unchanged: the log stays on the ticket, the public side stays in its own `tpub:` row, so a resident's update and a trustee's save still cannot overwrite each other. A ticked log entry gets an id (`pid`) and its text is kept on the public side under that id.
+- `functions/public-tickets.js`: new signed-in actions `publish`, `unpublish`, `hide`, `unhide`, and `GET ?one=<ticket>` (one ticket's public side for the editor, any status). Hidden updates are never sent to the public list. Existing tickets, updates and logs appear as they are: old log entries unticked, old report-page updates ticked.
+
 ## v2.41 — Usage: is the report page being used?
 **New "Usage" item in the main app** (menu, for admin and trustees)
 - Six totals: devices that have opened the report page, active in the last 7 days, visits in the last 7 and 30 days, how many use the home-screen icon, and how many units are recognised.

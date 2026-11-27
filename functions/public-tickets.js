@@ -92,7 +92,12 @@ function shape(id, prefix, d, pub, staffView) {
     closed: status === "closed" ? closedAt(d) : 0,
     desc: clean(d.desc, 1200),
     fixed: !finished && p.fixed ? { at: Number(p.fixed.at) || 0, by: clean(p.fixed.by, 60) } : null,
-    updates: (Array.isArray(p.updates) ? p.updates : []).slice(-MAX_UPDATES).map((u) => ({ ts: Number(u.ts) || 0, text: clean(u.text, 600), by: clean(u.by, 60), role: u.role === "trustee" ? "trustee" : "resident", kind: u.kind === "fixed" || u.kind === "notfixed" ? u.kind : "" })),
+    // An update a trustee has hidden is kept (it is part of the ticket's history) but only signed-in staff get it back.
+    updates: (Array.isArray(p.updates) ? p.updates : []).filter((u) => u && (staffView || !u.hidden)).slice(-MAX_UPDATES).map((u) => {
+      const o = { ts: Number(u.ts) || 0, text: clean(u.text, 600), by: clean(u.by, 60), role: u.role === "trustee" ? "trustee" : "resident", kind: u.kind === "fixed" || u.kind === "notfixed" ? u.kind : "" };
+      if (staffView) { if (u.hidden) o.hidden = true; if (u.ref) o.ref = clean(u.ref, 40); }
+      return o;
+    }),
     metoo: metoo.length,
     expected: finished ? "" : validDay(d.expectedBy),
     photos: (() => { const after = (Array.isArray(d.afterPhotos) ? d.afterPhotos : []).map(String); return publicPhotoIds(d).map((x) => ({ id: x, after: after.includes(x) })); })(),
@@ -179,6 +184,17 @@ export default async function handler(req) {
     const q = new URL(req.url).searchParams;
     const prefix = q.get("prefix") || "";
     if (!validPrefix(prefix)) return errorResponse(400, "bad prefix");
+    // One ticket's public side for the editor and the timeline — any status, public or not. Staff only.
+    if (q.has("one")) {
+      const one = q.get("one") || "";
+      if (!/^[\w.-]{3,80}$/.test(one)) return errorResponse(400, "ticket missing");
+      if (!staff(cfg, req.headers.get("x-pm-session") || "").ok) return errorResponse(401, "Please sign out and sign in again, then retry.");
+      try {
+        const rows = await supa(cfg, "/rest/v1/tickets?id=eq." + encodeURIComponent(prefix + one) + "&select=id,data&limit=1");
+        const d1 = rows && rows[0] && rows[0].data; if (!d1) return errorResponse(404, "No such ticket.");
+        return jsonResponse(200, { ok: true, ticket: shape(prefix + one, prefix, d1, await loadPub(cfg, prefix + one), true) });
+      } catch (e) { return errorResponse(502, "Could not load the updates: " + e.message); }
+    }
     if (q.has("photo")) { try { return await servePhoto(cfg, prefix, q.get("photo") || "", q.get("p") || "", q.get("size") === "thumb" ? "thumb" : "full"); } catch (e) { return noPhoto(); } }
     try { return await list(cfg, prefix, isStaffView(cfg, req.headers.get("x-pm-session") || "")); } catch (e) { return errorResponse(502, "Could not load the issues: " + e.message); }
   }
@@ -187,8 +203,11 @@ export default async function handler(req) {
   if (body.website) return jsonResponse(200, { ok: true });                         // honeypot: pretend it worked
   const prefix = String(body.prefix || ""), id = String(body.id || ""), action = String(body.action || "");
   if (!validPrefix(prefix) || !/^[\w.-]{3,80}$/.test(id)) return errorResponse(400, "ticket missing");
-  if (!["comment", "fixed", "reply", "notfixed", "metoo", "unmetoo"].includes(action)) return errorResponse(400, "unknown action");
-  const isStaffAction = action === "reply" || action === "notfixed";
+  // publish / unpublish: a trustee ticks an activity-log entry to show (or stop showing) on the report page.
+  // hide / unhide: a trustee takes an update that came through the report page off it, or puts it back.
+  const isCurate = ["publish", "unpublish", "hide", "unhide"].includes(action);
+  if (!isCurate && !["comment", "fixed", "reply", "notfixed", "metoo", "unmetoo"].includes(action)) return errorResponse(400, "unknown action");
+  const isStaffAction = isCurate || action === "reply" || action === "notfixed";
   let who = { name: "" };
   if (isStaffAction) { who = staff(cfg, body.token); if (!who.ok) return errorResponse(401, who.error); }
   const text = clean(body.text, 600), name = clean(body.name, 60);
@@ -200,6 +219,31 @@ export default async function handler(req) {
     const rows = await supa(cfg, "/rest/v1/tickets?id=eq." + encodeURIComponent(rowId) + "&select=id,data&limit=1");
     d = rows && rows[0] && rows[0].data;
   } catch (e) { return errorResponse(502, "Could not load the issue: " + e.message); }
+  if (isCurate) {
+    if (!d) return errorResponse(404, "No such ticket.");
+    let cp; try { cp = await loadPub(cfg, rowId); } catch (e) { return errorResponse(502, "Could not load the updates: " + e.message); }
+    cp.updates = (Array.isArray(cp.updates) ? cp.updates : []).filter(Boolean);
+    const ref = String(body.ref || ""), ts = Number(body.ts) || 0;
+    if (action === "publish") {
+      if (!/^[\w-]{4,40}$/.test(ref) || text.length < 1) return errorResponse(400, "Nothing to show.");
+      const at = ts > 0 && ts <= Date.now() + 60000 ? ts : Date.now(), ex = cp.updates.find((u) => u.ref === ref);
+      if (ex) { ex.text = text; ex.ts = at; delete ex.hidden; }
+      else {
+        if (cp.updates.length >= MAX_UPDATES) return errorResponse(429, "This issue already has the most updates the report page shows — take one off first.");
+        cp.updates.push({ ts: at, text, by: who.name || name || "Trustees", role: "trustee", ref });
+      }
+      cp.updates.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+    } else if (action === "unpublish") {
+      if (!/^[\w-]{4,40}$/.test(ref)) return errorResponse(400, "Nothing to take off.");
+      cp.updates = cp.updates.filter((u) => u.ref !== ref);
+    } else {
+      const u = cp.updates.find((x) => Number(x.ts) === ts && !x.ref);
+      if (!u) return errorResponse(404, "That update is no longer there.");
+      if (action === "hide") u.hidden = true; else delete u.hidden;
+    }
+    try { await savePub(cfg, rowId, cp); } catch (e) { return errorResponse(502, "Could not save: " + e.message); }
+    return jsonResponse(200, { ok: true, ticket: shape(rowId, prefix, d, cp, true) });
+  }
   if (!d || !isPublic(d)) return errorResponse(404, "That issue is not on the public list.");
   if (normStatus(d.status) === "closed") return errorResponse(409, "This issue is closed. If the problem is back, please log a new report.");
   if (normStatus(d.status) === "done" && (action === "metoo" || action === "fixed")) return errorResponse(409, "The trustees have already marked this one as done. If it is not right, add an update to say so.");
@@ -254,5 +298,5 @@ export default async function handler(req) {
       });
     } catch (e) { console.warn("public-tickets: notify failed", e.message); }
   }
-  return jsonResponse(200, { ok: true, ticket: shape(rowId, prefix, d, pub) });
+  return jsonResponse(200, { ok: true, ticket: shape(rowId, prefix, d, pub, isStaffAction) });
 }

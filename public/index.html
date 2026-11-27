@@ -12691,12 +12691,14 @@ function ptTktRender(id){
   if(t && id && (t.type || 'maintenance') === 'maintenance' && !t.parentId) h += ptTktExtraHtml(t, pub, can);
   if(p && p.fixed) h += '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--green-bd,rgba(74,222,158,.4));background:var(--green-bg,rgba(74,222,158,.12));font:400 13px/1.5 var(--sans);color:var(--text2)"><b style="color:var(--green,#1e9e6a)">✓ ' + ptEsc(p.fixed.by || 'A resident') + ' reported this fixed on ' + ptEsc(ptDay(p.fixed.at)) + '.</b> Close the ticket to confirm.' + (can ? ' <button type="button" onclick="ptTktAct(\'notfixed\')" style="display:block;margin-top:8px;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 12.5px var(--sans);cursor:pointer">Not fixed yet</button>' : '') + '</div>';
   if(p && p.metoo) h += '<div id="pt-tkt-metoo" style="margin-top:10px;padding:8px 12px;border-radius:10px;border:1px solid var(--accent-bd,rgba(31,168,152,.45));background:var(--accent-bg,rgba(31,168,152,.1));font:400 13px/1.5 var(--sans);color:var(--text2)"><b>🙋 Me too: ' + p.metoo + ' other resident' + (p.metoo > 1 ? 's have' : ' has') + ' this as well</b>' + (p.metooUnits && p.metooUnits.length ? ' — unit' + (p.metooUnits.length > 1 ? 's ' : ' ') + p.metooUnits.map(ptEsc).join(', ') + (p.metooUnits.length < p.metoo ? ' and others' : '') : '') + '</div>';
-  if(p) h += ptUpdatesHtml(p);
-  if(id && pub && can && t && t.status !== 'closed') h += '<div style="display:flex;gap:6px;margin-top:10px"><input id="pt-tkt-reply" type="text" maxlength="600" placeholder="Public reply — everyone on the report page sees this" style="flex:1;min-width:0;padding:8px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:400 13px var(--sans);outline:none"><button type="button" onclick="ptTktAct(\'reply\')" style="min-height:40px;padding:6px 12px;border-radius:7px;border:none;background:var(--accent);color:#fff;font:700 12.5px var(--sans);cursor:pointer;white-space:nowrap">Post</button></div><div id="pt-tkt-msg" style="font:400 12px var(--sans);color:var(--red,#d9534f);margin-top:4px"></div>';
+  // Updates are no longer a separate list here: they are in the Activity log below, one list (ul.js).
+  if(id && t){ var n = p && p.updates ? p.updates.filter(function(u){ return !u.hidden; }).length : 0;
+    h += '<div id="pt-tkt-upd" style="margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--surface2);font:400 13px/1.5 var(--sans);color:var(--text2)"><b>💬 Updates residents see: ' + n + '</b><br>They are in the <b>Activity log</b> below — every entry marked “on the report page”. Tick “Show on the report page” on a log entry to add it, or untick one to take it off.' + (can ? ' <button type="button" onclick="ptTktGoLog()" style="display:block;margin-top:8px;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 12.5px var(--sans);cursor:pointer">Open the activity log</button>' : '') + '</div><div id="pt-tkt-msg" style="font:400 12px var(--sans);color:var(--red,#d9534f);margin-top:4px"></div>'; }
   var typing = document.getElementById('pt-tkt-reply'), keep = typing ? typing.value : '';
   b.innerHTML = h;
   if(keep){ var again = document.getElementById('pt-tkt-reply'); if(again) again.value = keep; }
 }
+function ptTktGoLog(){ var body = document.getElementById('tkt-log-body'), tog = document.getElementById('tkt-log-toggle'); if(body && tog && (body.style.display === 'none' || getComputedStyle(body).display === 'none')) tog.click(); var inp = document.getElementById('tkt-note-input'); if(tog && tog.scrollIntoView) tog.scrollIntoView({ behavior:'smooth', block:'start' }); if(inp) setTimeout(function(){ try { inp.focus({ preventScroll:true }); } catch(e){} }, 350); }
 // Expected date and photo choices live on the ticket itself (expectedBy, publicPhotos, afterPhotos).
 function ptTktImages(t){
   if(typeof INVOICES === 'undefined') return [];
@@ -12766,7 +12768,7 @@ async function ptTktAct(action){
   if(action === 'reply' && text.length < 2){ if(el) el.focus(); return; }
   var who = (typeof _currentUserObj !== 'undefined' && _currentUserObj && (_currentUserObj.name || _currentUserObj.username)) || '';
   var j = await ptPost({ id:id, action:action, text:action === 'reply' ? text : '', name:who });
-  if(j.ok){ ptPut(j.ticket); if(PT.list && !PT.list.some(function(x){ return x.id === id; })) PT.list.push(j.ticket); ptTktRender(id); ptBanner(); }
+  if(j.ok){ ptPut(j.ticket); if(PT.list && !PT.list.some(function(x){ return x.id === id; })) PT.list.push(j.ticket); ptTktRender(id); ptBanner(); if(typeof ulTake === 'function'){ ulTake(j.ticket); ulRefresh(id); } }
   else { var m = document.getElementById('pt-tkt-msg'); if(m) m.textContent = j.error || 'That didn’t go through.'; }
 }
 // Tracker banner: tickets residents say are fixed, waiting for a trustee to confirm.
@@ -13241,6 +13243,155 @@ async function ptWEdit(){
   catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
   ptEmSettings();
 }
+
+// ═══ One log per ticket ═════════════════════════════════════════════════════════════════════════
+// The ticket's activity log and the updates on the report page are shown as ONE list in the editor.
+//   • An activity-log entry is internal until a trustee ticks "Show on the report page" (like a photo).
+//   • Anything that came in through the report page (a resident's update, "this has been fixed") is
+//     in the list already ticked; unticking hides it from residents but keeps it here.
+//   • Everything that is on the report page is on the timeline automatically.
+// Storage is unchanged underneath: the log stays on the ticket, the public side stays in its own
+// "tpub" row (so a resident's update and a trustee's save can never overwrite each other). A ticked
+// log entry gets an id (pid) and a copy of its text is kept on the public side under that id.
+var UL = { one:{}, loading:{}, syncT:null };
+function ulEl(id){ return document.getElementById(id); }
+function ulEsc(s){ return (typeof ptEsc === 'function') ? ptEsc(s) : String(s == null ? '' : s); }
+function ulCan(){ return typeof ptCanManage === 'function' && ptCanManage(); }
+function ulWho(){ return (typeof _currentUserObj !== 'undefined' && _currentUserObj && (_currentUserObj.name || _currentUserObj.username)) || ''; }
+function ulPub(id){ return UL.one[id] || ((typeof PT !== 'undefined' && PT.list) ? PT.list.filter(function(x){ return x.id === id; })[0] : null) || null; }
+function ulTake(ticket){ if(!ticket || !ticket.id) return; UL.one[ticket.id] = ticket; try { if(typeof ptPut === 'function') ptPut(ticket); } catch(e){} }
+async function ulLoad(id){
+  if(!id || UL.loading[id]) return; UL.loading[id] = true;
+  try {
+    var tok = (typeof getSessionToken === 'function') ? (getSessionToken() || '') : '';
+    var r = await fetch('/api/public-tickets?prefix=' + encodeURIComponent(ptPrefix()) + '&one=' + encodeURIComponent(id), { headers:{ 'X-PM-Session':tok } });
+    var j = await r.json(); if(r.ok && j && j.ok && j.ticket) UL.one[id] = j.ticket;
+  } catch(e){}
+  UL.loading[id] = false;
+  ulRefresh(id);
+}
+function ulRefresh(id){
+  if(typeof _currentTicketId === 'undefined' || _currentTicketId !== id || typeof TICKETS === 'undefined' || !TICKETS[id]) return;
+  try { renderTicketLog(TICKETS[id]); } catch(e){}
+  try { if(typeof refreshTimelineForTicket === 'function') refreshTimelineForTicket(id); } catch(e){}
+  try { if(typeof ptTktRender === 'function' && PT.tktId === id) ptTktRender(id); } catch(e){}
+}
+// The merged list, newest first: log entries (with whether each is on the report page) + what came through the report page.
+function ulMerged(t){
+  var p = ulPub(t.id), ups = (p && p.updates) || [], byRef = {}, log = t.log || [];
+  ups.forEach(function(u){ if(u.ref) byRef[u.ref] = u; });
+  var rows = log.map(function(e, i){ return { src:'log', i:i, e:e, ts:e.ts || 0, pub:p ? !!(e.pid && byRef[e.pid]) : !!e.pub }; });
+  ups.forEach(function(u){ if(u.ref && log.some(function(e){ return e.pid === u.ref; })) return; rows.push({ src:'pub', u:u, ts:u.ts || 0 }); });
+  return rows.sort(function(a, b){ return b.ts - a.ts; });
+}
+function ulWhen(ts){ try { return new Date(ts).toLocaleDateString('en-ZA', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); } catch(e){ return ''; } }
+function ulTick(on, onchange, label, cls){ return '<label class="ul-tick' + (cls ? ' ' + cls : '') + '"><input type="checkbox"' + (on ? ' checked' : '') + ' onchange="' + onchange + '"><span>' + label + '</span></label>'; }
+function ulRender(t){
+  var el = ulEl('tkt-log'); if(!el || !t) return;
+  var rows = ulMerged(t), can = ulCan(), isAdmin = (typeof _currentRole !== 'undefined' && _currentRole === 'admin');
+  var c = ulEl('tkt-log-count'); if(c) c.textContent = rows.length ? '(' + rows.length + (rows.length === 1 ? ' entry' : ' entries') + ')' : '';
+  var onPage = rows.filter(function(r){ return r.src === 'pub' ? !r.u.hidden : r.pub; }).length;
+  var head = '<div class="ul-key">' + (rows.length ? '<b>' + onPage + '</b> of ' + rows.length + ' on the report page.' : '') + ' Entries are for trustees only unless “Show on the report page” is ticked. Anything sent in through the report page arrives ticked.' + (typeof ptIsPublic === 'function' && !ptIsPublic(t) ? ' <b>This ticket is not on the report page</b>, so residents see none of it for now.' : t.status === 'closed' ? ' <b>This ticket is closed</b>, so it is no longer on the report page.' : '') + '</div>';
+  if(!rows.length){ el.innerHTML = head + '<div class="ul-none">No activity yet.</div>'; return; }
+  el.innerHTML = head + rows.map(function(r){
+    if(r.src === 'pub'){
+      var u = r.u, icon = u.kind === 'fixed' ? '✅' : u.kind === 'notfixed' ? '↩️' : u.role === 'trustee' ? '🛡' : '🙋';
+      return '<div class="tkt-log-entry ul-row ul-from-page' + (u.hidden ? ' ul-hidden' : '') + '">' + icon + ' ' + ulEsc(u.text)
+        + '<div class="tkt-log-time">' + ulEsc(u.by || (u.role === 'trustee' ? 'Trustees' : 'A resident')) + ' · ' + ulWhen(u.ts) + ' · <span class="ul-tag">' + (u.role === 'trustee' ? 'posted on the report page' : 'from the report page') + '</span></div>'
+        + (can ? '<div class="ul-ticks">' + ulTick(!u.hidden, 'ulHide(' + Number(u.ts) + ', !this.checked)', 'Show on the report page', 'ul-tick-pub') + '<span class="ul-note">' + (u.hidden ? 'Hidden from residents and the timeline' : 'On the timeline') + '</span></div>' : '') + '</div>';
+    }
+    var e = r.e, i = r.i, icon2 = e.type === 'note' ? '💬' : e.type === 'status' ? '🔄' : e.type === 'email' ? '✉️' : '📎';
+    var link = (e.type === 'email' && e.url) ? '<a href="' + ulEsc(e.url) + '" target="_blank" rel="noopener" class="ul-link">Open email →</a>' : '';
+    var ticks = can ? '<div class="ul-ticks">' + ulTick(r.pub, 'ulPublish(' + i + ', this.checked)', 'Show on the report page', 'ul-tick-pub') + ulTick(e.inTimeline === true || r.pub, 'tktLogToggleTimeline(' + i + ', this.checked)', 'Show on timeline', r.pub ? 'ul-locked' : '') + '</div>' : '';
+    var admin = isAdmin ? '<div class="ul-admin"><button type="button" onclick="tktLogEdit(' + i + ')">✏ Edit</button><button type="button" class="del" onclick="tktLogDelete(' + i + ')">🗑 Delete</button></div>' : '';
+    return '<div class="tkt-log-entry ul-row' + (r.pub ? ' ul-on-page' : '') + '" id="tkt-log-' + i + '">' + icon2 + ' ' + ulEsc(e.text) + link + '<div class="tkt-log-time">' + ulWhen(e.ts) + (r.pub ? ' · <span class="ul-tag">on the report page</span>' : '') + '</div>' + ticks + admin + '</div>';
+  }).join('');
+  Array.prototype.forEach.call(el.querySelectorAll('.ul-locked input'), function(x){ x.disabled = true; x.title = 'Everything on the report page is on the timeline'; });
+}
+function ulToast(msg, kind){ if(typeof blToast === 'function') blToast(msg, kind); }
+// Tick / untick "Show on the report page" on an activity-log entry.
+async function ulPublish(idx, on){
+  var id = (typeof _currentTicketId !== 'undefined') ? _currentTicketId : null, t = id && TICKETS[id]; if(!t || !t.log || !t.log[idx] || !ulCan()) return;
+  var e = t.log[idx];
+  if(on && !String(e.text || '').trim()){ ulToast('That entry has no text to show.', 'err'); ulRender(t); return; }
+  if(on && !e.pid) e.pid = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  e.pub = !!on; t.updated = Date.now();
+  try { saveTickets([id]); } catch(x){}
+  var j = await ptPost(on ? { id:id, action:'publish', ref:e.pid, text:String(e.text || '').slice(0, 600), ts:e.ts || 0, name:ulWho() } : { id:id, action:'unpublish', ref:e.pid });
+  if(j && j.ok){ ulTake(j.ticket); ulToast(on ? (ptIsPublic(t) ? 'Now on the report page' : 'Ticked — residents will see it once this ticket is on the report page') : 'Taken off the report page', 'ok'); }
+  else { e.pub = !on; try { saveTickets([id]); } catch(x){} ulToast((j && j.error) || 'That didn’t go through — try again.', 'err'); }
+  ulRefresh(id);
+}
+// Hide / show something that came in through the report page.
+async function ulHide(ts, hide){
+  var id = (typeof _currentTicketId !== 'undefined') ? _currentTicketId : null; if(!id || !ulCan()) return;
+  var j = await ptPost({ id:id, action:hide ? 'hide' : 'unhide', ts:ts });
+  if(j && j.ok){ ulTake(j.ticket); ulToast(hide ? 'Hidden from the report page — still kept here' : 'Back on the report page', 'ok'); }
+  else ulToast((j && j.error) || 'That didn’t go through — try again.', 'err');
+  ulRefresh(id);
+}
+// After an edit or a delete in the log: keep the public copy in step (new wording, or gone).
+function ulSync(t){
+  clearTimeout(UL.syncT); if(!t || !ulCan()) return;
+  UL.syncT = setTimeout(async function(){
+    var p = UL.one[t.id]; if(!p || !TICKETS[t.id]) return;
+    var log = TICKETS[t.id].log || [], todo = [];
+    (p.updates || []).forEach(function(u){ if(!u.ref) return; var e = log.filter(function(x){ return x.pid === u.ref; })[0];
+      if(!e || e.pub === false) todo.push({ id:t.id, action:'unpublish', ref:u.ref });
+      else if(String(e.text || '').slice(0, 600).trim() !== String(u.text || '').trim() || Number(e.ts || 0) !== Number(u.ts || 0)) todo.push({ id:t.id, action:'publish', ref:u.ref, text:String(e.text || '').slice(0, 600), ts:e.ts || 0, name:ulWho() }); });
+    if(!todo.length) return;
+    for(var i = 0; i < todo.length; i++){ var j = await ptPost(todo[i]); if(j && j.ok) ulTake(j.ticket); }
+    ulRefresh(t.id);
+  }, 700);
+}
+// The timeline: everything on the report page is on it, without ticking anything.
+function ulTimeline(t, events){
+  var p = ulPub(t.id); if(!p) return events;
+  (p.updates || []).forEach(function(u){
+    if(u.hidden) return;
+    var e = u.ref ? (t.log || []).filter(function(x){ return x.pid === u.ref; })[0] : null;
+    if(e && e.inTimeline === true) return;                         // already there as a ticked log entry
+    var res = u.role !== 'trustee';
+    events.push({ ts:u.ts || 0, kind:'note', icon:u.kind === 'fixed' ? '✅' : res ? '🙋' : '🌐', color:'#1fa898',
+      title:u.kind === 'fixed' ? 'Reported fixed — on the report page' : u.kind === 'notfixed' ? 'Not fixed yet — on the report page' : res ? 'Resident’s update — on the report page' : 'Update on the report page',
+      body:u.text || '', extra:u.by ? ('— ' + u.by) : '' });
+  });
+  return events.sort(function(a, b){ return (a.ts || 0) - (b.ts || 0); });
+}
+function ulStyle(){
+  if(ulEl('ul-style')) return; var s = document.createElement('style'); s.id = 'ul-style';
+  s.textContent = '.ul-key{margin:0 0 10px;font:400 12.5px/1.5 var(--sans);color:var(--muted)}.ul-key b{color:var(--text2)}.ul-none{font:400 13px var(--sans);color:var(--muted)}'
+    + '.ul-row{position:relative}.ul-row .tkt-log-time{font-family:var(--sans) !important;margin-top:3px}.ul-row.ul-on-page,.ul-row.ul-from-page{border-left:3px solid var(--accent) !important}.ul-row.ul-hidden{opacity:.62;border-left-color:var(--border2) !important}'
+    + '.ul-tag{display:inline-block;padding:1px 8px;border-radius:99px;background:var(--accent-bg,rgba(31,168,152,.1));border:1px solid var(--accent-bd,rgba(31,168,152,.45));color:var(--accent2);font:600 11px var(--sans)}'
+    + '.ul-hidden .ul-tag{background:var(--surface2);border-color:var(--border2);color:var(--muted)}'
+    + '.ul-ticks{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;margin-top:6px}.ul-tick{display:inline-flex;align-items:center;gap:8px;min-height:32px;font:500 12.5px var(--sans);color:var(--text2);cursor:pointer;user-select:none}'
+    + '.ul-tick input{width:18px;height:18px;margin:0;flex:none;accent-color:var(--accent);cursor:pointer}.ul-tick.ul-locked{opacity:.6;cursor:default}.ul-note{font:400 12px var(--sans);color:var(--muted)}'
+    + '.ul-admin{display:flex;gap:6px;margin-top:6px}.ul-admin button{min-height:32px;padding:4px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 12px var(--sans);cursor:pointer}.ul-admin button.del{color:var(--red,#d9534f);border-color:var(--red-bd,rgba(240,111,111,.4))}'
+    + '.ul-link{display:inline-block;margin-left:6px;font:600 12px var(--sans);color:var(--accent2);white-space:nowrap}'
+    + '#ul-note-pub-wrap{display:flex;align-items:center;gap:8px;min-height:36px;margin:10px 0 6px;font:500 13px var(--sans);color:var(--text2);cursor:pointer}#ul-note-pub-wrap input{width:18px;height:18px;margin:0;accent-color:var(--accent)}';
+  document.head.appendChild(s);
+}
+function ulNoteBox(){
+  var inp = ulEl('tkt-note-input'); if(!inp || !inp.parentNode) return;
+  var wrap = ulEl('ul-note-pub-wrap');
+  if(!wrap){ wrap = document.createElement('label'); wrap.id = 'ul-note-pub-wrap'; wrap.setAttribute('for', 'ul-note-pub'); wrap.innerHTML = '<input type="checkbox" id="ul-note-pub"><span>Also show this note on the report page</span>'; inp.parentNode.parentNode.insertBefore(wrap, inp.parentNode); }
+  wrap.style.display = ulCan() ? 'flex' : 'none';          // (it sits inside the note area, so it is hidden with it for read-only viewers)
+}
+function ulInstall(){
+  if(UL.installed) return; UL.installed = true;
+  if(typeof renderTicketLog !== 'function' || typeof ptPost !== 'function') return;
+  ulStyle();
+  var r0 = renderTicketLog; renderTicketLog = function(t){ var r = r0.apply(this, arguments); try { ulRender(t); ulNoteBox(); ulSync(t); } catch(e){ console.warn('ulRender', e); } return r; };
+  if(typeof buildTimelineEvents === 'function'){ var b0 = buildTimelineEvents; buildTimelineEvents = function(t){ var ev = b0.apply(this, arguments); try { return ulTimeline(t, ev); } catch(e){ return ev; } }; }
+  if(typeof addTicketNote === 'function'){ var a0 = addTicketNote; addTicketNote = async function(){
+    var id = _currentTicketId, cb = ulEl('ul-note-pub'), want = !!(cb && cb.checked), n0 = (id && TICKETS[id] && TICKETS[id].log) ? TICKETS[id].log.length : 0;
+    var r = await a0.apply(this, arguments);
+    try { if(want && id && TICKETS[id] && (TICKETS[id].log || []).length > n0){ cb.checked = false; await ulPublish(TICKETS[id].log.length - 1, true); } } catch(e){}
+    return r;
+  }; }
+  if(typeof openTicketModal === 'function'){ var o0 = openTicketModal; openTicketModal = function(id){ var r = o0.apply(this, arguments); try { if(id && ulCan()) ulLoad(id); } catch(e){} return r; }; }
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ulInstall); else ulInstall();
 
 // ═══ Tracker look — the report page's design carried into the trustees' tracker ═══
 // Nothing about how the tracker works changes here: every field, button and id is the one the rest
