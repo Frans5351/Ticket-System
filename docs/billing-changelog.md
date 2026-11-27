@@ -1,5 +1,8 @@
 # Billing changelog
 
+## v2.46 — Clearer step names on each issue
+- On "Current issues logged", the five steps under each issue now read **Reported · Obtaining quotes · Awaiting approval · In progress · Done** (they were "Quotes" and "Approval", which read as if the quotes were in and the approval given). On a phone the two longer names wrap onto two lines.
+
 ## v2.45 — "Approvals" on the report page is now "Awaiting approval"
 - The purple row a signed-in trustee sees on the report page is titled **Awaiting approval** instead of "Approvals", so it reads as things still waiting for a decision. Nothing else about it changed.
 

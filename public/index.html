@@ -12275,7 +12275,7 @@ function ptChip(t){
   return h;
 }
 // Where an issue stands, as five steps (an issue can skip steps — a small job goes straight to "In progress").
-var PT_STEPS = [['open', 'Reported'], ['awaiting_quote', 'Quotes'], ['awaiting_trustee_approval', 'Approval'], ['work_in_progress', 'In progress'], ['done', 'Done']];
+var PT_STEPS = [['open', 'Reported'], ['awaiting_quote', 'Obtaining quotes'], ['awaiting_trustee_approval', 'Awaiting approval'], ['work_in_progress', 'In progress'], ['done', 'Done']];
 function ptStepsHtml(t){
   var cur = 0; PT_STEPS.forEach(function(x, i){ if(x[0] === t.status) cur = i; }); if(t.status === 'closed') cur = PT_STEPS.length - 1;
   var fin = cur === PT_STEPS.length - 1, on = fin ? 'var(--green,#1e9e6a)' : 'var(--accent)';
