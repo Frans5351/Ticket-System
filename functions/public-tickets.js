@@ -48,7 +48,7 @@ const MAX_METOO = 60;            // per ticket
 const MAX_PHOTOS = 6;            // per ticket, on the public list
 const PHOTO_ID = /^[\w.-]{3,80}$/;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];   // never SVG or HTML
-const STATUS_LABEL = { open: "Open", awaiting_quote: "Obtaining quotes", awaiting_trustee_approval: "Awaiting trustee approval", work_in_progress: "Work in progress", done: "Done", closed: "Closed" };
+const STATUS_LABEL = { open: "Open", awaiting_quote: "Obtaining quotes", awaiting_trustee_approval: "Awaiting trustee approval", work_in_progress: "Work in progress", done: "Done", on_hold: "On hold", closed: "Closed" };
 const HIDDEN_CATEGORIES = ["Water Reading", "Electricity Reading"];
 
 async function supa(cfg, path, init = {}) {
@@ -72,6 +72,7 @@ function isPublic(d) {
 function closedAt(d) { return (d.dateClosed ? Date.parse(d.dateClosed) : 0) || Number(d.updated) || Number(d.added) || 0; }
 function onList(d, now) {
   if (!isPublic(d)) return false;
+  if (normStatus(d.status) === "on_hold") return false;                               // parked by the trustees: off the list until it is picked up again
   return normStatus(d.status) !== "closed" || (KEEP_CLOSED_DAYS > 0 && now - closedAt(d) <= KEEP_CLOSED_DAYS * 86400000);
 }
 // The photos a trustee ticked, limited to ones still attached to the ticket.
@@ -246,6 +247,7 @@ export default async function handler(req) {
   }
   if (!d || !isPublic(d)) return errorResponse(404, "That issue is not on the public list.");
   if (normStatus(d.status) === "closed") return errorResponse(409, "This issue is closed. If the problem is back, please log a new report.");
+  if (normStatus(d.status) === "on_hold") return errorResponse(409, "This issue is on hold for now, so it is not on the list. Please contact a trustee if you need to add to it.");
   if (normStatus(d.status) === "done" && (action === "metoo" || action === "fixed")) return errorResponse(409, "The trustees have already marked this one as done. If it is not right, add an update to say so.");
 
   let pub;

@@ -6890,6 +6890,10 @@ select.tk-in{cursor:pointer}
 .tkt-card.tk-card:hover{border-color:var(--accent) !important;box-shadow:0 3px 10px rgba(16,24,40,.1)}
 .tkt-card.tk-card:focus-visible{outline:3px solid rgba(31,168,152,.5);outline-offset:2px}
 .tkt-card.tk-card.tk-closed .tk-card-title{color:var(--muted)}
+.tkt-card.tk-card.tk-hold::before{background:#8a96a8}
+.tkt-card.tk-card.tk-hold{background:var(--surface2)}
+.tkt-card.tk-card.tk-hold .tk-steps i.on{background:#8a96a8}
+.tk-hold-pill{display:inline-flex;align-items:center;flex:none;margin-right:8px;padding:4px 11px;border-radius:99px;background:rgba(93,107,130,.13);border:1px solid rgba(93,107,130,.42);color:#5d6b82;font:700 12px var(--sans);white-space:nowrap}
 .tk-card-main{flex:1;min-width:0}
 .tk-card-meta{font:600 11.5px/1.4 var(--sans);letter-spacing:.2px;color:var(--muted);overflow-wrap:anywhere}
 .tk-card-title{margin-top:3px;font:700 16px/1.3 var(--sans);color:var(--text);overflow-wrap:anywhere}
@@ -13700,13 +13704,13 @@ function tkCardHtml(t, x){
   if(x.docCount) foot.push('<span class="tk-foot-docs">📎 ' + x.docCount + ' file' + (x.docCount !== 1 ? 's' : '') + '</span>');
   if(x.logCount) foot.push('<span>💬 ' + x.logCount + ' note' + (x.logCount !== 1 ? 's' : '') + '</span>');
   if(t.expectedBy && st !== 'closed' && st !== 'done') foot.push('<span>📅 expected ' + tkEsc(tkDay(t.expectedBy)) + '</span>');
-  return '<div class="tkt-card tk-card priority-' + (t.priority || 'medium') + ' status-' + (t.status || 'open') + ' type-' + ttype + (st === 'done' ? ' tk-done' : '') + (st === 'closed' ? ' tk-closed' : '') + '" role="button" tabindex="0" onclick="openTicketModal(\'' + t.id + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openTicketModal(\'' + t.id + '\')}">'
+  return '<div class="tkt-card tk-card priority-' + (t.priority || 'medium') + ' status-' + (t.status || 'open') + ' type-' + ttype + (st === 'done' ? ' tk-done' : '') + (st === 'closed' ? ' tk-closed' : '') + (st === 'on_hold' ? ' tk-hold' : '') + '" role="button" tabindex="0" onclick="openTicketModal(\'' + t.id + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openTicketModal(\'' + t.id + '\')}">'
     + '<div class="tk-card-main">'
     +   '<div class="tk-card-meta">' + meta + '</div>'
     +   '<div class="tk-card-title">' + tkEsc(t.title) + '</div>'
     +   (t.desc ? '<div class="tk-card-desc">' + tkEsc(String(t.desc).slice(0, 160)) + '</div>' : '')
     +   '<div class="tk-card-chips">' + chips + '</div>'
-    +   (action ? '' : tkStepsHtml(t.status))
+    +   (action ? '' : tkStepsHtml(st === 'on_hold' ? (t.heldFrom || 'open') : t.status))
     +   (foot.length ? '<div class="tk-card-foot">' + foot.join('') + '</div>' : '')
     +   (x.attHtml ? '<div class="tk-card-att">' + x.attHtml + '</div>' : '')
     + '</div>'
@@ -13807,7 +13811,18 @@ function tkBuildAction(){
   }
   var c = tkEl('tracker-type-chooser'); if(c) c.classList.add('tk-choose');
 }
-function tkInstall(){ try { tkBuildBar(); } catch(e){ console.warn('tkBuildBar', e); } try { tkBuildEditor(); } catch(e){ console.warn('tkBuildEditor', e); } try { tkBuildAction(); } catch(e){ console.warn('tkBuildAction', e); } }
+// On hold: "Resume" puts the ticket back where it was; the status strip shows that place with an "On hold" pill in front.
+function tkResume(){ var id = (typeof _currentTicketId !== 'undefined') ? _currentTicketId : null, t = id && TICKETS[id], sel = tkEl('tkt-status'); if(!t || !sel) return; sel.value = (t.heldFrom && TKT_STATUS[t.heldFrom]) ? t.heldFrom : 'open'; if(typeof autoSaveTicket === 'function') autoSaveTicket(); }
+function tkHoldFlow(){
+  if(typeof renderStatusFlow !== 'function' || tkHoldFlow.done) return; tkHoldFlow.done = true;
+  var r0 = renderStatusFlow; renderStatusFlow = function(status){
+    if(status !== 'on_hold') return r0.apply(this, arguments);
+    var t = (typeof _currentTicketId !== 'undefined' && _currentTicketId) ? TICKETS[_currentTicketId] : null, r = r0.call(this, (t && t.heldFrom) || 'open');
+    var el = tkEl('tkt-status-flow'); if(el) el.insertAdjacentHTML('afterbegin', '<span class="tk-hold-pill">⏸ On hold</span>');
+    return r;
+  };
+}
+function tkInstall(){ try { tkHoldFlow(); } catch(e){} try { tkBuildBar(); } catch(e){ console.warn('tkBuildBar', e); } try { tkBuildEditor(); } catch(e){ console.warn('tkBuildEditor', e); } try { tkBuildAction(); } catch(e){ console.warn('tkBuildAction', e); } }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tkInstall); else tkInstall();
 
 // ═══ Usage — is the report page being used? ═════════════════════════════════════════════════════
@@ -15032,6 +15047,7 @@ async function _emailInvoiceDocs(u, inv, invPdf, stmtPdf, outstanding){
               <option value="awaiting_trustee_approval">Awaiting Trustee Approval</option>
               <option value="work_in_progress">Work In Progress</option>
               <option value="done">Done</option>
+              <option value="on_hold">On Hold</option>
               <option value="closed">Closed</option>
             </select>
             <div id="tkt-reqappr-wrap" style="margin-top:7px;display:none">
@@ -20400,6 +20416,7 @@ var TKT_STATUS = {
   awaiting_trustee_approval: {label:'Awaiting Trustee Approval', bg:'var(--st-appr-bg)', color:'var(--st-appr)', border:'var(--st-appr-bd)'},
   work_in_progress:{label:'Work In Progress', bg:'var(--st-wip-bg)',   color:'var(--st-wip)',    border:'var(--st-wip-bd)'},
   done:           {label:'Done',             bg:'rgba(30,158,106,.12)', color:'#1e9e6a', border:'rgba(30,158,106,.38)'},
+  on_hold:        {label:'On Hold',          bg:'rgba(93,107,130,.13)', color:'#5d6b82', border:'rgba(93,107,130,.42)'},
   closed:         {label:'Closed',           bg:'var(--st-closed-bg)', color:'var(--st-closed)', border:'var(--st-closed-bd)'}
 };
 // Legacy aliases: data carrying retired status keys still needs a definition
@@ -20620,6 +20637,7 @@ function _journeyInsights(t, ms){
       awaiting_quote: 'Next: upload supplier quotes',
       work_in_progress: 'Next: mark it Done when the work is finished',
       done: 'Next: close it once you have checked the work',
+      on_hold: 'On hold — resume it when it can go ahead',
     };
     if(nextMap[t.status]) chips.push({icon:'\u27a1', text:nextMap[t.status]});
   } catch(e){}
@@ -21258,6 +21276,11 @@ function renderTicketApprovalPanel(t){
     return;
   }
 
+  if(status === 'on_hold' && userCan('canChangeStatus', t)){
+    panel.style.display = '';
+    panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.5">⏸ On hold. It is off the report page and the trustees’ approvals list until it is picked up again. Its quotes, approvals and log are kept.</div><button onclick="tkResume()" style="padding:10px 18px;background:var(--accent);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">▶ Resume — back to ' + escHtml((TKT_STATUS[t.heldFrom] || TKT_STATUS.open).label) + '</button></div>';
+    return;
+  }
   if(status === 'done' && userCan('canChangeStatus', t)){
     panel.style.display = '';
     panel.innerHTML = '<div style="padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:180px;font-size:11px;color:var(--muted);font-family:var(--sans);line-height:1.5">The work is done, and residents can see that on the report page. Close the ticket once you\u2019re satisfied \u2014 that takes it off the report page and records the close date.</div><button onclick="markTicketClosedSimple()" style="padding:10px 18px;background:var(--green);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;font-family:var(--sans);cursor:pointer">\u2713 Close ticket</button></div>';
@@ -22191,8 +22214,9 @@ function refreshStatusDropdownGating(t){
   if(!sel) return;
   var wipOption = sel.querySelector('option[value="work_in_progress"]');
   if(!wipOption) return;
-  var awaiting = t && t.status === 'awaiting_trustee_approval';
-  var preWork = t && (t.status === 'open' || t.status === 'awaiting_quote' || t.status === 'awaiting_trustee_approval');
+  var _gs = t ? (t.status === 'on_hold' ? (t.heldFrom || 'open') : t.status) : '';
+  var awaiting = t && _gs === 'awaiting_trustee_approval';
+  var preWork = t && (_gs === 'open' || _gs === 'awaiting_quote' || _gs === 'awaiting_trustee_approval');
   var thresholdMet = t ? isApprovalThresholdMet(t) : false;
   var isAdmin = _currentRole === 'admin';
   // Reset
@@ -22697,7 +22721,7 @@ function toggleTicketFilter(statusKey){
 function renderTicketFilterChips(){
   var host = document.getElementById('tkt-filter-chips');
   if(!host) return;
-  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','closed'];
+  var order = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','on_hold','closed'];
   host.innerHTML = order.filter(function(k){ return TKT_STATUS[k]; }).map(function(k){
     var s = TKT_STATUS[k];
     var active = !!_ticketStatusFilter[k];
@@ -22893,7 +22917,7 @@ function renderTickets(){
   // left border. Clicking a card toggles that status filter (same behaviour
   // as the chips — the two stay in sync because both re-render together).
   if(stats){
-    var statOrder = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','closed'];
+    var statOrder = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','on_hold','closed'];
     stats.innerHTML = statOrder.filter(function(k){ return TKT_STATUS[k]; }).map(function(k){
       var s=TKT_STATUS[k];
       var on = !!_ticketStatusFilter[k];
@@ -22987,7 +23011,7 @@ function renderTickets(){
   // ── Board view (desktop): columns per status, admin drags to move ──
   if(_tktView === 'board'){
     empty.style.display = 'none';
-    var cols = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','closed'];
+    var cols = ['open','awaiting_quote','awaiting_trustee_approval','work_in_progress','done','on_hold','closed'];
     var canDrag = _currentRole === 'admin';
     list.innerHTML = '<div class="tkt-board">' + cols.map(function(k){
       var meta = TKT_STATUS[k];
@@ -24118,6 +24142,8 @@ function _buildTicketFromForm(id, prev){
     reporterEditToken: prev.reporterEditToken,
     public: (function(){ var c = document.getElementById('tkt-public'); return c ? !!c.checked : prev.public; })(),
     expectedBy: prev.expectedBy || '',
+    heldFrom: prev.heldFrom || '',
+    agentTold: prev.agentTold || null,
     publicPhotos: prev.publicPhotos || [],
     afterPhotos: prev.afterPhotos || [],
     reporterUserId: prev.reporterUserId,
@@ -24166,8 +24192,9 @@ function autoSaveTicket(){
     // proposal), is blocked. This is defense-in-depth — the dropdown option is
     // also disabled in the UI.
     var _preWorkStatuses = ['open','awaiting_quote','awaiting_trustee_approval'];
+    var _fromStatus = prev.status === 'on_hold' ? (prev.heldFrom || 'open') : prev.status;
     if((status === 'work_in_progress' || status === 'done')
-       && _preWorkStatuses.indexOf(prev.status) !== -1
+       && _preWorkStatuses.indexOf(_fromStatus) !== -1
        && _currentRole !== 'admin'
        && ticketRequiresApproval(prev)
        && !isApprovalThresholdMet(prev)){
@@ -24192,7 +24219,8 @@ function autoSaveTicket(){
     if(status !== prev.status){
       TICKETS[id]._manualStatusAt = Date.now();
     }
-    if(hadAnyApproval && revokeStatuses.indexOf(status) !== -1 && status !== prev.status){
+    if(status === 'on_hold') TICKETS[id].heldFrom = prev.status === 'on_hold' ? (prev.heldFrom || 'open') : (prev.status || 'open'); else TICKETS[id].heldFrom = '';
+    if(hadAnyApproval && revokeStatuses.indexOf(status) !== -1 && status !== prev.status && !(prev.status === 'on_hold' && status === (prev.heldFrom || 'open'))){
       TICKETS[id].approvals = [];
       TICKETS[id].approvedQuoteId = null;
       TICKETS[id].approvedBy = null;

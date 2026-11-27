@@ -1,5 +1,14 @@
 # Billing changelog
 
+## v2.44 — A new status: On hold
+- **On Hold** is a new ticket status for something that is parked for now — not closed, not being worked on. Choose it in the ticket's Status list from any other status.
+- **While a ticket is on hold it is off the report page** ("Current issues logged") **and off the trustees' Approvals list** there. Residents cannot add updates or "Me too" to it in the meantime. Nothing is lost: its quotes, proposals, approvals, photos and log are kept.
+- **In the tracker** it has its own filter chip (between Done and Closed, off to start with, like Closed), its own summary card with the count, and its own column in the board view. On-hold cards are greyed, with an "On Hold" badge and the progress strip showing where the ticket was when it was parked.
+- **In the ticket** the status strip shows an "On hold" pill in front of the step it was at, and a **Resume** button puts it straight back to that step (for example "Resume — back to Awaiting Trustee Approval"). Resuming does **not** clear the trustee approvals already given.
+- On hold cannot be used to skip the approval step: a ticket parked before it had three approvals still needs them before a non-admin can move it to Work In Progress.
+- The reporter gets the usual status email ("put on hold for now — you will be told when it is picked up again"), and another when it is resumed.
+- The Approvals row on the report page stays as it was in v2.43.
+
 ## v2.43 — Trustees approve quotes and proposals on the report page
 **Signing in on the report page**
 - At the bottom of the report page there is a quiet line: **Trustee or managing agent? Sign in**. Residents never need it; everything they see is unchanged.

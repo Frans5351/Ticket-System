@@ -31,6 +31,7 @@ const STATUS_LABELS = {
   awaiting_trustee_approval: "Awaiting Trustee Approval",
   work_in_progress: "Work In Progress",
   done: "Done",
+  on_hold: "On hold",
   resolved: "Resolved",
   closed: "Closed",
 };
