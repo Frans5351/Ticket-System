@@ -1,5 +1,12 @@
 # Billing changelog
 
+## v2.39 — Two separate home-screen icons: the report page and the trustees' app
+- **The fault:** adding the main app (the tracker) to an iPhone home screen gave an icon that opened the report page. The page source named the report page's manifest, whose start address is `/?report`; the page switched to the admin manifest by script, but the iPhone used the one in the page source.
+- **The fix:** the manifest named in the page source (`manifest-page.json`, new) has no start address, so a phone that reads only that one opens the icon on the page it was added from. The script still switches to the full manifest for each side (`manifest.json` on the resident links, `manifest-admin.json` everywhere else), which is what Android uses.
+- **New page `/admin`** (`public/admin/index.html`): a small page whose own source carries the admin name ("PM Admin"), the navy icon and the admin manifest. Add *that* page to the home screen for the trustees' app; opened from the icon it goes straight to the main app. Opened in a browser it shows the steps and an "Open the trustees' app" button.
+- The residents' icon is unchanged: `/?report`, "Park Manor", teal icon.
+- An icon that was added before this version keeps its old start address — remove it and add it again.
+
 ## v2.38 — The tracker in the report page's look, and WeconnectU inside the app
 **The tracker tab**
 - The top of the tab is laid out in four tidy rows: the title with the **New** button, the search box, the status chips, then sort / unit filter / list-or-board / Share overview / Export / Readings. On a phone the chips and tools scroll sideways instead of wrapping into a pile.

@@ -9,14 +9,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" id="pm-app-title" content="Park Manor">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="manifest" id="pm-manifest" href="/manifest.json">
+<link rel="manifest" id="pm-manifest" href="/manifest-page.json">
 <link rel="apple-touch-icon" id="pm-touch-icon" href="/app-icon-180.png">
 <link rel="icon" id="pm-icon" type="image/png" sizes="192x192" href="/app-icon-192.png">
 <script>
 (function(){ try {
   var q = new URLSearchParams(location.search);
-  if(q.has('report') || q.has('water') || q.has('electricity') || q.has('contact-public')) return;
+  // The manifest named in the page source has no start address, so a phone that only reads
+  // that one (iPhone) opens the home-screen icon on the page it was added from. Browsers that
+  // follow the change below (Android) get the full manifest for this side of the site.
   var set = function(id, attr, v){ var e = document.getElementById(id); if(e) e.setAttribute(attr, v); };
+  if(q.has('report') || q.has('water') || q.has('electricity') || q.has('contact-public')){ set('pm-manifest', 'href', '/manifest.json'); return; }
   set('pm-manifest', 'href', '/manifest-admin.json'); set('pm-touch-icon', 'href', '/admin-icon-180.png'); set('pm-icon', 'href', '/admin-icon-192.png');
   set('pm-theme', 'content', '#1b2a44'); set('pm-app-title', 'content', 'PM Admin');
 } catch(e){} })();
