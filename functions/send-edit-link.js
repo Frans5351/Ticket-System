@@ -19,6 +19,7 @@
 
 import { jsonResponse, errorResponse, getConfig, supaFetch } from "./_passkey-shared.js";
 import { sendEmail, emailConfigError } from "./_email-shared.js";
+import { ROUTE_DEFAULT, pickPeople, whoLine } from "./_route-shared.js";
 
 export const config = { path: "/api/send-edit-link" };
 
@@ -262,6 +263,11 @@ export default async function handler(req) {
   //   2. The AGENT_NOTIFY_EMAIL env var (comma-separated), kept as a
   //      fallback / extra so the feature works before any user has an email.
   const agentSet = new Set();
+  // Which people at the managing agent get it (Settings → "agent_routing"). Only for ordinary
+  // reports where the resident chose to email the agent; null = no routing, behave as before.
+  let routed = null;
+  const wantsAgent = (notify === "agent" || notify === "both") && !isMeterReading;
+  const routePrefix = /^([\w-]{1,40}:)?$/.test(String(body.prefix || "")) ? String(body.prefix || "") : "";
   try {
     // Prefer the service-role key when configured; otherwise fall back to the
     // public anon key (the same one the client uses to read users — its RLS
@@ -290,8 +296,25 @@ export default async function handler(req) {
     });
     console.log("send-edit-link: management/trustee users found:", recipSeen, "| with email:", agentSet.size,
       "| via", cfg.supaServiceKey ? "service key" : "anon key");
+    if (wantsAgent) {
+      try {
+        const sr = await fetch(supaUrl + "/rest/v1/settings?key=eq." + encodeURIComponent(routePrefix + "agent_routing") + "&select=value&limit=1", {
+          headers: { apikey: supaKey, Authorization: "Bearer " + supaKey, Accept: "application/json" },
+        });
+        if (!sr.ok) throw new Error("settings " + sr.status);
+        const srows = await sr.json();
+        const saved = Array.isArray(srows) && srows[0] ? srows[0].value : undefined;
+        // Nothing saved yet: Park Manor's own scheme uses the standard list; another scheme has no routing until it saves one.
+        routed = pickPeople(saved !== undefined && saved !== null ? saved : (routePrefix ? null : ROUTE_DEFAULT), category, body.agentPeople);
+      } catch (e) {
+        console.warn("send-edit-link: could not read agent routing:", e.message);
+        routed = routePrefix ? null : pickPeople(ROUTE_DEFAULT, category, body.agentPeople);
+      }
+    }
   } catch (e) {
     console.warn("send-edit-link: could not read management users:", e.message);
+    // Still send it to the right people if the database could not be read at all (Park Manor's own scheme only).
+    if (!routed && wantsAgent && !routePrefix) routed = pickPeople(ROUTE_DEFAULT, category, body.agentPeople);
   }
   (process.env.AGENT_NOTIFY_EMAIL || "")
     .split(",")
@@ -306,7 +329,9 @@ export default async function handler(req) {
   if (quietReport) { agentSet.clear(); agentSet.add(bareAddress(bcInbox).toLowerCase()); }
   if (notify) {
     agentSet.clear();
-    if (notify === "agent" || notify === "both") {
+    if (wantsAgent && routed) {
+      routed.to.forEach((p) => agentSet.add(p.email));      // the people whose job it is; the "copied" people go in Cc below
+    } else if (notify === "agent" || notify === "both") {
       mgmtSet.forEach((e) => agentSet.add(e));
       (process.env.AGENT_NOTIFY_EMAIL || "").split(",").map((x) => bareAddress(x.trim())).filter(looksLikeEmail).forEach((e) => agentSet.add(e.toLowerCase()));
     }
@@ -316,6 +341,9 @@ export default async function handler(req) {
     }
   }
   const agentList = Array.from(agentSet);
+  const routeCc = routed ? routed.cc.filter((c) => !agentSet.has(c.email)) : [];
+  const routeWho = routed ? whoLine(routed.to) : "";
+  const routeCopied = routeCc.map((c) => c.name).join(", ");
   if (agentList.length) {
     const aSubject = isElecReading
       ? `⚡ Electricity meter reading — ${/^Main/.test(unit) ? unit : "Unit " + unit}`
@@ -330,6 +358,7 @@ export default async function handler(req) {
       unit ? `Unit:       ${unit}` : null,
       reporter ? `Name:       ${reporter}` : null,
       anonymous ? "Reported anonymously — no name or contact details were given." : null,
+      routeWho ? `Sent to:    ${routeWho}${routeCopied ? ` — copied: ${routeCopied}` : ""}` : null,
       phone ? `Phone:      ${phone}` : null,
       looksLikeEmail(to) ? `Email:      ${to}` : null,
       "",
@@ -359,7 +388,8 @@ export default async function handler(req) {
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:bold;color:#3a4354;margin-bottom:16px">${escH(title || "(no subject)")}</div>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin-bottom:14px">
         ${detailRow("Reference", ref)}
-        ${detailRow("Category", category)}
+        ${detailRow("Category", category === "Admin" ? "Admin and billing" : category)}
+        ${detailRow("Sent to", routeWho ? routeWho + (routeCopied ? " — copied: " + routeCopied : "") : "")}
         ${detailRow("Unit", unit)}
         ${detailRow("Name", anonymous ? "Anonymous — no contact details given" : reporter)}
         ${detailRow("Phone", phone)}
@@ -380,7 +410,7 @@ export default async function handler(req) {
       // copy the agent gets (their private edit link is NOT in this email
       // by design — it stays theirs alone via the opt-in email / WhatsApp).
       // (Water readings: the resident gets their own copy above instead of a CC.)
-      cc: looksLikeEmail(to) && !isMeterReading ? [to] : undefined,
+      cc: (() => { const cc = routeCc.map((c) => c.email); if (looksLikeEmail(to) && !isMeterReading) cc.push(to); return cc.length ? cc : undefined; })(),
       // Let the agent reply straight to the resident when we have their address.
       replyTo: looksLikeEmail(to) ? to : undefined,
       attachments: emailAttachments.map((a) => ({ name: a.filename, content: a.content })),
@@ -404,6 +434,7 @@ export default async function handler(req) {
     id: residentResult && residentResult.id,
     agentNotified: !!(agentResult && agentResult.ok),
     urgent, notify, notified: agentList.length,
+    routed: routed && agentList.length ? { to: routed.to.map((p) => p.name), copied: routeCc.map((c) => c.name), kind: routed.kind, chosenBy: routed.chosenBy } : null,
     residentCopy: !!(copyResult && copyResult.ok),
     residentCopyError: copyResult && !copyResult.ok ? String(copyResult.msg || "failed").slice(0, 200) : "",
   });

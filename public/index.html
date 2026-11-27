@@ -6334,15 +6334,15 @@ document.getElementById('tbody').addEventListener('click', function(e){
 <style id="bl-css">
 /* ═══ Billing UI — mobile-first. Everything is scoped to the billing surfaces
    so it can't leak into the rest of the app. ═══════════════════════════════ */
-#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu,#bl-toast{
+#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog,#bl-menu,#bl-toast{
   --bl-owe:#f0a06f;--bl-owe-bg:rgba(240,160,111,.12);--bl-owe-bd:rgba(240,160,111,.40);
   --bl-a1:#e6b34a;--bl-a2:#e8873a;--bl-a3:#e05c4a;--bl-a4:#b32d3a;
 }
-body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu,#bl-toast){
+body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog,#bl-menu,#bl-toast){
   --bl-owe:#b4570f;--bl-owe-bg:rgba(180,87,15,.09);--bl-owe-bd:rgba(180,87,15,.35);
 }
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog,#bl-menu) button{font-family:var(--sans)}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog,#bl-menu) :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ── Buttons ── */
 .bl-btn{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 14px var(--sans);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;white-space:nowrap;text-decoration:none;transition:background .12s,border-color .12s,transform .06s}
@@ -6442,14 +6442,14 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Unit table (desktop) ── */
 .bl-tbl{display:none}
 @media(min-width:900px){.bl-tbl{display:block}.bl-cards{display:none}}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb tbody{display:table-row-group!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb tr{display:table-row!important}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb th,
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
-:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal) .bl-tb .r{text-align:right!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb{width:100%;border-collapse:collapse!important;font-size:14px;display:table!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb thead{display:table-header-group!important;position:static!important;top:auto!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb tbody{display:table-row-group!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb tr{display:table-row!important}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb th,
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb td{display:table-cell!important;width:auto!important;padding:11px 12px!important;vertical-align:middle;border:none!important;border-bottom:1px solid var(--border)!important;background:transparent}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb th{font:600 11px var(--sans)!important;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)!important;text-align:left;background:transparent!important;white-space:nowrap}
+:is(#panel-billing,#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal) .bl-tb .r{text-align:right!important}
 .bl-tb tbody tr.row{cursor:pointer}
 .bl-tb tbody tr.row:hover td{background:var(--surface)}
 .bl-tb tfoot td{font-weight:700}
@@ -6517,13 +6517,13 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 .bl-toast-i.ok{background:var(--green);color:#06210f}
 
 /* ── Full-screen sheets (unit editor + importer) ── */
-#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
+#unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.62);align-items:flex-end;justify-content:center}
 #unit-modal{z-index:700}
 #wc-import-modal{z-index:720}
 .bl-sheet{background:var(--surface);width:100%;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;animation:bl-up .22s ease-out}
 @keyframes bl-up{from{transform:translateY(22px);opacity:0}to{transform:none;opacity:1}}
 @media(min-width:768px){
-  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal{align-items:center}
+  #unit-modal,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal{align-items:center}
   .bl-sheet{width:min(900px,94vw);height:min(90vh,920px);border-radius:20px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,.5)}
 }
 @media(prefers-reduced-motion:reduce){.bl-sheet,.bl-dlg-card,.bl-menu-panel,.bl-toast-i{animation:none!important}}
@@ -6561,10 +6561,10 @@ body:is(.theme-light,.theme-green,.theme-clean,.theme-portal) :is(#panel-billing
 /* ── Form fields ── */
 .bl-f{display:flex;flex-direction:column;gap:6px;min-width:0}
 .bl-lbl{font:600 12px var(--sans);color:var(--muted)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
-:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog) .bl-in{width:100%;min-width:0;max-width:100%;min-height:46px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none;-webkit-appearance:none;appearance:none;box-shadow:none}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog) .bl-in[type=date]{-webkit-appearance:auto;appearance:auto}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog) .bl-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+:is(#unit-modal,#panel-billing,#wc-import-modal,#binv-modal,#run-modal,#bset-modal,#plan-modal,#wr-modal,#er-modal,#us-modal,#bl-dialog) select.bl-in{padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238a96ad' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .bl-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .bl-grid.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bl-grid.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -7036,6 +7036,58 @@ select.tk-in{cursor:pointer}
   .tk-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   #tk-sec-reporter .tk-grid{grid-template-columns:1fr}
   .tk-in{font-size:16px}
+}
+
+/* ═══ Usage screen (us.js) ═══ */
+#us-modal{z-index:705}
+#us-body{font-family:var(--sans)}
+.us-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
+.us-seg{display:inline-flex;border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:var(--surface)}
+.us-seg button{min-height:40px;padding:0 14px;border:none;background:none;color:var(--text2);font:600 13.5px var(--sans);cursor:pointer}
+.us-seg button.on{background:var(--accent);color:#fff}
+.us-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.us-tile{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.05);min-width:0}
+.us-tile b{display:block;font:700 24px/1.1 var(--sans);color:var(--text);font-variant-numeric:tabular-nums}
+.us-tile span{display:block;margin-top:3px;font:500 12.5px/1.35 var(--sans);color:var(--muted)}
+.us-card{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.us-h{font:700 15px/1.3 var(--sans);color:var(--text);margin-bottom:10px}
+.us-n{display:inline-block;margin-left:6px;padding:1px 9px;border-radius:99px;background:var(--surface2);border:1px solid var(--border2);font:600 12px var(--sans);color:var(--text2)}
+.us-empty{padding:18px 8px;text-align:center;font:400 14px/1.6 var(--sans);color:var(--muted)}
+/* visits per day: one series, one colour, bars from a zero baseline */
+.us-chart{position:relative;padding-top:4px}
+.us-ymax{position:absolute;left:0;top:0;font:500 11px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums;padding:0 4px;background:var(--surface);z-index:1}
+.us-bars{display:flex;align-items:flex-end;gap:2px;height:120px;border-top:1px dashed var(--border);border-bottom:1px solid var(--border2)}
+.us-col{flex:1 1 0;min-width:0;height:100%;padding:0;border:none;background:none;display:flex;align-items:flex-end;cursor:pointer}
+.us-col i{display:block;width:100%;background:var(--accent);border-radius:4px 4px 0 0;opacity:.85}
+.us-col:hover i,.us-col:focus-visible i,.us-col.on i{opacity:1;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--accent)}
+.us-col:focus-visible{outline:none}
+.us-x{display:flex;justify-content:space-between;margin-top:5px;font:500 11px var(--sans);color:var(--muted)}
+.us-tip{margin-top:8px;min-height:20px;font:500 13px/1.5 var(--sans);color:var(--text2)}
+.us-more{margin-top:10px}
+.us-more summary{min-height:36px;display:flex;align-items:center;cursor:pointer;font:600 13px var(--sans);color:var(--accent2)}
+.us-about{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:6px 16px;margin:0 0 12px}
+.us-about p{margin:8px 0;font:400 13px/1.6 var(--sans);color:var(--text2)}
+.us-tb{width:100%;border-collapse:collapse;font:400 14px/1.4 var(--sans)}
+.us-tb th{padding:7px 8px;text-align:left;font:600 11.5px var(--sans);color:var(--muted);border-bottom:1px solid var(--border2)}
+.us-tb td{padding:9px 8px;border-bottom:1px solid var(--border);color:var(--text2)}
+.us-tb tr:last-child td{border-bottom:none}
+.us-tb .r{text-align:right;font-variant-numeric:tabular-nums;width:72px;white-space:nowrap}
+.us-dev{padding:12px 0;border-top:1px solid var(--border)}
+.us-dev:first-of-type{border-top:none;padding-top:2px}
+.us-dev-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.us-code{padding:2px 8px;border-radius:7px;background:var(--surface2);border:1px solid var(--border2);font:700 12px var(--mono,monospace);letter-spacing:.6px;color:var(--text2)}
+.us-who{font:700 15px/1.3 var(--sans);color:var(--text);overflow-wrap:anywhere}
+.us-chip{padding:2px 9px;border-radius:99px;border:1px solid var(--border2);background:var(--surface2);font:600 11.5px var(--sans);color:var(--text2);white-space:nowrap}
+.us-chip-staff{background:var(--info-bg,rgba(90,160,230,.1));border-color:var(--info-bd,rgba(90,160,230,.4));color:var(--info,#3b82c4)}
+.us-chip-me{background:var(--accent-bg,rgba(31,168,152,.1));border-color:var(--accent);color:var(--accent2)}
+.us-line{margin-top:4px;font:400 13px/1.55 var(--sans);color:var(--text2);overflow-wrap:anywhere}
+.us-line b{font-weight:700;font-variant-numeric:tabular-nums}
+.us-k{display:inline-block;min-width:54px;font-weight:600;color:var(--muted)}
+.us-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.us-acts .bl-btn{min-height:38px}
+@media (max-width:760px){
+  .us-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .us-bars{height:104px;gap:1px}
 }
 </style>
 
@@ -12423,6 +12475,7 @@ function ptInject(){
       setTimeout(function(){ var t = document.getElementById('pub-title'), d = document.getElementById('pub-desc'); if((t && t.value.trim()) || (d && d.value.trim())) ptFormToggle(true, true); }, 450);      // an unfinished draft: show it
       PT.flow = { notify:null, urgent:false, pub:null, anon:null }; PT.meter = ''; PT.park = null;
       ptAnonMount(); ptFlowRender();
+      ptRLoad().then(ptFlowRender);
     }
     ptRender(); ptLoad().then(ptRender);
     ['em', 'ag', 'cs'].forEach(function(k){ ptCRender(k); ptCLoad(k).then(function(){ ptCRender(k); }); });
@@ -12458,9 +12511,11 @@ function ptOpt(group, o, cur, wide){
 function ptQ(n, title, sub){ return '<div style="margin:' + (n > 1 ? '18px' : '2px') + ' 0 8px"><div style="font:700 14.5px var(--sans);color:var(--text2)">' + title + '</div>' + (sub ? '<div style="font:400 12.5px/1.45 var(--sans);color:var(--muted);margin-top:1px">' + sub + '</div>' : '') + '</div>'; }
 function ptFlowSummary(){
   var f = PT.flow || {}, bits = ['Logged on the trustees’ and managing agent’s board.'];
+  var who = (f.notify === 'agent' || f.notify === 'both') && ptRLive() ? ptRNames(ptRChosen()) : '', pub = ptRAdminCat() ? false : f.pub;
+  var agent = who ? ptEsc(who) + ' at the managing agent' : 'the managing agent';
   if(f.notify === 'none') bits.push('Nobody is emailed.');
-  else if(f.notify) bits.push((f.notify === 'agent' ? 'The managing agent is' : f.notify === 'trustees' ? 'The trustees are' : 'The trustees and the managing agent are') + ' emailed now' + (f.urgent ? ', marked <b style="color:var(--red,#d9534f)">URGENT</b>' : '') + '.');
-  if(f.pub === true) bits.push('Everyone can follow it on the “Current issues logged” list.'); else if(f.pub === false) bits.push('It stays private — not on the list.');
+  else if(f.notify) bits.push((f.notify === 'agent' ? agent.charAt(0).toUpperCase() + agent.slice(1) + (who && ptRChosen().length === 1 ? ' is' : who ? ' are' : ' is') : f.notify === 'trustees' ? 'The trustees are' : 'The trustees and ' + agent + ' are') + ' emailed now' + (f.urgent ? ', marked <b style="color:var(--red,#d9534f)">URGENT</b>' : '') + '.');
+  if(pub === true) bits.push('Everyone can follow it on the “Current issues logged” list.'); else if(pub === false) bits.push('It stays private — not on the list.');
   if(f.anon === true) bits.push('Your name is not recorded.');
   return bits.join(' ');
 }
@@ -12468,17 +12523,19 @@ function ptFlowRender(){
   var host = document.getElementById('pf-flow'); if(!host) return;
   var f = PT.flow || (PT.flow = { notify:null, urgent:false, pub:null, anon:null });
   var h = '<div class="pub-card-head"><span class="pub-step">5</span><span><b>How should we handle it?</b><i>it is always logged — you choose the rest</i></span></div>'
-    + '<div id="pf-q-notify" role="radiogroup" aria-label="Who should be emailed right now?">' + ptQ(1, 'Who should be emailed right now?') + '<div style="display:grid;gap:8px">' + PT_NOTIFY.map(function(o){ return ptOpt('notify', o, f.notify); }).join('') + '</div></div>';
+    + '<div id="pf-q-notify" role="radiogroup" aria-label="Who should be emailed right now?">' + ptQ(1, 'Who should be emailed right now?') + '<div style="display:grid;gap:8px">' + PT_NOTIFY.map(function(o){ return ptOpt('notify', o, f.notify) + (o.v === f.notify && (o.v === 'agent' || o.v === 'both') ? ptRHtml() : ''); }).join('') + '</div></div>';
   if(f.notify && f.notify !== 'none') h += '<label for="pub-urgent" style="display:flex;align-items:flex-start;gap:12px;min-height:48px;margin-top:10px;padding:10px 12px;border-radius:12px;cursor:pointer;border:1.5px solid ' + (f.urgent ? 'var(--red-bd,rgba(240,111,111,.5))' : 'var(--border2)') + ';background:' + (f.urgent ? 'var(--red-bg,rgba(240,111,111,.08))' : 'var(--surface)') + '"><input id="pub-urgent" type="checkbox"' + (f.urgent ? ' checked' : '') + ' onchange="ptPick(\'urgent\',this.checked)" style="width:22px;height:22px;flex:none;margin-top:1px;accent-color:var(--red,#d9534f)"><span><span style="display:block;font:700 14.5px var(--sans);color:var(--text2)">🚨 It’s urgent</span><span style="display:block;font:400 12.5px/1.45 var(--sans);color:var(--muted);margin-top:1px">The email is marked URGENT. For things that can’t wait — a burst pipe, a security problem, no power.</span></span></label>';
-  if(f.notify) h += '<div id="pf-q-pub" role="radiogroup" aria-label="Can everyone follow this on the list?">' + ptQ(2, 'Can everyone follow this on the list?', 'The “Current issues logged” list on this page, which anyone at Park Manor can open.')
+  if(f.notify && ptRAdminCat()) h += '<div id="pf-q-pub">' + ptQ(2, 'Can everyone follow this on the list?') + '<div id="pf-pub-private" style="display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:12px;border:1.5px solid var(--border2);background:var(--surface2);font:400 13px/1.5 var(--sans);color:var(--text2)"><span aria-hidden="true" style="flex:none;font-size:20px;line-height:1.2">🔒</span><span><b>No — admin and billing matters stay private.</b> Only the trustees and the managing agent see it. It does not go on the list.</span></div></div>';
+  else if(f.notify) h += '<div id="pf-q-pub" role="radiogroup" aria-label="Can everyone follow this on the list?">' + ptQ(2, 'Can everyone follow this on the list?', 'The “Current issues logged” list on this page, which anyone at Park Manor can open.')
     + '<div style="display:grid;gap:8px">' + ptOpt('pub', { v:'yes', ic:'🌐', t:'Yes, show it', d:'Neighbours see the issue and its status, and can add updates. ' + (f.anon === false ? 'Your name is never shown.' : 'No names are shown.') }, f.pub === true ? 'yes' : f.pub === false ? 'no' : null)
     + ptOpt('pub', { v:'no', ic:'🔒', t:'No, keep it private', d:'Only the trustees and the managing agent can see it.' }, f.pub === true ? 'yes' : f.pub === false ? 'no' : null) + '</div></div>';
-  if(f.notify && f.pub != null) h += '<div aria-live="polite" style="margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--surface2);font:400 13px/1.55 var(--sans);color:var(--text2)"><b>So:</b> ' + ptFlowSummary() + '</div>';
+  if(f.notify && (f.pub != null || ptRAdminCat())) h += '<div aria-live="polite" style="margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--surface2);font:400 13px/1.55 var(--sans);color:var(--text2)"><b>So:</b> ' + ptFlowSummary() + '</div>';
   host.innerHTML = h;
 }
 function ptPick(group, v){
   var f = PT.flow || (PT.flow = {});
   if(group === 'notify'){ f.notify = v; if(v === 'none') f.urgent = false; }
+  else if(group === 'person'){ var cur = ptRChosen().slice(), em = String(v.email), at = cur.indexOf(em); if(v.on && at < 0) cur.push(em); if(!v.on && at >= 0) cur.splice(at, 1); f.people = cur; }
   else if(group === 'urgent') f.urgent = !!v;
   else if(group === 'pub') f.pub = v === 'yes';
   else if(group === 'anon'){ f.anon = v === 'yes'; ptAnonPaint(); }
@@ -12510,10 +12567,105 @@ function ptFlowRead(){
   var f = PT.flow || {}, miss = function(msg, id){ if(typeof showPublicErr === 'function') showPublicErr(msg); var el = document.getElementById(id); if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'center' }); return null; };
   if(document.getElementById('pf-anon') && f.anon == null) return miss('Please choose whether to give your name or stay anonymous.', 'pf-anon');
   if(!f.notify) return miss('Please choose who should be emailed — or “Just log it”.', 'pf-q-notify');
+  var people = (f.notify === 'agent' || f.notify === 'both') && ptRLive() ? ptRChosen() : [];
+  if((f.notify === 'agent' || f.notify === 'both') && ptRLive() && !people.length) return miss('Please tick at least one person at the managing agent — or choose “Just log it” or “Trustees”.', 'pf-q-route');
+  if(ptRAdminCat()) f.pub = false;                                   // admin and billing matters never go on the public list
   if(f.pub == null) return miss('Please choose whether everyone can follow this on the list.', 'pf-q-pub');
   if(f.anon){ ['pub-name', 'pub-email', 'pub-phone'].forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
     var wrap = document.getElementById('pf-contact'); if(wrap) Array.prototype.forEach.call(wrap.querySelectorAll('input[type=checkbox]'), function(c){ c.checked = false; }); }
-  return { notify:f.notify, urgent:!!f.urgent && f.notify !== 'none', pub:f.pub !== false, anon:!!f.anon };
+  return { notify:f.notify, urgent:!!f.urgent && f.notify !== 'none', pub:f.pub !== false, anon:!!f.anon, people:people, who:ptRWho(people) };
+}
+
+// ── Who at the managing agent gets it ───────────────────────────────────────────────────────────
+// Settings key "agent_routing" = { on, adminCats:[category], people:[{name,email,role}] } — role is
+// "admin" (admin and billing), "maintenance" (everything else) or "always" (copied on every report).
+// When the resident chooses to email the managing agent, these people are listed under that choice
+// with the right ones ticked for the category picked; the ticks can be changed. The server only
+// ever mails addresses that are in the saved list (functions/_route-shared.js).
+var PT_R = { key:'agent_routing', max:12,
+  roles:{ admin:'Admin and billing', maintenance:'Maintenance and repairs', always:'Managing agent — copied on every report' },
+  def:{ on:true, adminCats:['Admin'], people:[ { name:'Ruaan', email:'ruaan@daviesgroup.co.za', role:'admin' }, { name:'Cheryl', email:'cheryl@daviesgroup.co.za', role:'maintenance' }, { name:'Tara', email:'tara@daviesgroup.co.za', role:'always' } ] } };
+PT.rt = { v:null, saved:false };
+function ptREmail(x){ return /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(String(x || '').trim()); }
+function ptRClean(v){
+  var seen = {}, people = (v && Array.isArray(v.people) ? v.people : []).slice(0, PT_R.max).map(function(p){
+    if(!p || !ptREmail(p.email)) return null; var em = String(p.email).trim().toLowerCase(); if(seen[em]) return null; seen[em] = 1;
+    return { name:String(p.name || '').replace(/[<>]/g, ' ').trim().slice(0, 60) || em, email:em, role:PT_R.roles[p.role] ? p.role : 'maintenance' };
+  }).filter(Boolean);
+  var cats = (v && Array.isArray(v.adminCats) ? v.adminCats : ['Admin']).map(function(c){ return String(c || '').trim().slice(0, 60); }).filter(Boolean);
+  return { on:!v || v.on !== false, adminCats:cats, people:people };
+}
+async function ptRLoad(){
+  var v = null; try { v = await sbGetSetting(PT_R.key); if(typeof v === 'string') v = JSON.parse(v); } catch(e){ v = null; }
+  var saved = !!v && typeof v === 'object' && !Array.isArray(v);
+  PT.rt.v = saved ? ptRClean(v) : (ptPrefix() ? ptRClean({ on:true, people:[] }) : ptRClean(PT_R.def));      // the standard list is Park Manor's managing agent
+  PT.rt.saved = saved; return PT.rt.v;
+}
+function ptRCur(){ return PT.rt.v || (ptPrefix() ? ptRClean({ on:true, people:[] }) : ptRClean(PT_R.def)); }
+function ptRLive(){ var r = ptRCur(); return r.on && r.people.length ? r : null; }
+function ptRAdminCat(){ var c = String(window._pubCategory || '').toLowerCase(); return !!c && ptRCur().adminCats.some(function(x){ return x.toLowerCase() === c; }); }
+function ptRDefault(){                                               // the people ticked for the category that is picked
+  var r = ptRLive(); if(!r) return [];
+  var kind = ptRAdminCat() ? 'admin' : 'maintenance', main = r.people.filter(function(p){ return p.role === kind; });
+  if(!main.length) main = r.people.filter(function(p){ return p.role !== 'always'; });
+  return main.concat(r.people.filter(function(p){ return p.role === 'always'; })).map(function(p){ return p.email; });
+}
+function ptRChosen(){ var f = PT.flow || {}, r = ptRLive(); if(!r) return []; var list = Array.isArray(f.people) ? f.people : ptRDefault(); return r.people.filter(function(p){ return list.indexOf(p.email) >= 0; }).map(function(p){ return p.email; }); }
+function ptRNames(emails){ var r = ptRCur(), n = r.people.filter(function(p){ return emails.indexOf(p.email) >= 0; }).map(function(p){ return p.name; }); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : (n[0] || ''); }
+function ptRWho(emails){ var r = ptRCur(); return r.people.filter(function(p){ return emails.indexOf(p.email) >= 0; }).map(function(p){ return p.name + (p.role === 'always' ? '' : ' (' + PT_R.roles[p.role].toLowerCase() + ')'); }).join(', '); }
+function ptRHtml(){
+  var r = ptRLive(); if(!r) return '';
+  var chosen = ptRChosen(), adm = ptRAdminCat(), cat = window._pubCategory || '';
+  var why = Array.isArray((PT.flow || {}).people) ? 'Your own choice — pick a different category above to start again from the usual people.'
+    : adm ? 'Ticked for you because this is an admin and billing matter. Change the ticks if you like.'
+    : cat ? 'Ticked for you because this is a maintenance matter. Change the ticks if you like.'
+    : 'Ticked for a maintenance matter. Choose “Admin & billing” at the top if it is about levies or your account — or change the ticks here.';
+  return '<div id="pf-q-route" role="group" aria-label="Who at the managing agent gets the email" style="margin:-2px 0 2px 14px;padding:10px 12px 8px;border-left:3px solid var(--accent);border-radius:0 12px 12px 0;background:var(--surface2)">'
+    + '<div style="font:700 13.5px/1.35 var(--sans);color:var(--text2)">Who at the managing agent gets it</div><div style="font:400 12.5px/1.45 var(--sans);color:var(--muted);margin:1px 0 6px">' + why + '</div>'
+    + r.people.map(function(p, i){ var on = chosen.indexOf(p.email) >= 0;
+        return '<label for="pf-person-' + i + '" style="display:flex;align-items:center;gap:12px;min-height:46px;padding:4px 0;cursor:pointer' + (i ? ';border-top:1px solid var(--border2)' : '') + '">'
+          + '<input id="pf-person-' + i + '" type="checkbox" data-email="' + ptEsc(p.email) + '"' + (on ? ' checked' : '') + ' onchange="ptPick(\'person\',{email:this.getAttribute(\'data-email\'),on:this.checked})" style="width:22px;height:22px;flex:none;margin:0;accent-color:var(--accent)">'
+          + '<span style="min-width:0"><span style="display:block;font:700 14px/1.3 var(--sans);color:var(--text2);overflow-wrap:anywhere">' + ptEsc(p.name) + '</span><span style="display:block;font:400 12.5px/1.4 var(--sans);color:var(--muted)">' + PT_R.roles[p.role] + '</span></span></label>'; }).join('')
+    + '</div>';
+}
+// One line for the ticket's activity log: who the report was emailed to when it was sent in.
+function ptRouteLog(pf){ pf = pf || {}; if((pf.notify !== 'agent' && pf.notify !== 'both') || !pf.who) return ''; return '📧 Emailed to the managing agent on submission: ' + pf.who; }
+// Settings: the people, their job, and the off-switch.
+function ptREditRows(){
+  var ed = PT.rEdit, inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box';
+  if(!ed.rows.length) return '<div class="bl-hint" style="margin-top:10px">Nobody listed — a report for the managing agent then goes to everyone with the managing-agent role under Users, as it did before.</div>';
+  return ed.rows.map(function(p, i){
+    return '<div style="margin-top:10px;padding:10px;border:1px solid var(--border2);border-radius:10px;background:var(--surface)">'
+      + '<div style="display:flex;gap:8px;align-items:center"><input id="pt-rn-' + i + '" type="text" maxlength="60" placeholder="Name" aria-label="Name" value="' + ptEsc(p.name) + '" style="' + inCss + ';flex:1;min-width:0"><button type="button" class="bl-btn" aria-label="Remove ' + ptEsc(p.name || 'this person') + '" onclick="ptREditDel(' + i + ')" style="flex:none;min-width:44px;min-height:40px">✕</button></div>'
+      + '<input id="pt-re-' + i + '" type="email" maxlength="120" placeholder="Email address" aria-label="Email address" inputmode="email" autocapitalize="off" spellcheck="false" value="' + ptEsc(p.email) + '" style="' + inCss + ';margin-top:6px">'
+      + '<select id="pt-rr-' + i + '" aria-label="What this person handles" style="' + inCss + ';margin-top:6px">' + Object.keys(PT_R.roles).map(function(k){ return '<option value="' + k + '"' + (p.role === k ? ' selected' : '') + '>' + PT_R.roles[k] + '</option>'; }).join('') + '</select></div>';
+  }).join('');
+}
+function ptREditCollect(){ var ed = PT.rEdit; if(!ed) return; var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; }; ed.rows = ed.rows.map(function(p, i){ return { name:g('pt-rn-' + i), email:g('pt-re-' + i), role:g('pt-rr-' + i) || p.role }; }); var on = document.getElementById('pt-r-on'); if(on) ed.on = !!on.checked; }
+function ptREditPaint(){ var el = document.getElementById('pt-r-rows'); if(el) el.innerHTML = ptREditRows(); }
+function ptREditAdd(){ ptREditCollect(); if(PT.rEdit.rows.length >= PT_R.max) return; PT.rEdit.rows.push({ name:'', email:'', role:'maintenance' }); ptREditPaint(); var el = document.getElementById('pt-rn-' + (PT.rEdit.rows.length - 1)); if(el) el.focus(); }
+function ptREditDel(i){ ptREditCollect(); PT.rEdit.rows.splice(i, 1); ptREditPaint(); }
+async function ptREdit(){
+  if(typeof _currentRole === 'undefined' || _currentRole !== 'admin' || typeof blDialog !== 'function') return;
+  var r = await ptRLoad();
+  PT.rEdit = { on:r.on, rows:r.people.map(function(p){ return Object.assign({}, p); }) };
+  var body = '<div class="bl-hint" style="margin-bottom:6px">When a resident reports an issue and chooses to email the managing agent, these people are listed with the right ones ticked: <b>Admin and billing</b> for a report in the “Admin &amp; billing” category, <b>Maintenance and repairs</b> for everything else, and anyone marked <b>copied on every report</b> each time. The resident can change the ticks. Meter readings are not affected.</div>'
+    + '<label for="pt-r-on" style="display:flex;align-items:flex-start;gap:10px;min-height:44px;cursor:pointer"><input id="pt-r-on" type="checkbox"' + (r.on ? ' checked' : '') + ' style="width:20px;height:20px;flex:none;margin-top:2px;accent-color:var(--accent)"><span style="font:400 13px/1.5 var(--sans);color:var(--text2)"><b>Send each report to the right person.</b> Untick to go back to emailing everyone with the managing-agent role under Users.</span></label>'
+    + '<div id="pt-r-rows">' + ptREditRows() + '</div>'
+    + '<button type="button" class="bl-btn" style="width:100%;margin-top:10px" onclick="ptREditAdd()">＋ Add a person</button>';
+  var res = await blDialog({ title:'Who at the managing agent gets a report', body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:ptREditCollect }, { label:'Cancel', value:false }] });
+  var ed = PT.rEdit; PT.rEdit = null;
+  if(res !== 'save' || !ed) return;
+  var typed = ed.rows.filter(function(p){ return String(p.name).trim() || String(p.email).trim(); }), val = ptRClean({ on:ed.on, adminCats:r.adminCats, people:typed });
+  if(val.people.length < typed.length && typeof blToast === 'function') blToast((typed.length - val.people.length) + ' left out — each person needs a valid email address, used once', 'err');
+  try { await sbSetSetting(PT_R.key, val); await ptRLoad(); if(typeof blToast === 'function') blToast('Saved', 'ok'); }
+  catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — try again.', 'err'); }
+  ptEmSettings();
+}
+function ptRSummary(r){
+  if(!r.people.length) return 'Nobody listed — everyone with the managing-agent role is emailed';
+  var by = function(k){ return r.people.filter(function(p){ return p.role === k; }).map(function(p){ return p.name; }).join(', ') || 'nobody'; };
+  return (r.on ? '' : 'Switched off — everyone with the managing-agent role is emailed. Saved list: ') + 'Admin and billing → ' + by('admin') + ' · Maintenance and repairs → ' + by('maintenance') + ' · Copied on every report → ' + by('always');
 }
 
 // ── Tracker (signed in): who can see a ticket, public updates, "reported fixed" ──
@@ -12629,6 +12781,8 @@ function ptBanner(){
 function ptInstall(){
   if(PT.installed) return; PT.installed = true;
   if(typeof renderPublicReportForm === 'function'){ var r0 = renderPublicReportForm; renderPublicReportForm = function(){ var r = r0.apply(this, arguments); try { ptInject(); } catch(e){} return r; }; }
+  // picking a category re-ticks the usual people for it (and an admin matter turns private)
+  if(typeof pubSelectCategory === 'function'){ var pc = pubSelectCategory; pubSelectCategory = function(){ var r = pc.apply(this, arguments); try { if(PT.flow && document.getElementById('pf-flow')){ PT.flow.people = null; ptFlowRender(); } } catch(e){} return r; }; }
   if(typeof renderTicketLinkedDocs === 'function'){ var rl = renderTicketLinkedDocs; renderTicketLinkedDocs = function(t){ var r = rl.apply(this, arguments); try { if(t && PT.tktId && t.id === PT.tktId){ clearTimeout(PT.tktT); PT.tktT = setTimeout(function(){ if(PT.tktId === t.id) ptTktRender(t.id); }, 60); } } catch(e){} return r; }; }
   if(typeof openTicketModal === 'function'){ var o = openTicketModal; openTicketModal = function(id){ var r = o.apply(this, arguments); try { ptTktOpen(id); } catch(e){} return r; }; }
   var pub = (typeof _PUBLIC_MODE !== 'undefined') ? _PUBLIC_MODE : null;
@@ -12765,6 +12919,7 @@ function ptEmEdit(){ return ptCEdit('em'); }
 function ptEmSettings(){
   var nEl = document.getElementById('pt-c-sum-not'); if(nEl) ptNLoad().then(function(list){ var live = ptNLive(); nEl.textContent = (live.length ? live.map(function(e){ return e.title; }).join(' · ') : 'None showing') + (list.length > live.length ? ' (' + (list.length - live.length) + ' expired)' : ''); });
   var wEl = document.getElementById('pt-c-sum-wcu'); if(wEl) ptWLoad().then(function(w){ wEl.textContent = w.url ? w.title + ' → ' + w.url + (w.embed ? ' (shown inside the page when the portal allows it)' : ' (opens in a new tab only)') : 'Hidden — no link set'; });
+  var rEl = document.getElementById('pt-c-sum-rt'); if(rEl) ptRLoad().then(function(r){ rEl.textContent = ptRSummary(r); });
   var dEl = document.getElementById('pt-c-sum-doc'); if(dEl) ptDLoad().then(function(list){ dEl.textContent = list.length ? list.map(function(e){ return e.title; }).join(' · ') : 'None'; });
   ['em', 'ag', 'cs'].forEach(function(k){
     var el = document.getElementById('pt-c-sum-' + k); if(!el) return;
@@ -13231,6 +13386,271 @@ function tkBuildAction(){
 }
 function tkInstall(){ try { tkBuildBar(); } catch(e){ console.warn('tkBuildBar', e); } try { tkBuildEditor(); } catch(e){ console.warn('tkBuildEditor', e); } try { tkBuildAction(); } catch(e){ console.warn('tkBuildAction', e); } }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', tkInstall); else tkInstall();
+
+// ═══ Usage — is the report page being used? ═════════════════════════════════════════════════════
+// Report page side: counts visits and which rows / buttons are used, per device, and sends them to
+// /api/usage (functions/usage.js). A device is a random id this browser keeps (the same one "Me too"
+// uses). Kept: days visited, counts, kind of device, browser, home-screen icon or not, and the unit
+// number if this device has sent a meter reading. NOT kept: names, IP addresses, exact times.
+// A visit in which a report is sent anonymously is taken back out, so the counts cannot point at
+// whoever sent it.
+// Main app side: a "Usage" item (admin and trustees) that shows the counts.
+var US = { on:false, q:{ visit:false, opens:{}, did:{} }, sent:{ opens:{}, did:{} }, timer:null, chain:Promise.resolve(), mute:false, seen:{}, data:null, filter:'res', err:'', loading:false, nav:false };
+var US_OPEN = { em:'Emergency numbers', ag:'Managing agent’s numbers', wcu:'Invoices and billing', cs:'City services', doc:'Documents', report:'Report an issue', water:'Water meter reading', elec:'Electricity meter reading', issues:'Current issues logged', install:'Add to home screen' };
+var US_DID = { report:'Reports sent (with a name)', water:'Water readings sent', elec:'Electricity readings sent', metoo:'“Me too” taps', update:'Updates posted', fixed:'“This has been fixed”', call:'Numbers tapped to call', email:'Addresses tapped to email', doc:'Documents opened', link:'Links opened', wcu:'Billing portal opened' };
+var US_GAP = 30 * 60 * 1000;      // a new visit = at least half an hour since the last one counted
+
+function usEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+function usPrefix(){ try { return schemePrefix(); } catch(e){ return ''; } }
+function usDev(){ if(typeof ptDev === 'function') return ptDev(); return ''; }
+// A short code for a device, so someone can say which one is theirs ("mine says K7QF").
+function usCode(dev){ var h = 0, s = String(dev || ''); for(var i = 0; i < s.length; i++){ h = (h * 31 + s.charCodeAt(i)) >>> 0; } var c = h.toString(36).toUpperCase(); return ('0000' + c).slice(-4); }
+function usKind(){
+  var ua = navigator.userAgent || '', touch = (navigator.maxTouchPoints || 0) > 1;
+  if(/iPhone|iPod/.test(ua)) return 'iPhone';
+  if(/iPad/.test(ua) || (/Macintosh/.test(ua) && touch)) return 'iPad';
+  if(/Android/.test(ua)) return /Mobile/.test(ua) ? 'Android phone' : 'Android tablet';
+  if(/CrOS/.test(ua)) return 'Chromebook';
+  if(/Windows/.test(ua)) return 'Windows computer';
+  if(/Macintosh|Mac OS X/.test(ua)) return 'Mac';
+  if(/Linux/.test(ua)) return 'Linux computer';
+  return 'Other';
+}
+function usBrowser(){
+  var ua = navigator.userAgent || '';
+  if(/FBAN|FBAV|Instagram|Line\/|WhatsApp|; wv\)/.test(ua)) return 'In-app browser';
+  if(/SamsungBrowser/.test(ua)) return 'Samsung Internet';
+  if(/EdgA?\/|EdgiOS/.test(ua)) return 'Edge';
+  if(/OPR\/|Opera/.test(ua)) return 'Opera';
+  if(/Firefox|FxiOS/.test(ua)) return 'Firefox';
+  if(/CriOS|Chrome\//.test(ua)) return 'Chrome';
+  if(/Safari/.test(ua)) return 'Safari';
+  return 'Other';
+}
+function usUnit(){ var u = ''; try { u = localStorage.getItem('pm_wr_unit') || localStorage.getItem('pm_er_unit') || ''; } catch(e){} return /^main$/i.test(u) ? '' : String(u).slice(0, 12); }
+function usStaff(){ try { return !!(typeof getSessionToken === 'function' && getSessionToken()); } catch(e){ return false; } }
+function usApp(){ try { return !!navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch(e){ return false; } }
+
+// ── Report page: collecting ─────────────────────────────────────────────────────────────────────
+function usBump(map, key){ map[key] = (map[key] || 0) + 1; }
+function usOpen(key){ if(!US.on || US.mute || !US_OPEN[key]) return; usBump(US.q.opens, key); usSoon(); }
+function usDid(key){ if(!US.on || US.mute || !US_DID[key]) return; usBump(US.q.did, key); usSoon(); }
+function usSoon(){ clearTimeout(US.timer); US.timer = setTimeout(function(){ usFlush(false); }, 4000); }
+function usPending(){ return US.q.visit || Object.keys(US.q.opens).length || Object.keys(US.q.did).length; }
+function usSend(body, beacon){
+  var json = JSON.stringify(body);
+  try { if(beacon && navigator.sendBeacon && navigator.sendBeacon('/api/usage', new Blob([json], { type:'application/json' }))) return Promise.resolve(); } catch(e){}
+  return fetch('/api/usage', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:json, keepalive:true }).then(function(){}, function(){});
+}
+function usFlush(beacon){
+  clearTimeout(US.timer);
+  if(!US.on || US.mute || !usPending()) return;
+  var q = US.q; US.q = { visit:false, opens:{}, did:{} };
+  Object.keys(q.opens).forEach(function(k){ US.sent.opens[k] = (US.sent.opens[k] || 0) + q.opens[k]; });
+  Object.keys(q.did).forEach(function(k){ US.sent.did[k] = (US.sent.did[k] || 0) + q.did[k]; });
+  var body = { prefix:usPrefix(), dev:usDev(), visit:q.visit, app:usApp(), kind:usKind(), browser:usBrowser(), unit:usUnit(), staff:usStaff(), opens:q.opens, did:q.did };
+  if(beacon) usSend(body, true); else US.chain = US.chain.then(function(){ return usSend(body, false); });
+}
+// An anonymous report was sent: take this visit, and what was tapped in it, back out — and count nothing more on this page load.
+function usForget(){
+  if(!US.on || US.mute) return;
+  clearTimeout(US.timer); US.mute = true; US.q = { visit:false, opens:{}, did:{} };
+  try { localStorage.removeItem('pm_us_visit'); } catch(e){}
+  var body = { prefix:usPrefix(), dev:usDev(), forget:true, undo:US.sent };
+  US.chain = US.chain.then(function(){ return usSend(body, false); });
+}
+function usNote(){
+  if(document.getElementById('us-note')) return true;
+  var host = document.getElementById('public-view-content'); if(!host || !host.children.length) return false;
+  var d = document.createElement('div'); d.id = 'us-note';
+  d.style.cssText = 'margin:14px 6px 20px;font:400 12px/1.5 var(--sans);color:var(--muted);text-align:center;overflow-wrap:anywhere';
+  d.innerHTML = 'The trustees can see how often this page is used and which buttons are tapped, per device — never your name. A report sent anonymously is not counted. Device code <b style="color:var(--text2);letter-spacing:.5px">' + usEsc(usCode(usDev())) + '</b>';
+  host.appendChild(d); return true;
+}
+function usStart(){
+  var pub = (typeof _PUBLIC_MODE !== 'undefined') ? _PUBLIC_MODE : null;
+  if(!pub || ['submit', 'water', 'electricity'].indexOf(pub.kind) < 0) return;
+  try { if(new URLSearchParams(location.search).has('test')) return; } catch(e){}
+  if(!usDev()) return;
+  US.on = true;
+  var now = Date.now(), last = 0; try { last = Number(localStorage.getItem('pm_us_visit')) || 0; } catch(e){}
+  if(!last || now - last > US_GAP || now < last){ US.q.visit = true; try { localStorage.setItem('pm_us_visit', String(now)); } catch(e){} }
+  if(pub.kind === 'water') usBump(US.q.opens, 'water'); else if(pub.kind === 'electricity') usBump(US.q.opens, 'elec');
+  setTimeout(function(){ usFlush(false); }, 1500);
+  // rows opened; numbers, addresses, documents and links tapped
+  document.addEventListener('click', function(ev){
+    try {
+      var t = ev.target; if(!t || !t.closest) return;
+      var row = t.closest('.pt-row');
+      if(row){ if(row.getAttribute('aria-expanded') !== 'true'){ var m = /pt-row-([a-z]+)/.exec(row.className); if(m) usOpen(m[1]); } return; }
+      var lb = t.closest('#pt-list-btn'); if(lb){ if(lb.getAttribute('aria-expanded') !== 'true') usOpen('issues'); return; }
+      var a = t.closest('a[href], #pt-wcu-go'); if(!a || !a.closest('#public-view-content')) return;
+      var href = String(a.getAttribute('href') || '');
+      if(a.id === 'pt-wcu-go' || a.closest('#pt-c-wcu')) usDid('wcu');
+      else if(/^tel:/i.test(href)) usDid('call');
+      else if(/^mailto:/i.test(href)) usDid('email');
+      else if(a.closest('#pt-c-doc')) usDid('doc');
+      else if(/^https?:/i.test(href)) usDid('link');
+    } catch(e){}
+  }, true);
+  // things sent: readings, reports (a named one is counted; an anonymous one un-counts the visit)
+  if(typeof sbUpsert === 'function'){ var up = sbUpsert; sbUpsert = function(table, id, data){
+    try {
+      if(!US.seen[table + ':' + id]){
+        if(table === 'water_readings'){ US.seen[table + ':' + id] = 1; usDid('water'); }
+        else if(table === 'electricity_readings'){ US.seen[table + ':' + id] = 1; usDid('elec'); }
+        else if(table === 'tickets' && data && data.createdViaPublicForm){ US.seen[table + ':' + id] = 1; if(data.anonymous) usForget(); else usDid('report'); }
+      }
+    } catch(e){}
+    return up.apply(this, arguments);
+  }; }
+  // "Me too", updates and "this has been fixed" go through the public list's own address
+  var f0 = window.fetch; window.fetch = function(u, o){
+    try { if(String(u).indexOf('/api/public-tickets') >= 0 && o && String(o.method || '').toUpperCase() === 'POST'){ var b = JSON.parse(o.body || '{}'); if(b.action === 'metoo') usDid('metoo'); else if(b.action === 'comment') usDid('update'); else if(b.action === 'fixed') usDid('fixed'); } } catch(e){}
+    return f0.apply(this, arguments);
+  };
+  var bye = function(){ usFlush(true); };
+  window.addEventListener('pagehide', bye);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'hidden') bye(); });
+  var tries = 0, tick = function(){ if(usNote() || ++tries > 20) return; setTimeout(tick, 400); }; setTimeout(tick, 600);
+}
+
+// ── Main app: the Usage screen ──────────────────────────────────────────────────────────────────
+function usCanOpen(){ return typeof _currentRole !== 'undefined' && (_currentRole === 'admin' || _currentRole === 'trustee'); }
+function usDayAdd(day, n){ var d = new Date(day + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function usDayName(day, today){ if(!day) return 'never'; if(day === today) return 'today'; if(day === usDayAdd(today, -1)) return 'yesterday'; return (typeof blDate === 'function') ? blDate(day) : day; }
+function usSince(row, today, n){ var from = usDayAdd(today, -(n - 1)), t = 0; Object.keys(row.days || {}).forEach(function(d){ if(d >= from && d <= today) t += row.days[d]; }); return t; }
+function usShown(){ var list = (US.data && US.data.devices) || []; return list.filter(function(r){ return r.visits > 0 && (US.filter === 'all' || (!r.staff && !r.hide)); }); }
+function usWho(r){ return r.label || (r.unit ? 'Unit ' + r.unit : 'Not identified'); }
+async function usLoad(){
+  US.loading = true; US.err = '';
+  try {
+    var r = await fetch('/api/usage?prefix=' + encodeURIComponent(usPrefix()), { headers:{ 'X-PM-Session':(typeof getSessionToken === 'function' && getSessionToken()) || '' } });
+    var j = await r.json(); if(!r.ok || !j || !j.ok) throw new Error((j && j.error) || 'failed');
+    US.data = j;
+  } catch(e){ US.err = String(e.message || e); }
+  US.loading = false;
+}
+async function openUsage(){
+  if(!usCanOpen()){ if(typeof blToast === 'function') blToast('Only trustees and admin can see the usage counts.', 'err'); return; }
+  var m = document.getElementById('us-modal'); if(!m) return;
+  m.style.display = 'flex'; document.body.style.overflow = 'hidden';
+  if(!US.nav && typeof blNavPush === 'function'){ US.nav = true; blNavPush(function(){ US.nav = false; closeUsage(true); }); }
+  usRender(); await usLoad(); usRender();
+}
+function closeUsage(fromBack){
+  var m = document.getElementById('us-modal'); if(m) m.style.display = 'none';
+  if(typeof BL === 'undefined' || !BL.open) document.body.style.overflow = '';
+  if(US.nav && fromBack !== true){ US.nav = false; if(typeof blNavPop === 'function') blNavPop(); }
+}
+function usSetFilter(f){ US.filter = f === 'all' ? 'all' : 'res'; usRender(); }
+async function usRefresh(){ await usLoad(); usRender(); if(!US.err && typeof blToast === 'function') blToast('Up to date', 'ok'); }
+function usTile(n, label){ return '<div class="us-tile"><b>' + n + '</b><span>' + label + '</span></div>'; }
+function usChart(rows, today){
+  var days = [], max = 0; for(var i = 29; i >= 0; i--){ var d = usDayAdd(today, -i), v = 0, dev = 0; rows.forEach(function(r){ var n = (r.days || {})[d] || 0; v += n; if(n) dev++; }); days.push({ d:d, v:v, dev:dev }); if(v > max) max = v; }
+  var total = days.reduce(function(a, x){ return a + x.v; }, 0);
+  var nice = function(d){ return usDayName(d, today); };
+  var bars = days.map(function(x, i){
+    var h = max ? Math.max(x.v ? 4 : 0, Math.round(x.v / max * 100)) : 0, tip = nice(x.d) + ': ' + x.v + ' visit' + (x.v === 1 ? '' : 's') + (x.v ? ' from ' + x.dev + ' device' + (x.dev === 1 ? '' : 's') : '');
+    return '<button type="button" class="us-col" aria-label="' + usEsc(tip) + '" data-tip="' + usEsc(tip) + '" onmouseenter="usTip(this)" onfocus="usTip(this)" onclick="usTip(this)" onmouseleave="usTip(null)" onblur="usTip(null)"><i style="height:' + h + '%"></i></button>';
+  }).join('');
+  return '<section class="us-card"><div class="us-h">Visits per day — last 30 days</div>'
+    + (total ? '<div class="us-chart"><div class="us-ymax" aria-hidden="true">' + max + '</div><div class="us-bars" id="us-bars">' + bars + '</div><div class="us-x" aria-hidden="true"><span>' + usEsc(nice(days[0].d)) + '</span><span>' + usEsc(nice(days[15].d)) + '</span><span>today</span></div><div class="us-tip" id="us-tip" role="status" aria-live="polite">Tap or point at a bar to see the day.</div></div>'
+        + '<details class="us-more"><summary>Show as a table</summary><table class="us-tb"><thead><tr><th>Day</th><th class="r">Visits</th><th class="r">Devices</th></tr></thead><tbody>' + days.slice().reverse().filter(function(x){ return x.v; }).map(function(x){ return '<tr><td>' + usEsc(nice(x.d)) + '</td><td class="r">' + x.v + '</td><td class="r">' + x.dev + '</td></tr>'; }).join('') + '</tbody></table></details>'
+      : '<div class="us-empty">No visits in the last 30 days.</div>')
+    + '</section>';
+}
+function usTip(el){ var t = document.getElementById('us-tip'); if(!t) return; Array.prototype.forEach.call(document.querySelectorAll('#us-bars .us-col.on'), function(c){ c.classList.remove('on'); }); if(el){ el.classList.add('on'); t.textContent = el.getAttribute('data-tip'); } }
+function usCounts(rows, field, names, title, unitWord){
+  var keys = Object.keys(names).map(function(k){ var n = 0, dev = 0; rows.forEach(function(r){ var c = (r[field] || {})[k] || 0; n += c; if(c) dev++; }); return { k:k, n:n, dev:dev }; }).filter(function(x){ return x.n; }).sort(function(a, b){ return b.n - a.n; });
+  return '<section class="us-card"><div class="us-h">' + title + '</div>' + (keys.length
+    ? '<table class="us-tb"><thead><tr><th>' + unitWord + '</th><th class="r">Times</th><th class="r">Devices</th></tr></thead><tbody>' + keys.map(function(x){ return '<tr><td>' + usEsc(names[x.k]) + '</td><td class="r">' + x.n + '</td><td class="r">' + x.dev + '</td></tr>'; }).join('') + '</tbody></table>'
+    : '<div class="us-empty">Nothing yet.</div>') + '</section>';
+}
+function usDevice(r, today){
+  var top = function(field, names){ return Object.keys(r[field] || {}).filter(function(k){ return names[k]; }).sort(function(a, b){ return r[field][b] - r[field][a]; }).map(function(k){ return usEsc(names[k]) + ' <b>' + r[field][k] + '</b>'; }).join(' · '); };
+  var opens = top('opens', US_OPEN), did = top('did', US_DID), v30 = usSince(r, today, 30);
+  return '<div class="us-dev" data-dev="' + usEsc(r.dev) + '"><div class="us-dev-top"><span class="us-code" title="Device code — shown at the bottom of the report page on that device">' + usEsc(usCode(r.dev)) + '</span><b class="us-who">' + usEsc(usWho(r)) + '</b>'
+    + (r.label && r.unit ? '<span class="us-chip">Unit ' + usEsc(r.unit) + '</span>' : '') + (r.staff ? '<span class="us-chip us-chip-staff">Trustee’s device</span>' : '') + (r.hide ? '<span class="us-chip">Left out of the totals</span>' : '') + (r.dev === usDev() ? '<span class="us-chip us-chip-me">This browser</span>' : '') + '</div>'
+    + '<div class="us-line">' + usEsc([r.kind || 'Unknown device', r.browser || '', r.app ? 'uses the home-screen icon' : 'in the browser'].filter(Boolean).join(' · ')) + '</div>'
+    + '<div class="us-line">Last seen <b>' + usEsc(usDayName(r.last, today)) + '</b> · first seen ' + usEsc(usDayName(r.first, today)) + ' · <b>' + r.visits + '</b> visit' + (r.visits === 1 ? '' : 's') + (v30 !== r.visits ? ' (' + v30 + ' in the last 30 days)' : '') + '</div>'
+    + (opens ? '<div class="us-line"><span class="us-k">Opened</span> ' + opens + '</div>' : '') + (did ? '<div class="us-line"><span class="us-k">Did</span> ' + did + '</div>' : '')
+    + '<div class="us-acts"><button type="button" class="bl-btn" onclick="usLabel(\'' + usEsc(r.dev) + '\')">Name this device</button><button type="button" class="bl-btn" onclick="usRemove(\'' + usEsc(r.dev) + '\')">Remove</button></div></div>';
+}
+function usRender(){
+  var body = document.getElementById('us-body'), sub = document.getElementById('us-sub'); if(!body) return;
+  if(US.loading && !US.data){ body.innerHTML = '<div class="us-empty">Loading…</div>'; return; }
+  if(US.err && !US.data){ body.innerHTML = '<div class="us-empty">Couldn’t load the usage counts — ' + usEsc(US.err) + '<div style="margin-top:10px"><button type="button" class="bl-btn pri" onclick="usRefresh()">Try again</button></div></div>'; return; }
+  var d = US.data || { today:new Date().toISOString().slice(0, 10), devices:[] }, today = d.today, all = d.devices.filter(function(r){ return r.visits > 0; }), rows = usShown();
+  var out = all.length - all.filter(function(r){ return !r.staff && !r.hide; }).length;
+  if(sub) sub.textContent = 'the report page · counted per device';
+  var seg = '<div class="us-seg" role="group" aria-label="Whose devices to count"><button type="button" class="' + (US.filter === 'res' ? 'on' : '') + '" aria-pressed="' + (US.filter === 'res') + '" onclick="usSetFilter(\'res\')">Residents</button><button type="button" class="' + (US.filter === 'all' ? 'on' : '') + '" aria-pressed="' + (US.filter === 'all') + '" onclick="usSetFilter(\'all\')">Everyone' + (out ? ' (+' + out + ')' : '') + '</button></div>';
+  var head = '<div class="us-bar">' + seg + '<button type="button" class="bl-btn" onclick="usRefresh()">↻ Refresh</button></div>';
+  if(!all.length){ body.innerHTML = head + '<div class="us-empty"><b>Nothing counted yet.</b><br>Counting starts from the first time someone opens the report page after this version went live. Open the report link on your phone and come back here.</div>' + usAbout(); return; }
+  var active7 = rows.filter(function(r){ return usSince(r, today, 7) > 0; }).length, v7 = rows.reduce(function(a, r){ return a + usSince(r, today, 7); }, 0), v30 = rows.reduce(function(a, r){ return a + usSince(r, today, 30); }, 0);
+  var units = {}; rows.forEach(function(r){ if(r.unit) units[r.unit] = 1; });
+  var tiles = '<div class="us-tiles">' + usTile(rows.length, 'devices have opened it') + usTile(active7, 'active in the last 7 days') + usTile(v7, 'visits in the last 7 days') + usTile(v30, 'visits in the last 30 days') + usTile(rows.filter(function(r){ return r.app; }).length, 'use the home-screen icon') + usTile(Object.keys(units).length, 'units recognised') + '</div>';
+  var devs = rows.slice().sort(function(a, b){ return (b.last || '').localeCompare(a.last || '') || b.visits - a.visits; });
+  body.innerHTML = head + (US.err ? '<div class="us-empty">Couldn’t refresh — ' + usEsc(US.err) + '</div>' : '') + tiles + usChart(rows, today)
+    + usCounts(rows, 'opens', US_OPEN, 'What gets opened', 'Row on the report page') + usCounts(rows, 'did', US_DID, 'What gets done', 'Action')
+    + '<section class="us-card"><div class="us-h">Devices <span class="us-n">' + devs.length + '</span></div>' + (devs.length ? devs.map(function(r){ return usDevice(r, today); }).join('') : '<div class="us-empty">No resident devices yet — choose “Everyone” to see the trustees’ own.</div>') + '</section>' + usAbout();
+}
+function usAbout(){
+  return '<details class="us-more us-about"><summary>What is counted, and what is not</summary><div>'
+    + '<p><b>A device</b> is one browser on one phone or computer. The same person on a phone and a laptop — or in Safari and on the home-screen icon — shows as two devices. This browser’s own code is <b>' + usEsc(usCode(usDev())) + '</b>.</p>'
+    + '<p><b>Counted:</b> the days it was opened (a new visit after half an hour away), which rows were opened, what was tapped or sent, the kind of device and browser, and whether it runs from the home-screen icon.</p>'
+    + '<p><b>Who it is:</b> the page never asks. A unit number appears only when that device has sent a meter reading. Each device shows a four-character code at the bottom of the report page, so someone can tell you theirs and you can name it here.</p>'
+    + '<p><b>Not kept:</b> names, IP addresses, locations or exact times. A visit in which a report is sent anonymously is removed from the counts, so this screen cannot be used to work out who sent it.</p>'
+    + '<p>A device where a trustee or admin is signed in is marked as a trustee’s device and left out of “Residents”. Use “Name this device” to leave out any other device of your own.</p></div></details>';
+}
+async function usLabel(dev){
+  var r = ((US.data && US.data.devices) || []).filter(function(x){ return x.dev === dev; })[0]; if(!r || typeof blDialog !== 'function') return;
+  var inCss = 'width:100%;padding:9px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font:400 15px var(--sans);outline:none;box-sizing:border-box';
+  var body = '<div class="bl-hint">Device ' + usEsc(usCode(r.dev)) + ' — ' + usEsc([r.kind, r.browser].filter(Boolean).join(' · ') || 'unknown') + '. A name here is only for the trustees; the resident never sees it.</div>'
+    + '<label class="bl-lbl" for="us-l-name" style="display:block;margin-top:8px">Name</label><input id="us-l-name" type="text" maxlength="60" placeholder="e.g. My phone, or the person’s name" value="' + usEsc(r.label) + '" style="' + inCss + '">'
+    + '<label class="bl-lbl" for="us-l-unit" style="display:block;margin-top:8px">Unit number</label><input id="us-l-unit" type="text" maxlength="12" inputmode="numeric" placeholder="optional" value="' + usEsc(r.unit) + '" style="' + inCss + '">'
+    + '<label for="us-l-hide" style="display:flex;align-items:flex-start;gap:10px;margin-top:12px;min-height:44px;cursor:pointer"><input id="us-l-hide" type="checkbox"' + (r.hide ? ' checked' : '') + ' style="width:20px;height:20px;flex:none;margin-top:2px;accent-color:var(--accent)"><span style="font:400 13px/1.5 var(--sans);color:var(--text2)"><b>Leave it out of the resident totals.</b> For your own devices and anyone else’s who is not a resident.</span></label>';
+  var got = null, grab = function(){ var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; }; got = { label:g('us-l-name'), unit:g('us-l-unit'), hide:!!(document.getElementById('us-l-hide') || {}).checked }; };
+  var res = await blDialog({ title:'Name this device', body:body, cancel:false, buttons:[{ label:'Save', kind:'pri', value:'save', onClick:grab }, { label:'Cancel', value:false }] });
+  if(res !== 'save' || !got) return;
+  await usPost({ action:'label', dev:dev, label:got.label, unit:got.unit, hide:got.hide }, 'Saved');
+}
+async function usRemove(dev){
+  if(typeof blConfirm !== 'function') return;
+  var ok = await blConfirm('Remove this device’s counts?', '<p>Device ' + usEsc(usCode(dev)) + ' is taken off this list. If it opens the report page again it starts from zero.</p>', 'Remove'); if(!ok) return;
+  await usPost({ action:'remove', dev:dev }, 'Removed');
+}
+async function usPost(b, done){
+  try {
+    b.prefix = usPrefix();
+    var r = await fetch('/api/usage', { method:'POST', headers:{ 'Content-Type':'application/json', 'X-PM-Session':(typeof getSessionToken === 'function' && getSessionToken()) || '' }, body:JSON.stringify(b) });
+    var j = await r.json(); if(!r.ok || !j || !j.ok) throw new Error((j && j.error) || 'failed');
+    if(typeof blToast === 'function') blToast(done, 'ok');
+  } catch(e){ if(typeof blToast === 'function') blToast('Couldn’t save — ' + String(e.message || e), 'err'); }
+  await usLoad(); usRender();
+}
+function usApplyAccess(){ var t = document.getElementById('us-tab'); if(t) t.style.display = usCanOpen() ? 'inline-flex' : 'none'; }
+function usInstall(){
+  if(US.installed) return; US.installed = true;
+  try { usStart(); } catch(e){}
+  if(US.on) return;                                   // the report page: nothing of the trustees' screen is needed
+  var nav = document.querySelector('.tabs');
+  if(nav && !nav.querySelector('[data-tab="usage"]')){
+    var b = document.createElement('button'); b.className = 'tab'; b.id = 'us-tab'; b.setAttribute('data-tab', 'usage'); b.textContent = 'Usage'; b.style.display = 'none';
+    b.addEventListener('click', function(){ openUsage(); });
+    var after = nav.querySelector('[data-tab="electricity"]') || nav.querySelector('[data-tab="water"]');
+    if(after && after.nextSibling) nav.insertBefore(b, after.nextSibling); else nav.appendChild(b);
+    if(typeof NAV_MENU_META !== 'undefined') NAV_MENU_META.usage = { label:'Usage', icon:'📈' };
+  }
+  if(!document.getElementById('us-modal')){
+    var m = document.createElement('div'); m.id = 'us-modal'; m.setAttribute('onclick', 'if(event.target===this)closeUsage()');
+    m.innerHTML = '<div class="bl-sheet" role="dialog" aria-modal="true" aria-label="Usage of the report page"><div class="bl-sh"><button class="bl-back" aria-label="Close" onclick="closeUsage()">←</button><div class="bl-sh-t"><b>📈 Usage</b><span id="us-sub"></span></div></div><div class="bl-body" id="us-body"></div></div>';
+    document.body.appendChild(m);
+  }
+  if(typeof applyBillingAccess === 'function'){ var o = applyBillingAccess; applyBillingAccess = function(){ var r = o.apply(this, arguments); try { usApplyAccess(); } catch(e){} return r; }; }
+  usApplyAccess();
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', usInstall); else usInstall();
 
 </script>
 
@@ -15951,6 +16371,11 @@ function deleteDuplicates(){
           <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">📞 Managing agent contacts on the report page</div>
           <div id="pt-c-sum-ag" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
           <button onclick="ptCEdit('ag')" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit contacts</button>
+        </div>
+        <div id="agent-routing-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">📧 Who at the managing agent gets a report</div>
+          <div id="pt-c-sum-rt" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:8px;line-height:1.6;overflow-wrap:anywhere"></div>
+          <button onclick="ptREdit()" style="padding:8px 12px;background:var(--info-bg);border:1px solid var(--info-bd);border-radius:6px;color:var(--info);font-size:11px;font-family:var(--mono);cursor:pointer;white-space:nowrap">Edit people</button>
         </div>
         <div id="billing-portal-row" style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border2)">
           <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">🧾 Invoices and billing link on the report page</div>
@@ -27777,7 +28202,7 @@ function buildPublicFormFields(editing, existing){
   var photoInputDisabled = (editing && photosLeft <= 0);
   var catTiles = [
     ['Plumbing','\ud83d\udea0'], ['Electrical','\ud83d\udca1'], ['Common Area','\ud83c\udfde'],
-    ['Security','\ud83d\udd12'], ['Structural','\ud83e\uddf1'], ['Pests','\ud83d\udc00'],
+    ['Security','\ud83d\udd12'], ['Structural','\ud83e\uddf1'], ['Pests','\ud83d\udc00'], ['Admin','\ud83e\uddfe','Admin & billing'],
     ['Water Reading','\ud83d\udca7'], ['Electricity Reading','\u26a1'], ['Other','\u2753']
   ];
   window._pubCategory = ex.category || '';
@@ -27786,7 +28211,7 @@ function buildPublicFormFields(editing, existing){
     + '<div id="pub-cat-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:14px">'
     + catTiles.map(function(c){
         var on = window._pubCategory === c[0];
-        return '<button type="button" data-cat="'+c[0]+'" onclick="pubSelectCategory(this)" style="padding:10px 6px;border-radius:10px;border:1.5px solid '+(on?'var(--accent)':'var(--border2)')+';background:'+(on?'var(--accent-bg)':'var(--surface)')+';color:var(--text2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">'+c[1]+'</span>'+c[0]+'</button>';
+        return '<button type="button" data-cat="'+c[0]+'" onclick="pubSelectCategory(this)" style="padding:10px 6px;border-radius:10px;border:1.5px solid '+(on?'var(--accent)':'var(--border2)')+';background:'+(on?'var(--accent-bg)':'var(--surface)')+';color:var(--text2);font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:20px">'+c[1]+'</span>'+(c[2] || c[0]).replace('&','&amp;')+'</button>';
       }).join('')
     + '</div>';
   return ''
@@ -27937,6 +28362,7 @@ var PUB_CAT_HINTS = {
   'Security':   ['e.g. Gate motor not closing properly', 'What happened, where, and when?'],
   'Structural': ['e.g. Crack in the bathroom wall', 'Where is it, roughly how big, and is it getting worse?'],
   'Pests':      ['e.g. Rats near the bins', 'What have you seen, where, and how often?'],
+  'Admin':      ['e.g. Query on my levy statement', 'Which statement or month, the amount, and what looks wrong or what you need. Please leave out bank details.'],
   'Water Reading': ['Water meter reading', 'Type all the digits shown on your meter (e.g. 03457.2) and the date you took the reading. A photo of the meter helps a lot.'],
   'Other':      ['e.g. Question about parking', 'Tell us what\'s going on or what you\'d like to know \u2014 as much detail as helps.']
 };
@@ -28187,6 +28613,7 @@ async function submitPublicReport(){
       linkedDocIds: photoIds,
       log: [{type: 'status', text: '+ Submitted via public form' + (name ? ' by ' + name : ''), ts: Date.now()}]
     };
+    if(typeof ptRouteLog === 'function'){ var _rl = ptRouteLog(window._ptFlow); if(_rl) ticket.log.push({type:'note', text:_rl, ts: Date.now()}); }
     // Resident proposal: attach it as a criterion attributed to the resident and
     // move the ticket straight to Awaiting Trustee Approval so trustees can vote.
     // The timeline keeps the original "open" (submitted) entry, then shows the
@@ -28250,6 +28677,7 @@ async function submitPublicReport(){
               phone: phone,
               category: window._pubCategory || 'Other',
               urgent: !!window._ptUrgentNow, notify: (window._ptFlow || {}).notify || '', anonymous: !!(window._ptFlow && window._ptFlow.anon),
+              agentPeople: (window._ptFlow || {}).people || [], prefix: (typeof schemePrefix === 'function') ? schemePrefix() : '',
               bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
               attachments: notifyAtt
             })
@@ -28293,6 +28721,7 @@ async function submitPublicReport(){
           email: email,
           category: window._pubCategory || 'Other',
           urgent: !!window._ptUrgentNow, notify: (window._ptFlow || {}).notify || '', anonymous: !!(window._ptFlow && window._ptFlow.anon),
+          agentPeople: (window._ptFlow || {}).people || [], prefix: (typeof schemePrefix === 'function') ? schemePrefix() : '',
           bcInbox: (typeof currentSchemeNotifyEmail==='function') ? currentSchemeNotifyEmail() : '',
           attachments: notifyAtt
         })

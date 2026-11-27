@@ -1,5 +1,45 @@
 # Billing changelog
 
+## v2.41 — Usage: is the report page being used?
+**New "Usage" item in the main app** (menu, for admin and trustees)
+- Six totals: devices that have opened the report page, active in the last 7 days, visits in the last 7 and 30 days, how many use the home-screen icon, and how many units are recognised.
+- **Visits per day** for the last 30 days as a bar chart (tap a bar for the day's count; "Show as a table" underneath).
+- **What gets opened** (Emergency numbers, Documents, Current issues logged …) and **What gets done** (numbers tapped to call, documents opened, readings sent, "Me too", updates, reports sent with a name) — times and number of devices.
+- **Devices:** one entry per phone or computer browser — kind of device and browser, home-screen icon or browser, first seen, last seen, visits, what it opened and did. **Name this device** adds a name and unit and can leave it out of the resident totals; **Remove** deletes its counts.
+- "Residents / Everyone" switch: a device where a trustee or admin is signed in is marked as a trustee's device and left out of "Residents".
+
+**How a device is recognised**
+- The page never asks who someone is. A **unit number** shows only when that device has sent a meter reading. Every device shows a four-character **device code** at the bottom of the report page; the same code is on its entry under Usage, so a resident (or you, on your own phone) can say which one is theirs.
+- The same person on two devices — or in Safari and on the home-screen icon — counts as two devices.
+
+**What is deliberately not kept**
+- No names, no IP addresses or locations, no exact times (days only), no full browser string.
+- **A visit in which a report is sent anonymously is removed from the counts**, and nothing more is counted on that page load — so this screen cannot be used to work out who sent an anonymous report.
+- A short line at the bottom of the report page tells residents the page is counted.
+- Link previews and bots are ignored; links opened with `&test` are not counted; the trustees' app itself is not counted.
+
+**Technical:** `functions/usage.js` (`/api/usage`) and `functions/_usage-shared.js`; one `settings` row per device, key `usage:<device id>`, per complex — no new table. Counting starts when this version is live; there is no history before that.
+
+## v2.40 — A report goes to the right person at the managing agent
+**On the report page**
+- New category tile **Admin & billing** in "Report an issue" (levies, statements, payments, account queries). In the tracker it is the existing **Admin** category.
+- Under **Managing agent** (and under **Both**) in "Who should be emailed right now?" there is now a short list of the people at the managing agent, each with what they handle and a tick-box. The right ones are ticked already, from the category picked:
+  - Admin & billing → **Ruaan** (admin and billing) and **Tara** (copied on every report)
+  - anything else → **Cheryl** (maintenance and repairs) and **Tara**
+- The resident can change the ticks — take Tara off, add Cheryl, and so on. Picking a different category starts again from the usual people. At least one person must be ticked.
+- The summary line names them ("Ruaan and Tara at the managing agent are emailed now"), and the ticket's activity log records who was emailed on submission.
+- **Admin & billing reports are always private**: the "can everyone follow this on the list?" question is replaced by a note, and the report never goes on the public list.
+
+**The email**
+- It is addressed to the ticked person or people; anyone marked "copied on every report" is in Cc, with the resident as before. The email has a "Sent to" line.
+- When this is on, a report for the managing agent no longer goes to everyone with the managing-agent role under Users (or `AGENT_NOTIFY_EMAIL`) — only to the people ticked. Trustees, the Park Manor inbox, "Just log it" and meter readings are unchanged.
+- The form only sends back addresses; the server uses an address only if it is in the saved list, so the form cannot send mail anywhere else (`functions/_route-shared.js`).
+
+**Settings → Who at the managing agent gets a report → Edit people** (admin)
+- A list of people: name, email address and what they handle — **Admin and billing**, **Maintenance and repairs**, or **Managing agent — copied on every report**. Add or remove people; more than one person can have the same job.
+- A tick at the top switches the whole thing off (back to emailing everyone with the managing-agent role).
+- `settings` key `agent_routing`, per complex. Park Manor starts with Ruaan, Cheryl and Tara until a list is saved; another complex starts empty and behaves as before until its own people are entered.
+
 ## v2.39 — Two separate home-screen icons: the report page and the trustees' app
 - **The fault:** adding the main app (the tracker) to an iPhone home screen gave an icon that opened the report page. The page source named the report page's manifest, whose start address is `/?report`; the page switched to the admin manifest by script, but the iPhone used the one in the page source.
 - **The fix:** the manifest named in the page source (`manifest-page.json`, new) has no start address, so a phone that reads only that one opens the icon on the page it was added from. The script still switches to the full manifest for each side (`manifest.json` on the resident links, `manifest-admin.json` everywhere else), which is what Android uses.
