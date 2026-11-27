@@ -1,5 +1,21 @@
 # Billing changelog
 
+## v2.43 — Trustees approve quotes and proposals on the report page
+**Signing in on the report page**
+- At the bottom of the report page there is a quiet line: **Trustee or managing agent? Sign in**. Residents never need it; everything they see is unchanged.
+- A trustee, an admin or the managing agent signs in with their existing username and password. A device that is already signed in to the main app in the same browser is recognised without signing in again. **Sign out** is in the panel.
+
+**The Approvals row** (purple, under the notices — only when signed in)
+- Lists every ticket that is **Awaiting trustee approval**: number, category, unit, title and description, and each **quote**, **supplier quote** and **proposal** on it — supplier, amount, quote number, **View the quote**, how many approvals it has (e.g. "2 of 3") and who gave them.
+- A **trustee** taps **Approve**, is asked once in place, and the approval is recorded in their own name — the same approvals list, log line and 3-trustee threshold the main app uses. **Take it back** withdraws it.
+- **The third approval moves the ticket to Work In Progress** in the same step. The trustee is told so before confirming; the reporter gets the usual status email. If an item already has three approvals (given in the main app) but the ticket was not moved, a **Move to Work in progress** button does it.
+- **Emailing the managing agent:** at that step the people from *Settings → Who at the managing agent gets a report* are listed with tick-boxes — the maintenance person (or the admin-and-billing person for an Admin ticket) and whoever is copied on everything are ticked; change the ticks, or untick all to send nothing. The email says what was approved, the amount, who approved it, and links the quote. The ticket records who was told.
+- **Approved — going ahead:** below the waiting list, the tickets approved in the last 90 days, with the chosen item, who approved it and who at the managing agent was told.
+- **Admin and managing agent** see both lists but have no approve buttons here. (An admin still records an approval on a trustee's behalf in the main app, as before.)
+- Before saving, the newest copy of the ticket is fetched, so two trustees approving close together both count.
+
+**Technical:** `ta.js` in the page; new `functions/approved-notify.js` (`/api/approved-notify`) — it builds the email from the database, only for a ticket that really is in progress with three approvals on that item, and only to addresses in the saved routing list. Nothing in the main app's approval panel was changed.
+
 ## v2.42 — One log per ticket: activity log and report-page updates together
 **In the ticket editor**
 - The **Activity log** now lists everything in one place, newest first: the trustees' own entries *and* whatever came in through the report page (a resident's update, "this has been fixed", a public reply). The separate "Updates" list and "Public reply" box under *On the report page* are gone; a short note there says how many updates residents see and jumps to the log.

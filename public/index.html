@@ -13393,6 +13393,278 @@ function ulInstall(){
 }
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ulInstall); else ulInstall();
 
+// ═══ Trustee approvals on the report page ═══════════════════════════════════════════════════════
+// The report page is the "light" app: anyone can read it. A trustee who signs in on it also gets
+// an "Approvals" row listing the tickets that are awaiting trustee approval, with their quotes and
+// proposals, and can approve one — the same vote the main app's approval panel records (same
+// approvals list on the ticket, same threshold). When an item reaches the threshold the ticket
+// moves to Work In Progress.
+//   • Only a trustee approves here, as themselves. An admin signed in sees the list but is told to
+//     record approvals on a trustee's behalf in the main app.
+//   • As everywhere in this app this is a workflow and audit step, not an access boundary.
+var TA = { open:false, list:null, done:[], loading:false, err:'', busy:'', login:false, loginErr:'', loginBusy:false, more:{}, ask:null, msg:null };
+function taEl(id){ return document.getElementById(id); }
+function taEsc(s){ return (typeof ptEsc === 'function') ? ptEsc(s) : String(s == null ? '' : s); }
+var TA_ROLES = { trustee:'trustee', admin:'admin', management:'managing agent' };
+function taSess(){ try { var s = (typeof getLocalSession === 'function') ? getLocalSession() : null; if(s && s.userId && TA_ROLES[s.role]) return { id:s.userId, name:s.name || s.username || 'Trustee', role:s.role }; } catch(e){} return null; }      // trustees approve; admin and the managing agent look only
+function taNeed(){ return (typeof TRUSTEE_APPROVAL_THRESHOLD !== 'undefined') ? TRUSTEE_APPROVAL_THRESHOLD : 3; }
+function taToast(m, k){ TA.msg = { text:m, kind:k || 'ok' }; taRender(); }
+function taMoney(v){ return (typeof _shareMoney === 'function') ? _shareMoney(v) : ''; }
+function taIsWaiting(t){ var s = (typeof normalizeStatus === 'function') ? normalizeStatus(t.status) : t.status; return !!t && s === 'awaiting_trustee_approval' && (t.type || 'maintenance') === 'maintenance'; }
+function taItems(t){ try { return _shareApprovableItems(t); } catch(e){ return []; } }
+function taVotes(t, itemId){ return ((typeof getTicketApprovals === 'function') ? getTicketApprovals(t) : (t.approvals || [])).filter(function(a){ return a && a.quoteId === itemId; }); }
+function taWinner(t){ var c = {}, win = ''; ((typeof getTicketApprovals === 'function') ? getTicketApprovals(t) : []).forEach(function(a){ if(!a) return; c[a.quoteId] = (c[a.quoteId] || 0) + 1; if(c[a.quoteId] >= taNeed() && !win) win = a.quoteId; }); return win; }      // the item that reached the threshold
+// The managing agent's people (Settings → who at the managing agent gets a report) and who is ticked for this ticket's category.
+function taPeople(){ try { var r = (typeof ptRLive === 'function') ? ptRLive() : null; return r ? r.people : []; } catch(e){ return []; } }
+function taPeopleDefault(t){ var all = taPeople(); if(!all.length) return []; var cats = (ptRCur().adminCats || []).map(function(x){ return x.toLowerCase(); }), kind = cats.indexOf(String(t.category || '').toLowerCase()) >= 0 ? 'admin' : 'maintenance';
+  var main = all.filter(function(p){ return p.role === kind; }); if(!main.length) main = all.filter(function(p){ return p.role !== 'always'; });
+  return main.concat(all.filter(function(p){ return p.role === 'always'; })).map(function(p){ return p.email; }); }
+function taNames(emails){ var n = taPeople().filter(function(p){ return emails.indexOf(p.email) >= 0; }).map(function(p){ return p.name; }); return n.length > 1 ? n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1] : (n[0] || ''); }
+function taMineCount(){ var s = taSess(); if(!s || !TA.list) return 0; return TA.list.filter(function(t){ return !((typeof getTicketApprovals === 'function') ? getTicketApprovals(t) : []).some(function(a){ return a.trusteeId === s.id; }); }).length; }
+
+async function taLoad(){
+  if(TA.loading) return; TA.loading = true; TA.err = ''; taRender();
+  try {
+    var rows = await sbLoadAll('tickets'), list = [];
+    var done = [], since = Date.now() - 90 * 86400000;
+    Object.keys(rows || {}).forEach(function(id){ var t = rows[id]; if(!t) return; t.id = t.id || id;
+      if(taIsWaiting(t)){ TICKETS[id] = t; list.push(t); }
+      else if((t.type || 'maintenance') === 'maintenance' && ['work_in_progress', 'done'].indexOf((typeof normalizeStatus === 'function') ? normalizeStatus(t.status) : t.status) >= 0 && (t.updated || 0) > since && taWinner(t)){ TICKETS[id] = t; done.push(t); } });
+    list.sort(function(a, b){ return (b.updated || b.added || 0) - (a.updated || a.added || 0); });
+    done.sort(function(a, b){ return (b.updated || 0) - (a.updated || 0); }); TA.done = done.slice(0, 8);
+    var ids = []; list.concat(TA.done).forEach(function(t){ (t.linkedDocIds || []).forEach(function(d){ if(!INVOICES[d]) ids.push(d); }); if(t.quotes) Object.keys(t.quotes).forEach(function(k){ var q = t.quotes[k]; if(q && q.docId && !INVOICES[q.docId]) ids.push(q.docId); }); });
+    if(ids.length && typeof fetchMissingInvoices === 'function'){ try { await fetchMissingInvoices(ids); } catch(e){} }
+    try { if(typeof SUPPLIERS !== 'undefined' && !Object.keys(SUPPLIERS).length){ var sup = await sbLoadAll('suppliers', { global:true }); Object.keys(sup || {}).forEach(function(k){ SUPPLIERS[k] = sup[k]; }); } } catch(e){}
+    TA.list = list;
+  } catch(e){ TA.err = 'Couldn’t load the approvals — check your connection and try again.'; }
+  TA.loading = false; taRender();
+}
+function taStyle(){
+  if(taEl('ta-style')) return; var s = document.createElement('style'); s.id = 'ta-style';
+  s.textContent = '.pt-row.pt-row-ta{background:#5b4bc4;border-color:#5b4bc4;color:#fff;box-shadow:0 4px 14px rgba(91,75,196,.28)}.pt-row-ta .pt-st,.pt-row-ta .pt-cv{color:rgba(255,255,255,.92)}.pt-row-ta .pt-ic{background:rgba(255,255,255,.18)}'
+    + '.ta-bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;margin:0 2px 10px;font:400 13px/1.5 var(--sans);color:var(--muted)}.ta-bar b{color:var(--text2)}'
+    + '.ta-link{min-height:40px;padding:6px 12px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:600 13px var(--sans);cursor:pointer}'
+    + '.ta-card{margin:0 0 12px;border:1px solid var(--border2);border-radius:14px;background:var(--surface);box-shadow:0 1px 3px rgba(16,24,40,.08);overflow:hidden;border-left:5px solid #5b4bc4}'
+    + '.ta-head{padding:14px 16px 10px}.ta-meta{font:600 11.5px/1.4 var(--sans);letter-spacing:.2px;color:var(--muted)}.ta-title{margin-top:3px;font:700 16.5px/1.3 var(--sans);color:var(--text);overflow-wrap:anywhere}'
+    + '.ta-desc{margin-top:6px;font:400 13.5px/1.55 var(--sans);color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere}.ta-desc.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}'
+    + '.ta-more{margin-top:2px;padding:8px 14px 8px 0;border:none;background:none;color:var(--accent2);font:600 13px var(--sans);cursor:pointer;min-height:44px;min-width:88px;text-align:left}'
+    + '.ta-item{margin:0 12px 12px;padding:12px 14px;border:1px solid var(--border2);border-radius:12px;background:var(--surface2)}.ta-item.met{border-color:var(--green-bd,rgba(74,222,158,.5));background:var(--green-bg,rgba(74,222,158,.1))}'
+    + '.ta-kind{display:inline-block;padding:2px 9px;border-radius:99px;border:1px solid var(--border2);background:var(--surface);font:600 11.5px var(--sans);color:var(--text2)}'
+    + '.ta-name{margin-top:6px;font:700 15px/1.35 var(--sans);color:var(--text);overflow-wrap:anywhere;white-space:pre-wrap}.ta-amt{margin-top:2px;font:700 17px/1.3 var(--sans);color:var(--text);font-variant-numeric:tabular-nums}'
+    + '.ta-votes{margin-top:8px;font:400 13px/1.5 var(--sans);color:var(--text2)}.ta-votes b{font-variant-numeric:tabular-nums}'
+    + '.ta-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.ta-btn{flex:1 1 140px;min-height:46px;padding:8px 14px;border-radius:12px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:700 14px var(--sans);cursor:pointer}'
+    + '.ta-btn.pri{background:#5b4bc4;border-color:#5b4bc4;color:#fff}.ta-btn.go{background:var(--green,#1e9e6a);border-color:var(--green,#1e9e6a);color:#fff}.ta-btn.done{background:var(--surface);color:var(--green,#1e9e6a);border-color:var(--green-bd,rgba(74,222,158,.5))}.ta-btn:disabled{opacity:.6;cursor:default}'
+    + '.ta-ask{flex:1 1 100%;font:400 13.5px/1.55 var(--sans);color:var(--text2)}.ta-msg{margin:0 0 12px;padding:10px 12px;border-radius:12px;font:600 13.5px/1.5 var(--sans);border:1px solid var(--green-bd,rgba(74,222,158,.5));background:var(--green-bg,rgba(74,222,158,.12));color:var(--text2)}.ta-msg.err{border-color:var(--red-bd,rgba(240,111,111,.45));background:var(--red-bg,rgba(240,111,111,.08))}'
+    + '.ta-sec{margin:18px 2px 10px;font:700 15px/1.3 var(--sans);color:var(--text2)}.ta-card.ta-done{border-left-color:var(--green,#1e9e6a)}.ta-tell{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border2)}.ta-tell label{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;font:400 13.5px/1.4 var(--sans);color:var(--text2)}.ta-tell input{width:22px;height:22px;flex:none;margin:0;accent-color:#5b4bc4}'
+    + '.ta-empty{padding:16px 12px;text-align:center;font:400 14px/1.6 var(--sans);color:var(--muted)}'
+    + '#ta-signin{margin:6px 4px 0;text-align:center}#ta-signin > button{min-height:40px;padding:6px 12px;border:none;background:none;color:var(--muted);font:500 13px var(--sans);text-decoration:underline;cursor:pointer}'
+    + '.ta-login{max-width:420px;margin:8px auto 0;padding:14px;border:1px solid var(--border2);border-radius:14px;background:var(--surface);text-align:left}.ta-login label{display:block;margin:8px 0 4px;font:600 12.5px var(--sans);color:var(--muted)}'
+    + '.ta-login input{width:100%;min-height:46px;padding:10px 12px;box-sizing:border-box;border:1px solid var(--border2);border-radius:10px;background:var(--surface2);color:var(--text);font:400 16px var(--sans);outline:none}.ta-login .err{min-height:18px;margin-top:8px;font:500 13px var(--sans);color:var(--red,#d9534f)}';
+  document.head.appendChild(s);
+}
+// The boxes this needs on the landing: the Approvals row under the notices, and a quiet sign-in line at the bottom.
+function taMount(){
+  if(taEl('ta-box')) return true;
+  var em = taEl('pt-c-em'), inst = taEl('pt-install'); if(!em || !inst) return false;
+  taStyle();
+  em.insertAdjacentHTML('beforebegin', '<div id="ta-box" style="display:none;margin-bottom:10px"></div>');
+  inst.insertAdjacentHTML('afterend', '<div id="ta-signin"></div>');
+  return true;
+}
+function taRender(){
+  if(!taMount()) return;
+  var box = taEl('ta-box'), sign = taEl('ta-signin'), s = taSess();
+  // not signed in: only the quiet line (and the sign-in box when it is opened)
+  if(!s){
+    box.style.display = 'none'; box.innerHTML = '';
+    sign.innerHTML = '<button type="button" id="ta-signin-btn" aria-expanded="' + TA.login + '" onclick="taLoginToggle()">Trustee or managing agent? Sign in</button>'
+      + (TA.login ? '<form class="ta-login" id="ta-login" onsubmit="event.preventDefault();taLogin()"><div style="font:400 13px/1.5 var(--sans);color:var(--text2)">For trustees (to approve quotes and proposals) and the managing agent (to see what has been approved). Residents do not need to sign in — everything else on this page works without it.</div>'
+        + '<label for="ta-user">Username</label><input id="ta-user" type="text" autocomplete="username" autocapitalize="off" spellcheck="false">'
+        + '<label for="ta-pass">Password</label><input id="ta-pass" type="password" autocomplete="current-password">'
+        + '<div class="err" id="ta-login-err" role="alert">' + taEsc(TA.loginErr) + '</div><button type="submit" class="ta-btn pri" style="width:100%"' + (TA.loginBusy ? ' disabled' : '') + '>' + (TA.loginBusy ? 'Signing in…' : 'Sign in') + '</button></form>' : '');
+    return;
+  }
+  sign.innerHTML = '';
+  var n = TA.list ? TA.list.length : 0, mine = taMineCount(), isTrustee = s.role === 'trustee';
+  var sub = TA.list == null ? 'Quotes and proposals waiting for the trustees' : !n ? (TA.done.length ? 'Nothing is waiting · ' + TA.done.length + ' approved' : 'Nothing is waiting') : (isTrustee && mine ? mine + ' waiting for your approval' : n + ' awaiting approval');
+  var h = ptRowHtml({ id:'ta-row', kind:'ta', icon:'🗳', title:'Approvals', sub:sub, open:TA.open, controls:'ta-body', onclick:'taToggle()' });
+  if(TA.open){
+    h += '<div id="ta-body" style="margin-top:10px"><div class="ta-bar"><span>Signed in as <b>' + taEsc(s.name) + '</b>' + ' · ' + TA_ROLES[s.role] + '</span><span><button type="button" class="ta-link" onclick="taLoad()">↻ Refresh</button> <button type="button" class="ta-link" onclick="taSignOut()">Sign out</button></span></div>';
+    if(TA.msg) h += '<div id="ta-msg" role="status" aria-live="polite" class="ta-msg ' + (TA.msg.kind === 'err' ? 'err' : 'ok') + '">' + taEsc(TA.msg.text) + '</div>';
+    if(!isTrustee) h += '<div class="ta-empty" style="text-align:left;padding:10px 12px;border:1px solid var(--border2);border-radius:12px;background:var(--surface2);margin-bottom:12px">' + (s.role === 'management' ? 'You are signed in for the managing agent. You can see what is waiting for the trustees and what they have approved; only a trustee approves.' : 'You are signed in as an admin. On this page only a trustee approves, in their own name. To record an approval on a trustee’s behalf, use the ticket in the main app.') + '</div>';
+    if(TA.loading && !TA.list) h += '<div class="ta-empty">Loading…</div>';
+    else if(TA.err) h += '<div class="ta-empty">' + taEsc(TA.err) + '</div>';
+    else if(!n) h += '<div class="ta-empty"><b>Nothing is waiting for approval.</b><br>When a ticket is moved to “Awaiting trustee approval”, its quotes and proposals appear here.</div>';
+    else h += TA.list.map(function(t){ return taCard(t, s, isTrustee); }).join('');
+    if(TA.list && !TA.err && TA.done.length) h += '<div class="ta-sec" id="ta-done">✅ Approved — going ahead</div>' + TA.done.map(taDoneCard).join('');
+    h += '</div>';
+  }
+  box.innerHTML = h; box.style.display = '';
+}
+function taCard(t, s, isTrustee){
+  var items = taItems(t), need = taNeed(), desc = String(t.desc || '').trim(), long = desc.length > 180, openDesc = !!TA.more[t.id];
+  var meta = [(t.ticketNumber != null ? '#' + t.ticketNumber : ''), t.category || '', t.unit ? 'Unit ' + t.unit : '', (typeof ptDay === 'function' && (t.added || t.dateOpen)) ? 'logged ' + ptDay(t.added || Date.parse(t.dateOpen)) : ''].filter(Boolean).join(' · ');
+  var h = '<div class="ta-card" data-ticket="' + taEsc(t.id) + '"><div class="ta-head"><div class="ta-meta">' + taEsc(meta) + '</div><div class="ta-title">' + taEsc(t.title || 'Untitled') + '</div>'
+    + (desc ? '<div class="ta-desc' + (long && !openDesc ? ' clamp' : '') + '">' + taEsc(desc) + '</div>' + (long ? '<button type="button" class="ta-more" onclick="taMore(\'' + taEsc(t.id) + '\')">' + (openDesc ? 'Show less' : 'Read it all') + '</button>' : '') : '') + '</div>';
+  if(!items.length) return h + '<div class="ta-empty" style="padding-top:0">No quote or proposal has been added to this ticket yet.</div></div>';
+  h += items.map(function(it){
+    var votes = taVotes(t, it.id), mine = votes.some(function(a){ return a.trusteeId === s.id; }), met = votes.length >= need, amt = taMoney(it.amount), busy = TA.busy === t.id + '|' + it.id;
+    var names = votes.map(function(a){ return taEsc(a.trusteeName || 'Trustee'); }).join(', ');
+    var acts = '', ask = TA.ask && TA.ask.tid === t.id && TA.ask.itemId === it.id ? TA.ask : null;
+    if(ask && isTrustee){
+      var q = ask.kind === 'undo' ? '<b>Take back your approval?</b> Your approval is removed and the count goes down by one.'
+        : ask.kind === 'start' ? '<b>Move this ticket to Work in progress?</b> It has the ' + need + ' approvals it needs. Whoever reported it is told the work is starting.'
+        : votes.length + 1 >= need ? '<b>Approve this ' + taEsc(it.kind.toLowerCase()) + '?</b> Yours is approval ' + (votes.length + 1) + ' of ' + need + '. That is enough: the ticket moves to <b>Work in progress</b> and whoever reported it is told.'
+        : '<b>Approve this ' + taEsc(it.kind.toLowerCase()) + '?</b> It is recorded in your name (' + taEsc(s.name) + '). ' + need + ' trustees must approve the same item before the work starts — this makes ' + (votes.length + 1) + '.';
+      var moves = ask.kind === 'start' || (ask.kind === 'approve' && votes.length + 1 >= need), ppl = moves ? taPeople() : [];
+      if(ppl.length) q += '<div class="ta-tell"><b>Email the managing agent that it is going ahead</b>' + ppl.map(function(p, i){ var on = (ask.people || []).indexOf(p.email) >= 0; return '<label for="ta-p-' + i + '"><input id="ta-p-' + i + '" type="checkbox" data-email="' + taEsc(p.email) + '"' + (on ? ' checked' : '') + (busy ? ' disabled' : '') + ' onchange="taPerson(this.getAttribute(\'data-email\'),this.checked)"><span><b>' + taEsc(p.name) + '</b> — ' + taEsc(PT_R.roles[p.role] || '') + '</span></label>'; }).join('') + '</div>';
+      acts = '<div class="ta-ask" role="alertdialog" aria-label="Please confirm">' + q + '</div><button type="button" class="ta-btn ' + (ask.kind === 'start' ? 'go' : 'pri') + ' ta-yes"' + (busy ? ' disabled' : '') + ' onclick="taConfirm()">' + (busy ? 'Saving…' : ask.kind === 'undo' ? 'Yes, take it back' : ask.kind === 'start' ? 'Yes, move it' : 'Yes, approve') + '</button><button type="button" class="ta-btn ta-no"' + (busy ? ' disabled' : '') + ' onclick="taCancel()">Cancel</button>';
+    } else {
+    if(it.docId) acts += '<button type="button" class="ta-btn" onclick="taDoc(\'' + taEsc(it.docId) + '\')">📄 View the quote</button>';
+    if(isTrustee){
+      acts += mine ? '<button type="button" class="ta-btn done"' + (busy ? ' disabled' : '') + ' onclick="taApprove(\'' + taEsc(t.id) + '\',\'' + taEsc(it.id) + '\',true)">✓ You approved — take it back</button>'
+                   : '<button type="button" class="ta-btn pri"' + (busy ? ' disabled' : '') + ' onclick="taApprove(\'' + taEsc(t.id) + '\',\'' + taEsc(it.id) + '\',false)">' + (busy ? 'Saving…' : 'Approve') + '</button>';
+      if(met) acts += '<button type="button" class="ta-btn go"' + (busy ? ' disabled' : '') + ' onclick="taStart(\'' + taEsc(t.id) + '\',\'' + taEsc(it.id) + '\')">▶ Move to Work in progress</button>';
+    }
+    }
+    return '<div class="ta-item' + (met ? ' met' : '') + '" data-item="' + taEsc(it.id) + '"><span class="ta-kind">' + taEsc(it.kind) + (it.number ? ' ' + taEsc(it.number) : '') + '</span><div class="ta-name">' + taEsc(it.name) + '</div>' + (amt ? '<div class="ta-amt">' + taEsc(amt) + '</div>' : '')
+      + '<div class="ta-votes"><b>' + votes.length + ' of ' + need + '</b> approvals' + (met ? ' — <b>enough to start the work</b>' : '') + (names ? '<br>' + names : '') + '</div><div class="ta-acts">' + acts + '</div></div>';
+  }).join('');
+  return h + '</div>';
+}
+function taDoneCard(t){
+  var win = taWinner(t), it = taItems(t).filter(function(x){ return x.id === win; })[0] || { kind:'Item', name:'(no longer on the ticket)' }, votes = taVotes(t, win), amt = taMoney(it.amount);
+  var st = (typeof normalizeStatus === 'function') ? normalizeStatus(t.status) : t.status, told = t.agentTold && t.agentTold.to ? t.agentTold.to.concat(t.agentTold.copied || []).join(', ') : '';
+  return '<div class="ta-card ta-done" data-ticket="' + taEsc(t.id) + '"><div class="ta-head"><div class="ta-meta">' + taEsc([(t.ticketNumber != null ? '#' + t.ticketNumber : ''), t.category || '', t.unit ? 'Unit ' + t.unit : '', st === 'done' ? 'Done' : 'In progress'].filter(Boolean).join(' · ')) + '</div><div class="ta-title">' + taEsc(t.title || 'Untitled') + '</div></div>'
+    + '<div class="ta-item met"><span class="ta-kind">' + taEsc(it.kind) + (it.number ? ' ' + taEsc(it.number) : '') + '</span><div class="ta-name">' + taEsc(it.name) + '</div>' + (amt ? '<div class="ta-amt">' + taEsc(amt) + '</div>' : '')
+    + '<div class="ta-votes">Approved by <b>' + votes.map(function(a){ return taEsc(a.trusteeName || 'Trustee'); }).join(', ') + '</b>' + (told ? '<br>Managing agent told: ' + taEsc(told) : '') + '</div>'
+    + (it.docId ? '<div class="ta-acts"><button type="button" class="ta-btn" onclick="taDoc(\'' + taEsc(it.docId) + '\')">📄 View the quote</button></div>' : '') + '</div></div>';
+}
+function taMore(id){ TA.more[id] = !TA.more[id]; taRender(); }
+function taToggle(){ TA.open = !TA.open; taRender(); if(TA.open && !TA.list) taLoad(); }
+function taLoginToggle(){ TA.login = !TA.login; TA.loginErr = ''; taRender(); if(TA.login){ var u = taEl('ta-user'); if(u) u.focus(); } }
+async function taLogin(){
+  var u = (taEl('ta-user') || {}).value, p = (taEl('ta-pass') || {}).value; u = String(u || '').trim().toLowerCase(); p = String(p || '');
+  var fail = function(m){ TA.loginBusy = false; TA.loginErr = m; taRender(); var ue = taEl('ta-user'); if(ue) ue.value = u; };
+  if(!u || !p) return fail('Enter your username and password.');
+  TA.loginBusy = true; TA.loginErr = ''; taRender(); var ue0 = taEl('ta-user'); if(ue0) ue0.value = u;
+  var user = null;
+  try {
+    var r = await fetch('/api/passkey/password-login', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ username:u, password:p }) });
+    if(r.ok){ var d = await r.json(); if(d && d.token && typeof setSessionToken === 'function'){ try { setSessionToken(d.token); } catch(e){} } user = d && d.user; }
+    else if(r.status !== 404 && r.status < 500) return fail('That username or password is not right.');
+  } catch(e){}
+  if(!user){                                              // the server sign-in is not there (or is down): check against the users list, as the main app does
+    try { var rows = await sbLoadAll('users'), cand = Object.keys(rows || {}).map(function(k){ var x = rows[k]; if(x && !x.id) x.id = k; return x; }).filter(function(x){ return x && String(x.username || '').toLowerCase() === u; })[0];
+      if(cand && typeof verifyPassword === 'function' && await verifyPassword(p, cand.password)) user = cand; } catch(e){}
+  }
+  if(!user) return fail('That username or password is not right.');
+  if(!TA_ROLES[user.role]) return fail('That login is not a trustee’s or the managing agent’s, so there is nothing more to see here.');
+  try { if(typeof setLocalSession === 'function') setLocalSession(user); } catch(e){}
+  try { _currentUserObj = user; _currentRole = user.role; _isAdmin = (user.role === 'admin'); } catch(e){}
+  TA.loginBusy = false; TA.login = false; TA.loginErr = ''; TA.open = true; TA.list = null;
+  taRender(); taLoad(); try { taEl('ta-box').scrollIntoView({ behavior:'smooth', block:'start' }); } catch(e){}
+}
+function taSignOut(){
+  try { if(typeof clearLocalSession === 'function') clearLocalSession(); } catch(e){}
+  try { if(typeof setSessionToken === 'function') setSessionToken(null); } catch(e){}
+  try { _currentUserObj = null; _currentRole = null; _isAdmin = false; } catch(e){}
+  TA.open = false; TA.list = null; TA.ask = null; TA.msg = null; taRender();
+}
+// The newest copy of the ticket, so two trustees approving close together do not overwrite each other.
+async function taFresh(id){
+  try { var want = scopedId(id), r = await supa.from('tickets').select('id, data').eq('id', want).limit(1), row = r && !r.error && Array.isArray(r.data) ? r.data.filter(function(x){ return x && x.id === want; })[0] : null;
+    if(row && row.data){ var t = row.data; t.id = t.id || id; return t; } } catch(e){}
+  return TICKETS[id] || null;
+}
+async function taSave(t){ TICKETS[t.id] = t; await sbUpsert('tickets', t.id, t); }
+// Email the ticked people at the managing agent. Returns the sentence for the message line.
+async function taTell(t, itemId, people){
+  if(!taPeople().length) return '';
+  if(!people || !people.length) return ' The managing agent was not emailed.';
+  try {
+    var r = await fetch('/api/approved-notify', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ prefix:ptPrefix(), id:t.id, item:itemId, agentPeople:people, token:(typeof getSessionToken === 'function' && getSessionToken()) || '', bcInbox:(typeof currentSchemeNotifyEmail === 'function') ? currentSchemeNotifyEmail() : '' }) });
+    var j = await r.json();
+    if(r.ok && j && j.ok && j.sent){
+      t.agentTold = { ts:Date.now(), to:j.to || [], copied:j.copied || [] }; t.log = t.log || [];
+      t.log.push({ type:'email', text:'📧 Managing agent told it is going ahead: ' + (j.to || []).join(', ') + ((j.copied || []).length ? ' — copied: ' + j.copied.join(', ') : ''), ts:Date.now() + 2 });
+      await taSave(t); return ' ' + taNames(people) + ' at the managing agent ' + (people.length === 1 ? 'has' : 'have') + ' been emailed.';
+    }
+    return ' The email to the managing agent did not go' + (j && (j.error || j.reason) ? ' (' + (j.error || j.reason) + ')' : '') + ' — please let them know yourself.';
+  } catch(e){ return ' The email to the managing agent did not go — please let them know yourself.'; }
+}
+function taToWip(t, label, who){
+  t.status = 'work_in_progress'; t.log = t.log || [];
+  t.log.push({ type:'status', text:'▶ Set to In Progress — ' + taNeed() + ' trustees approved: ' + label + ' (' + who + ', via the report page)', ts:Date.now() + 1 });
+  try { if(typeof notifyReporterStatusChange === 'function') notifyReporterStatusChange(t, 'work_in_progress'); } catch(e){}
+}
+function taApprove(tid, itemId, undo){ var s = taSess(); if(!s || s.role !== 'trustee' || TA.busy || !TICKETS[tid]) return; TA.ask = { tid:tid, itemId:itemId, kind:undo ? 'undo' : 'approve', people:taPeopleDefault(TICKETS[tid]) }; TA.msg = null; taRender(); }
+function taPerson(email, on){ var a = TA.ask; if(!a || TA.busy) return; var l = (a.people || []).slice(), at = l.indexOf(email); if(on && at < 0) l.push(email); if(!on && at >= 0) l.splice(at, 1); a.people = l; }
+function taStart(tid, itemId){ var s = taSess(); if(!s || s.role !== 'trustee' || TA.busy || !TICKETS[tid]) return; TA.ask = { tid:tid, itemId:itemId, kind:'start', people:taPeopleDefault(TICKETS[tid]) }; TA.msg = null; taRender(); }
+function taCancel(){ if(TA.busy) return; TA.ask = null; taRender(); }
+function taConfirm(){ var a = TA.ask; if(!a || TA.busy) return; if(a.kind === 'start') taDoStart(a.tid, a.itemId); else taDoApprove(a.tid, a.itemId, a.kind === 'undo'); }
+async function taDoApprove(tid, itemId, undo){
+  var s = taSess(); if(!s || s.role !== 'trustee' || TA.busy) return;
+  var need = taNeed();
+  TA.busy = tid + '|' + itemId; taRender();
+  try {
+    var t = await taFresh(tid); if(!t) throw new Error('gone');
+    if(!taIsWaiting(t)){ TICKETS[tid] = t; TA.busy = ''; TA.ask = null; taToast('This ticket is no longer awaiting approval.', 'err'); return taLoad(); }
+    var it = taItems(t).filter(function(x){ return x.id === itemId; })[0];
+    if(!it){ TA.busy = ''; TA.ask = null; taToast('That quote is no longer on the ticket.', 'err'); return taLoad(); }
+    var approvals = (typeof getTicketApprovals === 'function' ? getTicketApprovals(t) : []).slice(), at = -1;
+    approvals.forEach(function(a, i){ if(a && a.quoteId === itemId && a.trusteeId === s.id) at = i; });
+    var money = taMoney(it.amount), label = it.name + (money ? ' (' + money + ')' : ''), moved = false;
+    t.log = t.log || [];
+    if(undo){ if(at >= 0){ approvals.splice(at, 1); t.log.push({ type:'status', text:'↩ Approval withdrawn by ' + s.name + ' (via the report page): ' + it.name, ts:Date.now() }); } }
+    else if(at < 0){ approvals.push({ quoteId:itemId, trusteeId:s.id, trusteeName:s.name, ts:Date.now(), recordedBy:null, viaReportPage:true }); t.log.push({ type:'status', text:'✓ ' + it.kind + ' approved by ' + s.name + ' (via the report page): ' + label, ts:Date.now() }); }
+    t.approvals = approvals; t.approvedQuoteId = null; t.approvedBy = null; t.approvedByName = null; t.approvedAt = null; t.updated = Date.now();
+    if(!undo && approvals.filter(function(a){ return a.quoteId === itemId; }).length >= need){ taToWip(t, label, 'the last approval was ' + s.name + '’s'); moved = true; }
+    var people = (TA.ask && TA.ask.people) || [], told = '';
+    await taSave(t);
+    if(!undo){ try { if(typeof _notifyAcceptedResidentProposals === 'function') await _notifyAcceptedResidentProposals(t); } catch(e){} }
+    if(moved) told = await taTell(t, itemId, people);
+    taToast(undo ? 'Your approval was taken back' : moved ? 'Approved — the ticket is now in progress.' + told : 'Approved — thank you', 'ok');
+  } catch(e){ taToast('That could not be saved — check your connection and try again.', 'err'); }
+  TA.busy = ''; TA.ask = null; await taLoad(); try { if(typeof ptLoad === 'function') ptLoad().then(ptRender); } catch(e){}
+}
+// An item already has enough approvals (given in the main app, say) but the ticket has not been moved yet.
+async function taDoStart(tid, itemId){
+  var s = taSess(); if(!s || s.role !== 'trustee' || TA.busy) return;
+  var t0 = TICKETS[tid], it0 = t0 ? taItems(t0).filter(function(x){ return x.id === itemId; })[0] : null; if(!it0) return;
+  TA.busy = tid + '|' + itemId; taRender();
+  try {
+    var t = await taFresh(tid);
+    if(!t || !taIsWaiting(t)){ TA.busy = ''; TA.ask = null; taToast('This ticket is no longer awaiting approval.', 'err'); return taLoad(); }
+    if(taVotes(t, itemId).length < taNeed()){ TA.busy = ''; TA.ask = null; taToast('That item no longer has ' + taNeed() + ' approvals.', 'err'); return taLoad(); }
+    var it = taItems(t).filter(function(x){ return x.id === itemId; })[0] || it0, money = taMoney(it.amount);
+    taToWip(t, it.name + (money ? ' (' + money + ')' : ''), 'moved by ' + s.name); t.updated = Date.now();
+    var people = (TA.ask && TA.ask.people) || [];
+    await taSave(t); var told = await taTell(t, itemId, people); taToast('The ticket is now in progress.' + told, 'ok');
+  } catch(e){ taToast('That could not be saved — check your connection and try again.', 'err'); }
+  TA.busy = ''; TA.ask = null; await taLoad(); try { if(typeof ptLoad === 'function') ptLoad().then(ptRender); } catch(e){}
+}
+// Open the quote's file: a stored link opens directly; a file kept inside the record opens as a copy.
+async function taDoc(id){
+  var inv = (typeof INVOICES !== 'undefined') ? INVOICES[id] : null;
+  if(!inv && typeof fetchMissingInvoices === 'function'){ try { await fetchMissingInvoices([id]); inv = INVOICES[id]; } catch(e){} }
+  var src = inv && (inv.url || inv.data || inv.file_data || '');
+  if(!src){ taToast('The quote’s file could not be loaded here — open the ticket in the main app.', 'err'); return; }
+  if(/^https:\/\//i.test(src)){ window.open(src, '_blank', 'noopener'); return; }
+  try {
+    var m = /^data:([^;,]+)[^,]*,(.*)$/.exec(src); if(!m) throw new Error('not a file');
+    var bin = atob(m[2]), buf = new Uint8Array(bin.length); for(var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([buf], { type:/^(application\/pdf|image\/(png|jpe?g|webp|gif))$/i.test(m[1]) ? m[1] : 'application/octet-stream' }));
+    var a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  } catch(e){ taToast('The quote’s file could not be opened here — open the ticket in the main app.', 'err'); }
+}
+function taInstall(){
+  if(TA.installed) return; TA.installed = true;
+  var pub = (typeof _PUBLIC_MODE !== 'undefined') ? _PUBLIC_MODE : null; if(!pub || pub.kind !== 'submit') return;
+  var tries = 0, tick = function(){ if(taMount()){ taRender(); var s = taSess(); if(s){ taLoad(); } return; } if(++tries < 30) setTimeout(tick, 300); }; tick();
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', taInstall); else taInstall();
+
 // ═══ Tracker look — the report page's design carried into the trustees' tracker ═══
 // Nothing about how the tracker works changes here: every field, button and id is the one the rest
 // of the app already uses. This file only (1) draws each ticket in the list as a card like the
