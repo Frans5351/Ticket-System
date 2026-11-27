@@ -1,5 +1,22 @@
 # Billing changelog
 
+## v2.47 — Tracker tidy-up: less on screen, nothing taken away
+**The tracker tab**
+- Each status chip now carries its own count ("Open 3", "On Hold 0" …). The separate row of summary cards under the toolbar is gone — it showed the same statuses and counts a second time.
+- The **Readings** button is out of the tracker toolbar; water and electricity readings are in the menu.
+
+**The ticket screen**
+- **Header:** ticket number and status only. The clipped copy of the description that sat next to them is gone (the description is the first thing below).
+- **Journey line:** one line — how long it has been open, how many events, last activity — plus the "Next:" hint. The row of small step dots and the second "Full timeline" link are gone; the status strip above and the Timeline button already do those jobs.
+- **Sub-tickets:** just the heading and the Add button until there are sub-tickets.
+- **Next-step panel:** shorter wording ("Work is under way. Mark it Done when it's finished — residents and the reporter are told.").
+- **Details:** "Date closed" only appears once the ticket is closed (or has a closed date).
+- **Reported by:** the "No users on file to link to" note is hidden when there is nobody to link.
+- **On the report page:** the explanations are one line each.
+- **Activity log:** starts open, so what residents see is visible straight away. Edit and Delete on each entry are small links instead of two full-width buttons; the note box is full width.
+- **"Resync"** is out of the header. It is at the very bottom as "Send this ticket to the server again", next to "Changes are saved as you make them."
+- No field was deleted and nothing about saving changed: hidden fields come back when they apply.
+
 ## v2.46 — Clearer step names on each issue
 - On "Current issues logged", the five steps under each issue now read **Reported · Obtaining quotes · Awaiting approval · In progress · Done** (they were "Quotes" and "Approval", which read as if the quotes were in and the approval given). On a phone the two longer names wrap onto two lines.
 
