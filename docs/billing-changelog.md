@@ -1,5 +1,33 @@
 # Billing changelog
 
+## v2.50 — Clearer "Add to your home screen" steps; the Park Manor site keeps its own name
+**Add to your home screen (report page)**
+- The steps are rewritten for people who are not technical, one tap per step, each with a small picture of the button to look for.
+- **iPhone (Safari):** 1. tap the three dots on the right of the address bar at the bottom → 2. tap Share → 3. scroll down and tap Add to Home Screen → 4. tap Add at the top right → 5. look for the icon. A note covers older iPhones, where the Share button is already on the bottom bar. It still explains that it only works in Safari, with the Copy the link button.
+- **Android — Chrome:** three dots at the top right → Add to Home screen (or Install app) → Install / Add → look for the icon.
+- **Samsung phones — Samsung Internet:** three lines at the bottom right → Add page to (or Add to) → Home screen → Add, with a fallback if the three lines are not there.
+- On Android both sets are shown, the one for the browser in use first. The one-tap Install button still appears when the browser offers it.
+
+**Naming**
+- The Park Manor site is back to its own names and icon for the trustees' side ("PM Admin"). The Stoep name and icon from v2.49 are kept aside for the separate Stoep site that will be set up later; nothing on the Park Manor site says Stoep.
+
+## v2.49 — The app has a name: Stoep
+- The main app (the trustees' and managing agent's side) is now called **Stoep** when it is added to a home screen, with a new icon: steps up to a door, on the same navy. The install page at `/admin` says Stoep too.
+- The residents' page is unchanged: it carries the community's own name ("Park Manor") and the teal icon.
+- Icons already on a home screen keep their old name until they are removed and added again.
+- Not changed yet: the web address, and the words "scheme" and "body corporate" inside the app. Those follow once the new address is chosen.
+
+## v2.48 — More than one scheme, phase 1: the residents' side
+The app already keeps each scheme's data apart (every record carries the scheme's prefix; Park Manor has none). This version makes the residents' side follow the scheme. The full audit and the remaining phases are in the project document *Multi_Scheme_Plan*.
+- **Resident links can name their scheme:** `?report&s=<scheme id>`, `?water&s=…`, `?electricity&s=…`. The scheme applies to that page load only — it never changes which scheme an admin has open in the main app. **Park Manor's links are unchanged** (no `&s=`).
+- Every resident link the app writes out — in Settings, in the readings reminders, in the home-screen hint — carries the scheme when it is not Park Manor.
+- The report page is named after its scheme (header, page title, home-screen wording). The entrance photo shows for Park Manor only.
+- Park Manor's own content does not show for another scheme until that scheme enters its own: the managing agent's numbers, the people who get the report emails, the WeconnectU row, the rules, and the standing meter-reading notice. Emergency numbers and City services show for every scheme.
+- A link naming a scheme that does not exist shows "This link is not quite right" over the page, so nothing can be sent into a scheme that is not there.
+- **Report emails now go only to that scheme's users.** The server used to read the trustees and managing-agent users of every scheme.
+- On a scheme's report page, a trustee or managing-agent login from another scheme is refused ("That login is not for …"). An admin login works across schemes.
+- Not yet per scheme (see the plan): logins in the main app, meter readings (12 houses assumed), the wording of emails, the embedded bank data, statement details, and the home-screen name and icon.
+
 ## v2.47 — Tracker tidy-up: less on screen, nothing taken away
 **The tracker tab**
 - Each status chip now carries its own count ("Open 3", "On Hold 0" …). The separate row of summary cards under the toolbar is gone — it showed the same statuses and counts a second time.

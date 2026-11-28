@@ -282,7 +282,9 @@ export default async function handler(req) {
     const rows = res.ok ? await res.json() : [];
     if (!res.ok) console.warn("send-edit-link: users query returned", res.status);
     let recipSeen = 0;
-    (Array.isArray(rows) ? rows : []).forEach((r) => {
+    // Users belong to a scheme by the prefix on their id ("ps:user_1"); the original scheme's have none.
+    const inScheme = (id) => (routePrefix ? String(id || "").startsWith(routePrefix) : !String(id || "").includes(":"));
+    (Array.isArray(rows) ? rows : []).filter((r) => r && inScheme(r.id)).forEach((r) => {
       const u = r && r.data ? r.data : r;
       // Management users always receive the notification. Trustees receive it
       // for ordinary reports too — but NOT for water meter readings, which are
